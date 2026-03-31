@@ -1,0 +1,55 @@
+CREATE DATABASE wfh_system;
+USE wfh_system;
+
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id VARCHAR(50) UNIQUE NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('admin', 'leader', 'member') NOT NULL,
+    department VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO users (employee_id, full_name, username, password, role, department) 
+VALUES ('ADM-001', 'Aung Thura Khant', 'admin', 'admin', 'admin', 'HR');
+
+INSERT INTO users (employee_id, full_name, username, password, role, department) 
+VALUES ('ADM-002', 'Aung Thura Khant', 'leader', 'leader', 'leader', 'IT');
+
+INSERT INTO users (employee_id, full_name, username, password, role, department) 
+VALUES ('ADM-003', 'Aung Thura Khant', 'member', 'member', 'member', 'IT');
+
+ALTER TABLE users ADD COLUMN current_status VARCHAR(20) DEFAULT 'Office';
+
+CREATE TABLE announcements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    sender_role ENUM('admin', 'leader') NOT NULL,
+    created_by VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE users ADD COLUMN current_status ENUM('Office', 'WFH') DEFAULT 'Office';
+
+ALTER TABLE users ADD COLUMN batch VARCHAR(50) AFTER department;
+
+CREATE TABLE IF NOT EXISTS projects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_name VARCHAR(255) NOT NULL,
+    created_by VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    project_id INT,
+    task_name VARCHAR(255),
+    assigned_to VARCHAR(100), -- Member Full Name
+    progress INT DEFAULT 0, -- 0 to 100%
+    status VARCHAR(50) DEFAULT 'Todo',
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
