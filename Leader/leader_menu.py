@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from Leader.leader_activity import LeaderActivity # Activity အတွက် Import လုပ်ခြင်း
 from Leader.leader_project import LeaderProject
+from Leader.leader_report_view import LeaderReportView
 
 class LeaderMenu:
     def __init__(self, sidebar, content, user):
@@ -11,7 +12,7 @@ class LeaderMenu:
         # Image (5) ပါ Design နှင့် Menu Items များအတိုင်း Fixed လုပ်ထားခြင်း
         self.add_nav_btn("📊  Dashboard", self.show_dashboard)
         self.add_nav_btn("📰  Activity", self.show_activity)
-        self.add_nav_btn("📝  Daily Report", self.show_reports)
+        self.add_nav_btn("📝  Daily Report", self.show_reports_list)
         self.add_nav_btn("📁  Project", self.show_project)
         self.add_nav_btn("🏠  WFH Schedule", self.show_schedule)
         self.add_nav_btn("📅  Attendance", self.show_attendance)
@@ -61,10 +62,13 @@ class LeaderMenu:
             error_lbl = ctk.CTkLabel(self.content, text=f"Error loading Leader Activity: {e}")
             error_lbl.pack(pady=20)
 
-    def show_reports(self):
-        """📝 Reviewing Member Reports"""
+    def show_reports_list(self):
+        """View all reports from members"""
         self.clear_content()
-        ctk.CTkLabel(self.content, text="Member Daily Reports Review", font=("Arial", 22)).pack(pady=20)
+        # Now we only import and call one thing. 
+        # No callbacks or extra methods needed in this file!
+        from Leader.leader_report_view import LeaderReportView
+        LeaderReportView(self.content).pack(fill="both", expand=True)
 
     def show_project(self):
         """📁 Project Management View Integration"""

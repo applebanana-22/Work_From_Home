@@ -142,3 +142,4 @@ class TaskManagerWindow(ctk.CTkToplevel):
                 self.refresh_tasks()
             except Exception as e:
                 messagebox.showerror("Error", str(e), parent=self)
+                
