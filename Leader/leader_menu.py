@@ -67,7 +67,6 @@ class LeaderMenu:
         self.clear_content()
         # Now we only import and call one thing. 
         # No callbacks or extra methods needed in this file!
-        from Leader.leader_report_view import LeaderReportView
         LeaderReportView(self.content).pack(fill="both", expand=True)
 
     def show_project(self):
