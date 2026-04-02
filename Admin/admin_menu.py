@@ -1,21 +1,23 @@
 import customtkinter as ctk
 from Admin.admin_users import AdminUsers
 from Admin.admin_activity import AdminAnnouncements 
+# 1. Import your new Team Management class here
+from Admin.admin_teams import AdminTeams
 
 class AdminMenu:
     def __init__(self, sidebar, content, user):
         self.sidebar = sidebar
         self.content = content
         self.user = user
-        self.nav_buttons = [] # Track buttons to manage active states
+        self.nav_buttons = [] 
 
         # Navigation Buttons
-        # Icons stay the same, but colors will adapt
         self.add_nav_btn("📰   Activity", self.show_activity)
         self.add_nav_btn("👥   User Management", self.show_users)
+        # 2. Add the new Create Team button here
+        self.add_nav_btn("🛡️   Team Management", self.show_teams) 
         self.add_nav_btn("📅   Attendance", self.show_logs)
 
-        # Initial View
         self.show_activity()
 
     def add_nav_btn(self, text, command):
@@ -25,7 +27,6 @@ class AdminMenu:
             text=text, 
             command=lambda: self.on_btn_click(btn, command), 
             fg_color="transparent", 
-            # FIX: Light Mode = Dark Gray (#333333), Dark Mode = Light Gray (#D1D1D1)
             text_color=("#333333", "#D1D1D1"), 
             hover_color=("#E0E0E0", "#2B2B2B"), 
             anchor="w", 
@@ -38,31 +39,27 @@ class AdminMenu:
 
     def on_btn_click(self, clicked_btn, command):
         """Visual feedback when a button is selected"""
-        # Reset all buttons to transparent
         for btn in self.nav_buttons:
-            btn.configure(fg_color="transparent")
+            # Reset text color to adaptive gray when unselected
+            btn.configure(fg_color="transparent", text_color=("#333333", "#D1D1D1"))
         
-        # Highlight selected button with professional blue
+        # Highlight selected
         clicked_btn.configure(fg_color=("#3498DB", "#1f538d"), text_color="white")
         command()
 
     def clear_content(self):
-        """Clear content area for new view"""
         for widget in self.content.winfo_children():
             widget.destroy()
 
     def show_activity(self):
-        """📰 Admin Announcements View"""
         self.clear_content()
         try:
-            # Ensure AdminAnnouncements uses adaptive colors internally too
             activity_view = AdminAnnouncements(self.content, self.user)
             activity_view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error("Activity", e)
 
     def show_users(self):
-        """👥 User Management (CRUD) View"""
         self.clear_content()
         try:
             users_view = AdminUsers(self.content, self.user)
@@ -70,18 +67,25 @@ class AdminMenu:
         except Exception as e:
             self.show_error("User Management", e)
 
+    # 3. Add the new View Method
+    def show_teams(self):
+        self.clear_content()
+        try:
+            teams_view = AdminTeams(self.content, self.user)
+            teams_view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error("Team Management", e)
+
     def show_logs(self):
-        """📅 System Access Logs View"""
         self.clear_content()
         ctk.CTkLabel(
             self.content, 
             text="System Logs - Access History", 
             font=("Arial", 22, "bold"),
-            text_color=("#2C3E50", "#FFFFFF") # Adaptive Heading
+            text_color=("#2C3E50", "#FFFFFF") 
         ).pack(pady=20)
 
     def show_error(self, view_name, error):
-        """Standardized error display"""
         error_lbl = ctk.CTkLabel(
             self.content, 
             text=f"Error loading {view_name}: {error}",

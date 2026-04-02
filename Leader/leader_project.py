@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
+# Ensure this import matches your actual file structure for the TaskManager
 from Leader.task_manager import TaskManagerWindow
 
 class LeaderProject(ctk.CTkFrame):
@@ -31,25 +32,38 @@ class LeaderProject(ctk.CTkFrame):
         self.refresh_projects()
 
     def refresh_projects(self):
-        for w in self.list_frame.winfo_children(): w.destroy()
+        """Clears and re-populates the project list filtered by the leader's team_id"""
+        # 1. Clear existing cards to prevent duplication
+        for w in self.list_frame.winfo_children(): 
+            w.destroy()
         
         try:
-            self.db.cursor.execute("SELECT * FROM projects ORDER BY id DESC")
+            # 2. Filter query by team_id so leaders only see their own team's projects
+            # This ensures Team 1 projects don't show up for other team leaders
+            sql = "SELECT * FROM projects WHERE team_id = %s ORDER BY id DESC"
+            self.db.cursor.execute(sql, (self.user['team_id'],))
             projects = self.db.cursor.fetchall()
             
+            if not projects:
+                ctk.CTkLabel(self.list_frame, text="No projects found for your team.", 
+                             text_color="gray", font=("Arial", 14)).pack(pady=40)
+                return
+
             for proj in projects:
+                # --- Card Container ---
                 card = ctk.CTkFrame(self.list_frame, corner_radius=12, border_width=1, 
                                     fg_color=("#FFFFFF", "#1E1E1E"), 
                                     border_color=("#E0E0E0", "#333333"))
                 card.pack(fill="x", pady=8, padx=10)
                 
-                # --- Left: Info ---
+                # --- Left: Info Section ---
                 info_f = ctk.CTkFrame(card, fg_color="transparent")
                 info_f.pack(side="left", padx=20, pady=15)
                 
                 ctk.CTkLabel(info_f, text=proj['project_name'], font=("Arial", 16, "bold"),
                              text_color=("#2D3436", "#ECF0F1")).pack(anchor="w")
                 
+                # Dynamic status color based on progress string
                 status_color = "#F1C40F" if "Pending" in proj['status'] else "#2ECC71"
                 ctk.CTkLabel(info_f, text=f"● {proj['status']}", font=("Arial", 12),
                              text_color=status_color).pack(anchor="w")
@@ -58,32 +72,64 @@ class LeaderProject(ctk.CTkFrame):
                 btn_f = ctk.CTkFrame(card, fg_color="transparent")
                 btn_f.pack(side="right", padx=20)
                 
-                # Manage Tasks
-                ctk.CTkButton(btn_f, text="Manage", width=80, height=32, 
-                              fg_color="#3498DB", command=lambda p=proj: 
-                              TaskManagerWindow(self, p['id'], p['project_name'])).pack(side="left", padx=5)
+                # 1. Manage Tasks Button
+                ctk.CTkButton(
+                    btn_f, 
+                    text="Manage", 
+                    width=80, 
+                    height=32, 
+                    fg_color="#3498DB", 
+                    command=lambda p=proj: TaskManagerWindow(
+                        self, 
+                        p['id'], 
+                        p['project_name'], 
+                        self.user
+                    )
+                ).pack(side="left", padx=5)
 
-                # Edit Project (Update Feature)
-                ctk.CTkButton(btn_f, text="Edit", width=60, height=32, 
-                              fg_color="#F39C12", hover_color="#D35400",
-                              command=lambda p=proj: self.update_project(p['id'], p['project_name'])).pack(side="left", padx=5)
+                # 2. Edit Project Button
+                ctk.CTkButton(
+                    btn_f, 
+                    text="Edit", 
+                    width=60, 
+                    height=32, 
+                    fg_color="#F39C12", 
+                    hover_color="#D35400",
+                    command=lambda p=proj: self.update_project(p['id'], p['project_name'])
+                ).pack(side="left", padx=5)
 
-                # Delete
-                ctk.CTkButton(btn_f, text="Delete", width=60, height=32, 
-                              fg_color="transparent", text_color="#E74C3C", 
-                              hover_color=("#FEE2E2", "#2D1A1A"),
-                              command=lambda pid=proj['id']: self.delete_project(pid)).pack(side="left", padx=5)
+                # 3. Delete Button
+                ctk.CTkButton(
+                    btn_f, 
+                    text="Delete", 
+                    width=60, 
+                    height=32, 
+                    fg_color="transparent", 
+                    text_color="#E74C3C", 
+                    hover_color=("#FEE2E2", "#2D1A1A"),
+                    command=lambda pid=proj['id']: self.delete_project(pid)
+                ).pack(side="left", padx=5)
                 
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"Database Error in refresh_projects: {e}")
 
     def open_create_project(self):
+        """CRUD: Create New Project with Team Association"""
         dialog = ctk.CTkInputDialog(text="Enter Project Name:", title="New Project")
         p_name = dialog.get_input()
         if p_name:
             try:
-                sql = "INSERT INTO projects (project_name, created_by, status) VALUES (%s, %s, %s)"
-                self.db.cursor.execute(sql, (p_name, self.user['full_name'], 'Pending'))
+                # ADDED team_id to the INSERT statement
+                sql = "INSERT INTO projects (project_name, created_by, team_id, status) VALUES (%s, %s, %s, %s)"
+                
+                # Use self.user['team_id'] to lock this project to Team 1, Team 2, etc.
+                self.db.cursor.execute(sql, (
+                    p_name.strip(), 
+                    self.user['full_name'], 
+                    self.user['team_id'], 
+                    'Pending'
+                ))
+                
                 self.db.conn.commit()
                 self.refresh_projects()
             except Exception as e:
@@ -106,6 +152,7 @@ class LeaderProject(ctk.CTkFrame):
                     messagebox.showerror("Error", str(e))
 
     def delete_project(self, pid):
+        """CRUD: Delete Project"""
         if messagebox.askyesno("Confirm", "Delete this project and all related tasks?"):
             try:
                 self.db.cursor.execute("DELETE FROM projects WHERE id=%s", (pid,))
