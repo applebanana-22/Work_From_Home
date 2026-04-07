@@ -1,4 +1,6 @@
 import mysql.connector
+import os
+from datetime import datetime
 
 class Database:
     def __init__(self):
@@ -63,3 +65,25 @@ class Database:
         except Exception as e:
             print(f"Error deleting team: {e}")
             return False
+        
+    def check_in_user(self, user_id, location):
+        """Inserts a new record for today"""
+        today = datetime.now().strftime('%Y-%m-%d')
+        now = datetime.now().strftime('%H:%M:%S')
+        
+        sql = """
+            INSERT INTO attendance (user_id, attendance_date, check_in, location_type)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE check_in = VALUES(check_in)
+        """
+        self.cursor.execute(sql, (user_id, today, now, location))
+        self.conn.commit()
+
+    def check_out_user(self, user_id):
+        """Updates today's record with a check-out time"""
+        today = datetime.now().strftime('%Y-%m-%d')
+        now = datetime.now().strftime('%H:%M:%S')
+        
+        sql = "UPDATE attendance SET check_out = %s WHERE user_id = %s AND attendance_date = %s"
+        self.cursor.execute(sql, (now, user_id, today))
+        self.conn.commit()

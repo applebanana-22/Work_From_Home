@@ -4,6 +4,8 @@ from Admin.admin_menu import AdminMenu
 from Leader.leader_menu import LeaderMenu
 from Member.member_menu import MemberMenu
 from tkinter import messagebox
+import datetime
+from datetime import datetime
 
 class Dashboard(ctk.CTk):
     def __init__(self, user_data):
@@ -88,35 +90,51 @@ class Dashboard(ctk.CTk):
         ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 13, "bold")).pack(side="left", padx=5)
 
     def setup_bottom_sidebar(self):
-        """Includes the Mode Switcher and Logout"""
+        """Includes Theme, Attendance (Check-in/out), Status, and Logout"""
         bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         bottom_frame.pack(side="bottom", fill="x", padx=15, pady=20)
 
-        # --- THEME SWITCHER ---
-        ctk.CTkLabel(bottom_frame, text="Appearance", font=("Arial", 11, "bold"), text_color="gray70").pack(anchor="w", padx=5)
+        # --- 1. ATTENDANCE (Check-in / Check-out) ---
+        ctk.CTkLabel(bottom_frame, text="Attendance", font=("Arial", 11, "bold"), text_color="gray70").pack(anchor="w", padx=5)
         
-        self.theme_switch = ctk.CTkSwitch(
-            bottom_frame, text="Dark Mode", 
-            command=self.change_appearance_mode,
-            progress_color="#3498DB"
+        # We store the state in self.is_checked_in (You should ideally fetch this from DB on login)
+        self.is_checked_in = False 
+        
+        self.attendance_btn = ctk.CTkButton(
+            bottom_frame, 
+            text="📍 Check-in Now", 
+            fg_color="#2ECC71", 
+            hover_color="#27AE60",
+            height=35,
+            font=("Arial", 12, "bold"),
+            command=self.toggle_attendance
         )
-        self.theme_switch.select() # Default to Dark
-        self.theme_switch.pack(pady=(5, 15), padx=5, anchor="w")
+        self.attendance_btn.pack(fill="x", pady=(5, 15))
 
-        # --- STATUS SWITCHER ---
-        ctk.CTkLabel(bottom_frame, text="Your Status", font=("Arial", 11, "bold"), text_color="gray70").pack(anchor="w", padx=5)
+        # --- 2. STATUS SWITCHER (Office / WFH) ---
+        ctk.CTkLabel(bottom_frame, text="Your Location", font=("Arial", 11, "bold"), text_color="gray70").pack(anchor="w", padx=5)
         
         self.status_switch = ctk.CTkSegmentedButton(
             bottom_frame, 
             values=["🏢 Office", "🏠 WFH"],
             command=self.update_status,
-            selected_color="#1E8449"
+            selected_color="#3498DB"
         )
         self.status_switch.pack(fill="x", pady=(5, 15))
         
         current = self.user.get('current_status', 'Office')
         self.status_switch.set("🏢 Office" if current == "Office" else "🏠 WFH")
 
+        # --- 3. THEME SWITCHER ---
+        self.theme_switch = ctk.CTkSwitch(
+            bottom_frame, text="Dark Mode", 
+            command=self.change_appearance_mode,
+            progress_color="#3498DB"
+        )
+        self.theme_switch.select() 
+        self.theme_switch.pack(pady=(5, 15), padx=5, anchor="w")
+
+        # --- 4. LOGOUT ---
         self.logout_btn = ctk.CTkButton(
             bottom_frame, text="🚪 Logout", fg_color="transparent", 
             text_color="#E74C3C", hover_color=("#FADBD8", "#2B2B2B"), anchor="w",
@@ -149,6 +167,28 @@ class Dashboard(ctk.CTk):
             self.db.conn.commit()
         except Exception as e:
             print(f"Update error: {e}")
+    
+    def toggle_attendance(self):
+        location = "Office" if "Office" in self.status_switch.get() else "WFH"
+        
+        if not self.is_checked_in:
+            if messagebox.askyesno("Check-in", "Confirm Check-in?"):
+                try:
+                    self.db.check_in_user(self.user['id'], location) # DB Call
+                    self.is_checked_in = True
+                    self.attendance_btn.configure(text="🚩 Check-out", fg_color="#E74C3C")
+                    messagebox.showinfo("Success", "Check-in recorded!")
+                except Exception as e:
+                    messagebox.showerror("Error", str(e))
+        else:
+            if messagebox.askyesno("Check-out", "Confirm Check-out?"):
+                try:
+                    self.db.check_out_user(self.user['id']) # DB Call
+                    self.is_checked_in = False
+                    self.attendance_btn.configure(text="📍 Check-in Now", fg_color="#2ECC71")
+                    messagebox.showinfo("Success", "Check-out recorded!")
+                except Exception as e:
+                    messagebox.showerror("Error", str(e))
 
     def logout_event(self):
         if messagebox.askyesno("Logout", "Are you sure you want to logout?"):

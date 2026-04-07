@@ -107,3 +107,16 @@ CREATE TABLE IF NOT EXISTS overtime (
 
 ALTER TABLE overtime 
 MODIFY COLUMN status ENUM('Pending', 'Accepted', 'Rejected', 'Approved') DEFAULT 'Pending';
+
+CREATE TABLE attendance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    attendance_date DATE NOT NULL,
+    check_in TIME DEFAULT NULL,
+    check_out TIME DEFAULT NULL,
+    location_type ENUM('Office', 'WFH') DEFAULT 'Office',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    -- Prevent duplicate rows for the same user on the same day
+    UNIQUE KEY unique_user_date (user_id, attendance_date)
+);
