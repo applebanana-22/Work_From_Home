@@ -1,106 +1,92 @@
 import customtkinter as ctk
-from Leader.leader_activity import LeaderActivity # Activity အတွက် Import လုပ်ခြင်း
+from Leader.leader_activity import LeaderActivity 
 from Leader.leader_project import LeaderProject
 from Leader.leader_report_view import LeaderReportView
 from Leader.leader_overtime import LeaderOvertime
+from Leader.leader_dashboard import LeaderDashboard # Dashboard file အသစ်ကို import လုပ်ခြင်း
 
 class LeaderMenu:
-    def __init__(self, sidebar, content, user):
+    def __init__(self, sidebar, content, user, db=None):
         self.sidebar = sidebar
         self.content = content
         self.user = user
+        self.db = db
 
-        # Image (5) ပါ Design နှင့် Menu Items များအတိုင်း Fixed လုပ်ထားခြင်း
-        self.add_nav_btn("📊  Dashboard", self.show_dashboard)
-        self.add_nav_btn("📰  Activity", self.show_activity)
-        self.add_nav_btn("📝  Daily Report", self.show_reports_list)
-        self.add_nav_btn("📁  Project", self.show_project)
-        self.add_nav_btn("🏠  WFH Schedule", self.show_schedule)
-        self.add_nav_btn("📅  Attendance", self.show_attendance)
-        self.add_nav_btn("⏰  Overtime Requests", self.show_overtime)
-
-        # Dashboard ကို Default View အဖြစ် သတ်မှတ်ခြင်း
+        # Navigation Buttons Setup
+        self.setup_menu()
+        
+        # Default View
         self.show_dashboard()
 
+    def setup_menu(self):
+        menus = [
+            ("📊  Dashboard", self.show_dashboard),
+            ("📰  Activity", self.show_activity),
+            ("📝  Daily Report", self.show_reports_list),
+            ("📁  Project", self.show_project),
+            ("🏠  WFH Schedule", self.show_schedule),
+            ("📅  Attendance", self.show_attendance),
+            ("⏰  Overtime Requests", self.show_overtime)
+        ]
+        for text, cmd in menus:
+            self.add_nav_btn(text, cmd)
+
     def add_nav_btn(self, text, command):
-        """Sidebar ခလုတ်များအတွက် Modern UI Style သတ်မှတ်ခြင်း"""
         btn = ctk.CTkButton(
-            self.sidebar, 
-            text=text, 
-            command=command, 
-            fg_color="transparent", 
-            text_color="#D1D1D1", # Grayish white text
-            hover_color="#2b2b2b", 
-            anchor="w", 
-            height=42,
-            font=("Arial", 13),
-            corner_radius=8
+            self.sidebar, text=text, command=command, 
+            fg_color="transparent", text_color="#D1D1D1", 
+            hover_color="#2b2b2b", anchor="w", height=42,
+            font=("Arial", 13), corner_radius=8
         )
         btn.pack(fill="x", padx=12, pady=2)
 
     def clear_content(self):
-        """Content area ရှိ widget ဟောင်းများကို ဖျက်ထုတ်ခြင်း"""
         for widget in self.content.winfo_children():
             widget.destroy()
 
+    # --- View Switching Logic ---
+
     def show_dashboard(self):
-        """📊 Team Overview Dashboard"""
         self.clear_content()
-        ctk.CTkLabel(
-            self.content, 
-            text="Leader Dashboard – Team Overview", 
-            font=("Arial", 24, "bold"),
-            text_color="gray80"
-        ).pack(expand=True)
+        try:
+            # Separate file ထဲက Dashboard class ကို ခေါ်ယူခြင်း
+            dash = LeaderDashboard(self.content, self.user, self.db)
+            dash.pack(fill="both", expand=True)
+        except Exception as e:
+            ctk.CTkLabel(self.content, text=f"Error loading Dashboard: {e}").pack(pady=20)
 
     def show_activity(self):
-        """📰 Team & Admin Announcements (Integrated with LeaderActivity)"""
         self.clear_content()
         try:
-            # LeaderActivity class ကို ခေါ်ယူအသုံးပြုခြင်း
-            activity_view = LeaderActivity(self.content, self.user)
-            activity_view.pack(fill="both", expand=True)
+            LeaderActivity(self.content, self.user).pack(fill="both", expand=True)
         except Exception as e:
-            error_lbl = ctk.CTkLabel(self.content, text=f"Error loading Leader Activity: {e}")
-            error_lbl.pack(pady=20)
-
-    def show_reports_list(self):
-        """View all reports from members"""
-        self.clear_content()
-        # Now we only import and call one thing. 
-        # No callbacks or extra methods needed in this file!
-        LeaderReportView(self.content).pack(fill="both", expand=True)
+            ctk.CTkLabel(self.content, text=f"Error: {e}").pack(pady=20)
 
     def show_project(self):
-        """📁 Project Management View Integration"""
         self.clear_content()
         try:
-            # LeaderProject class ကို ခေါ်ယူအသုံးပြုခြင်း
-            project_view = LeaderProject(self.content, self.user)
-            project_view.pack(fill="both", expand=True)
+            LeaderProject(self.content, self.user).pack(fill="both", expand=True)
         except Exception as e:
-            error_lbl = ctk.CTkLabel(self.content, text=f"Error loading Projects: {e}")
-            error_lbl.pack(pady=20)
+            ctk.CTkLabel(self.content, text=f"Error: {e}").pack(pady=20)
+
+    def show_overtime(self):
+        self.clear_content()
+        try:
+            LeaderOvertime(self.content, self.user).pack(fill="both", expand=True)
+        except Exception as e:
+            ctk.CTkLabel(self.content, text=f"Error: {e}").pack(pady=20)
+
+    def show_reports_list(self):
+        self.clear_content()
+        try:
+            LeaderReportView(self.content).pack(fill="both", expand=True)
+        except Exception as e:
+            ctk.CTkLabel(self.content, text=f"Error: {e}").pack(pady=20)
 
     def show_schedule(self):
-        """🏠 WFH Schedule"""
         self.clear_content()
         ctk.CTkLabel(self.content, text="Team WFH/Office Schedule", font=("Arial", 22)).pack(pady=20)
 
     def show_attendance(self):
-        """📅 Attendance Tracking"""
         self.clear_content()
         ctk.CTkLabel(self.content, text="Team Attendance Logs", font=("Arial", 22)).pack(pady=20)
-        
-    def show_overtime(self):
-        """⏰ Overtime Management View Integration"""
-        self.clear_content()
-        try:
-            # LeaderOvertime class ကို ခေါ်ယူအသုံးပြုခြင်း
-            # self.content ကိုအသုံးပြုပြီး style တူအောင် ချိန်ညှိထားပါတယ်
-            ot_view = LeaderOvertime(self.content, self.user)
-            ot_view.pack(fill="both", expand=True)
-        except Exception as e:
-            # Error တက်ခဲ့ရင် user ကို label နဲ့ ပြသပေးဖို့ဖြစ်ပါတယ်
-            error_lbl = ctk.CTkLabel(self.content, text=f"Error loading Overtime: {e}")
-            error_lbl.pack(pady=20)
