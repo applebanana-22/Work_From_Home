@@ -2,6 +2,7 @@ import customtkinter as ctk
 from Leader.leader_activity import LeaderActivity # Activity အတွက် Import လုပ်ခြင်း
 from Leader.leader_project import LeaderProject
 from Leader.leader_report_view import LeaderReportView
+from Leader.leader_overtime import LeaderOvertime
 
 class LeaderMenu:
     def __init__(self, sidebar, content, user):
@@ -16,6 +17,7 @@ class LeaderMenu:
         self.add_nav_btn("📁  Project", self.show_project)
         self.add_nav_btn("🏠  WFH Schedule", self.show_schedule)
         self.add_nav_btn("📅  Attendance", self.show_attendance)
+        self.add_nav_btn("⏰  Overtime Requests", self.show_overtime)
 
         # Dashboard ကို Default View အဖြစ် သတ်မှတ်ခြင်း
         self.show_dashboard()
@@ -89,3 +91,16 @@ class LeaderMenu:
         """📅 Attendance Tracking"""
         self.clear_content()
         ctk.CTkLabel(self.content, text="Team Attendance Logs", font=("Arial", 22)).pack(pady=20)
+        
+    def show_overtime(self):
+        """⏰ Overtime Management View Integration"""
+        self.clear_content()
+        try:
+            # LeaderOvertime class ကို ခေါ်ယူအသုံးပြုခြင်း
+            # self.content ကိုအသုံးပြုပြီး style တူအောင် ချိန်ညှိထားပါတယ်
+            ot_view = LeaderOvertime(self.content, self.user)
+            ot_view.pack(fill="both", expand=True)
+        except Exception as e:
+            # Error တက်ခဲ့ရင် user ကို label နဲ့ ပြသပေးဖို့ဖြစ်ပါတယ်
+            error_lbl = ctk.CTkLabel(self.content, text=f"Error loading Overtime: {e}")
+            error_lbl.pack(pady=20)
