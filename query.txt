@@ -106,4 +106,4 @@ CREATE TABLE IF NOT EXISTS overtime (
 );
 
 ALTER TABLE overtime 
-MODIFY COLUMN status ENUM('Pending', 'Accepted', 'Declined', 'Canceled') DEFAULT 'Pending';
+MODIFY COLUMN status ENUM('Pending', 'Accepted', 'Rejected', 'Approved') DEFAULT 'Pending';
