@@ -120,3 +120,31 @@ CREATE TABLE attendance (
     -- Prevent duplicate rows for the same user on the same day
     UNIQUE KEY unique_user_date (user_id, attendance_date)
 );
+
+CREATE TABLE leave_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    leave_type ENUM('Sick Leave', 'Casual Leave', 'Vacation', 'Other') NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT,
+    status ENUM('Pending', 'Approved', 'Rejected') DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+ALTER TABLE leave_requests 
+ADD COLUMN is_half_day BOOLEAN DEFAULT FALSE;
+
+
+CREATE TABLE wfh_schedules (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    leader_id INT NOT NULL,
+    schedule_date DATE NOT NULL,
+    status ENUM('Office', 'WFH') NOT NULL,
+    UNIQUE KEY unique_schedule (user_id, schedule_date),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+pip install reportlab
