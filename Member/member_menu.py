@@ -4,6 +4,7 @@ from Member.member_dashboard import MemberDashboard
 from Member.member_activity import MemberActivity
 from Member.member_project import MemberProject
 from Member.member_report import MemberReportFrame
+from Member.member_schedule import MemberSchedule
 
 class MemberMenu:
     def __init__(self, sidebar, content, user):
@@ -93,7 +94,12 @@ class MemberMenu:
         
     def show_schedule(self):
         self.clear()
-        ctk.CTkLabel(self.content, text="Member WFH/Office Schedule", font=("Arial", 22)).pack(pady=20) 
+        try:
+            # Initialize the actual class we built
+            view = MemberSchedule(self.content, self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Schedule View Error: {e}")
 
 
     
