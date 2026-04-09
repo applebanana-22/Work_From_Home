@@ -92,4 +92,9 @@ class LeaderMenu:
 
     def show_attendance(self):
         self.clear_content()
-        ctk.CTkLabel(self.content, text="Team Attendance Logs", font=("Arial", 22)).pack(pady=20)
+        try:
+            from Leader.leader_attendance import LeaderAttendance
+            view = LeaderAttendance(self.content, self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            ctk.CTkLabel(self.content, text=f"Error loading Attendance: {e}", text_color="red").pack(pady=20)

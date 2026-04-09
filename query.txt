@@ -148,3 +148,7 @@ CREATE TABLE wfh_schedules (
 );
 
 pip install reportlab
+
+ALTER TABLE wfh_schedules MODIFY COLUMN status VARCHAR(25);
+
+ALTER TABLE leave_requests ADD COLUMN total_days DECIMAL(4,2) AFTER is_half_day;

@@ -27,6 +27,7 @@ class MemberMenu:
         self.add_nav_btn("⏰ Overtime", self.show_overtime)
         self.add_nav_btn("📅 Leave Request", self.show_leave_request)
         self.add_nav_btn("🏠 WFH Schedule", self.show_schedule)
+        self.add_nav_btn("🚪 Attendance", self.show_attendance)
 
 
     def add_nav_btn(self, text, command):
@@ -100,6 +101,16 @@ class MemberMenu:
             view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error(f"Schedule View Error: {e}")
+    
+    
+    def show_attendance(self):
+        self.clear()
+        try:
+            from Member.member_attendance import MemberAttendance
+            view = MemberAttendance(self.content, self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Attendance View Error: {e}")
 
 
     

@@ -36,13 +36,13 @@ class MemberLeave(ctk.CTkFrame):
         inner = ctk.CTkFrame(form_card, fg_color="transparent")
         inner.pack(pady=30, padx=30, fill="x")
 
-        # --- ROW 0: USE DATE RANGE TOGGLE ---
+        # --- DATE RANGE TOGGLE ---
         self.use_range_var = ctk.BooleanVar(value=False)
         self.range_check = ctk.CTkSwitch(inner, text="Enable Date Range (Long Leave)", 
                                          variable=self.use_range_var, command=self.update_day_count)
         self.range_check.grid(row=0, column=0, columnspan=2, padx=10, pady=(0, 15), sticky="w")
 
-        # --- ROW 1: START & END DATES ---
+        # --- START & END DATES ---
         ctk.CTkLabel(inner, text="Start Date:").grid(row=1, column=0, sticky="w", padx=10)
         self.start_cal = DateEntry(inner, width=20, background='#3498DB', date_pattern='yyyy-mm-dd')
         self.start_cal.grid(row=2, column=0, padx=10, pady=(0, 15), sticky="w")
@@ -51,63 +51,61 @@ class MemberLeave(ctk.CTkFrame):
         self.end_cal = DateEntry(inner, width=20, background='#3498DB', date_pattern='yyyy-mm-dd')
         self.end_cal.grid(row=2, column=1, padx=10, pady=(0, 15), sticky="w")
 
-        # --- ROW 3: LEAVE TYPE ---
+        # --- LEAVE TYPE ---
         ctk.CTkLabel(inner, text="Leave Type:").grid(row=3, column=0, sticky="w", padx=10)
         self.type_var = ctk.StringVar(value="Sick Leave")
-        ctk.CTkOptionMenu(inner, values=["Sick Leave", "Casual Leave", "Vacation"], variable=self.type_var, width=250).grid(row=4, column=0, columnspan=2, padx=10, pady=(0, 15), sticky="w")
+        ctk.CTkOptionMenu(inner, values=["Sick Leave", "Casual Leave", "Vacation"], 
+                          variable=self.type_var, width=250).grid(row=4, column=0, columnspan=2, padx=10, pady=(0, 15), sticky="w")
 
-        # --- ROW 5: ADD HALF DAY (+0.5) ---
+        # --- HALF DAY CHECKBOX ---
         self.add_half_var = ctk.BooleanVar(value=False)
         self.half_day_check = ctk.CTkCheckBox(inner, text="Add Half-Day (+0.5 days)", 
                                               variable=self.add_half_var, command=self.update_day_count)
         self.half_day_check.grid(row=5, column=0, columnspan=2, padx=10, pady=(0, 15), sticky="w")
 
-        # --- ROW 6: DURATION DISPLAY ---
+        # --- DURATION DISPLAY ---
         self.count_lbl = ctk.CTkLabel(inner, text="Total Duration: 0 Day(s)", font=("Arial", 16, "bold"), text_color="gray")
         self.count_lbl.grid(row=6, column=0, sticky="w", padx=10, pady=(0, 15))
 
-        # --- ROW 7: REASON ---
+        # --- REASON ---
         ctk.CTkLabel(inner, text="Reason:").grid(row=7, column=0, sticky="w", padx=10)
         self.reason_txt = ctk.CTkTextbox(inner, height=80, width=500)
         self.reason_txt.grid(row=8, column=0, columnspan=2, padx=10, pady=(0, 20), sticky="w")
 
-        # --- ROW 9: SUBMIT ---
+        # --- SUBMIT ---
         ctk.CTkButton(inner, text="Submit Request", fg_color="#10B981", height=40, width=200, 
                       command=self.submit_leave).grid(row=9, column=0, columnspan=2, pady=10)
 
-        # Binds
         self.start_cal.bind("<<DateEntrySelected>>", lambda e: self.update_day_count())
         self.end_cal.bind("<<DateEntrySelected>>", lambda e: self.update_day_count())
-        
         self.update_day_count()
 
     def update_day_count(self):
         total = 0.0
-        
-        # 1. Base calculation from range
+        # ၁ ရက်ပဲယူတာလား ဒါမှမဟုတ် ရက်ရှည် (Range) လား စစ်ဆေးပါတယ်
         if self.use_range_var.get():
             start = self.start_cal.get_date()
             end = self.end_cal.get_date()
             diff = (end - start).days + 1
             if diff > 0:
                 total = float(diff)
-        
-        # 2. Add the half-day bonus
+        else:
+            # Range ပိတ်ထားရင် Default ၁ ရက်လို့ ယူဆပါတယ် (Half-day မဟုတ်ရင်)
+            total = 1.0 if not self.add_half_var.get() else 0.0
+
         if self.add_half_var.get():
-            total += 0.5
+            total += 0.5 if self.use_range_var.get() else 0.5
             
-        # 3. UI Update
         if total == 0:
             self.count_lbl.configure(text="Total Duration: 0 Day(s)", text_color="gray")
         else:
             self.count_lbl.configure(text=f"Total Duration: {total} Day(s)", text_color="#3498DB")
-            
         return total
 
     def submit_leave(self):
         total = self.update_day_count()
         if total <= 0:
-            messagebox.showerror("Error", "Duration cannot be 0. Please enable range or half-day.")
+            messagebox.showerror("Error", "Duration cannot be 0.")
             return
             
         l_type = self.type_var.get()
@@ -117,10 +115,13 @@ class MemberLeave(ctk.CTkFrame):
         is_hd = 1 if self.add_half_var.get() else 0
 
         try:
-            sql = """INSERT INTO leave_requests (user_id, leave_type, start_date, end_date, reason, is_half_day) 
-                     VALUES (%s, %s, %s, %s, %s, %s)"""
-            self.db.cursor.execute(sql, (self.user['id'], l_type, start, end, reason, is_hd))
-            self.db.conn.commit()
+            sql = """INSERT INTO leave_requests (user_id, leave_type, start_date, end_date, reason, is_half_day, total_days) 
+                     VALUES (%s, %s, %s, %s, %s, %s, %s)"""
+            self.db.cursor.execute(sql, (self.user['id'], l_type, start, end, reason, is_hd, total))
+            
+            # ပြင်ဆင်ရန်: .connection အစား .conn ကို သုံးပါ
+            self.db.conn.commit() 
+            
             messagebox.showinfo("Success", f"Request Sent! Total: {total} Days")
             self.show_list_view()
         except Exception as e:
@@ -128,22 +129,18 @@ class MemberLeave(ctk.CTkFrame):
 
     def refresh_list(self):
         for w in self.list_f.winfo_children(): w.destroy()
-        # Logic to display correct count in history
-        query = "SELECT *, (DATEDIFF(end_date, start_date) + 1) as diff FROM leave_requests WHERE user_id = %s ORDER BY id DESC"
+        # total_days ကို တိုက်ရိုက်ယူသုံးလိုက်ပါပြီ
+        query = "SELECT * FROM leave_requests WHERE user_id = %s ORDER BY id DESC"
         self.db.cursor.execute(query, (self.user['id'],))
+        
         for r in self.db.cursor.fetchall():
             card = ctk.CTkFrame(self.list_f, fg_color=("#F0F0F0", "#252525"), corner_radius=8)
             card.pack(fill="x", pady=5, padx=10)
             
-            # If start == end and it wasn't a range, diff is 1. If is_hd is 1, total is diff - 1 + 0.5? 
-            # Simplified: Let's assume if end_date was set same as start, diff is 1.
-            # If user didn't use range, we only show the 0.5.
-            if r['start_date'] == r['end_date'] and r['is_half_day']:
-                days = 0.5
-            else:
-                days = float(r['diff']) + (0.5 if r['is_half_day'] else 0)
-
+            days = r['total_days']
             info = f"📅 {r['start_date']} to {r['end_date']} ({days} Days)\nType: {r['leave_type']} | Reason: {r['reason']}"
+            
             ctk.CTkLabel(card, text=info, justify="left").pack(side="left", padx=15, pady=10)
             status_color = {"Pending": "#F39C12", "Approved": "#27AE60", "Rejected": "#E74C3C"}
-            ctk.CTkLabel(card, text=r['status'], text_color=status_color.get(r['status'], "gray"), font=("Arial", 12, "bold")).pack(side="right", padx=15)
+            ctk.CTkLabel(card, text=r['status'], text_color=status_color.get(r['status'], "gray"), 
+                         font=("Arial", 12, "bold")).pack(side="right", padx=15)
