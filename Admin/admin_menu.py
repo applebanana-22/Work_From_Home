@@ -3,6 +3,7 @@ from Admin.admin_users import AdminUsers
 from Admin.admin_activity import AdminAnnouncements 
 # 1. Import your new Team Management class here
 from Admin.admin_teams import AdminTeams
+from Admin.admin_attendance import AdminAttendance
 
 class AdminMenu:
     def __init__(self, sidebar, content, user):
@@ -16,7 +17,7 @@ class AdminMenu:
         self.add_nav_btn("👥   User Management", self.show_users)
         # 2. Add the new Create Team button here
         self.add_nav_btn("🛡️   Team Management", self.show_teams) 
-        self.add_nav_btn("📅   Attendance", self.show_logs)
+        self.add_nav_btn("📅   Attendance", self.show_attendance)
 
         self.show_activity()
 
@@ -92,3 +93,11 @@ class AdminMenu:
             text_color="#E74C3C"
         )
         error_lbl.pack(pady=20)
+    
+    def show_attendance(self):
+        self.clear_content()
+        try:
+            attendance_view = AdminAttendance(self.content, self.user)
+            attendance_view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error("Attendance", e)
