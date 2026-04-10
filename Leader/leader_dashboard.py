@@ -1,52 +1,81 @@
 import customtkinter as ctk
+from tkinter import ttk
+import socketio
+from database import Database
+from datetime import datetime
 
 class LeaderDashboard(ctk.CTkFrame):
-    def __init__(self, master, user, db):
-        super().__init__(master, fg_color="transparent")
+    def __init__(self, parent, user, db=None):
+        super().__init__(parent, fg_color="transparent")
         self.user = user
-        self.db = db
-
-        # --- Welcome Section ---
-        self.welcome_f = ctk.CTkFrame(self, fg_color="transparent")
-        self.welcome_f.pack(fill="x", padx=40, pady=(40, 20))
-
-        ctk.CTkLabel(self.welcome_f, 
-                     text=f"Welcome back, {self.user['full_name']}! 👋", 
-                     font=("Arial", 28, "bold"), 
-                     text_color=("#1A1A1A", "#FFFFFF")).pack(anchor="w")
+        self.db = Database() # database.py မှ class ကို သုံးခြင်း
+        self.sio = socketio.Client()
         
-        ctk.CTkLabel(self.welcome_f, 
-                     text="Here is your team's performance overview for today.", 
-                     font=("Arial", 14), 
-                     text_color="gray").pack(anchor="w", pady=5)
+        self.setup_ui()
+        self.connect_tracking_server()
+        self.load_initial_data()
 
-        # --- Stats Container ---
-        self.stats_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.stats_container.pack(fill="x", padx=40, pady=20)
+    def setup_ui(self):
+        # Header
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=20)
+        
+        ctk.CTkLabel(header, text=f"Team Monitor: {self.user['full_name']}", font=("Arial", 24, "bold")).pack(side="left")
 
-        self.refresh_stats()
+        # Table Section
+        self.table_frame = ctk.CTkFrame(self, fg_color=("#DBDBDB", "#2B2B2B"))
+        self.table_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-    def refresh_stats(self):
-        for w in self.stats_container.winfo_children(): w.destroy()
+        columns = ("id", "name", "wfh_office", "attendance", "status")
+        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings", height=15)
+        
+        self.tree.heading("id", text="Emp ID")
+        self.tree.heading("name", text="Member Name")
+        self.tree.heading("wfh_office", text="Work Mode")
+        self.tree.heading("attendance", text="Check-In")
+        self.tree.heading("status", text="Live Status")
 
-        # Team specs: 11 members logic
-        stats = [
-            {"title": "Total Members", "value": "11", "color": "#3498DB"},
-            {"title": "Active Projects", "value": "3", "color": "#10B981"},
-            {"title": "Pending OT", "value": "2", "color": "#F39C12"},
-            {"title": "Today's Attendance", "value": "9/11", "color": "#9B59B6"}
-        ]
+        self.tree.column("status", width=150, anchor="center")
+        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
 
-        for item in stats:
-            card = self.create_card(self.stats_container, item['title'], item['value'], item['color'])
-            card.pack(side="left", padx=(0, 20))
+    def load_initial_data(self):
+        """Database မှ မိမိ Team Member များကို ဆွဲထုတ်ပြသခြင်း"""
+        for item in self.tree.get_children():
+            self.tree.delete(item)
 
-    def create_card(self, master, title, value, color):
-        card = ctk.CTkFrame(master, width=180, height=110, corner_radius=12, 
-                            border_width=1, border_color=("#E0E0E0", "#333333"))
-        card.pack_propagate(False)
-        ctk.CTkLabel(card, text=title, font=("Arial", 12), text_color="gray").pack(pady=(15, 0))
-        ctk.CTkLabel(card, text=value, font=("Arial", 28, "bold"), text_color=color).pack(pady=5)
-        line = ctk.CTkFrame(card, height=4, fg_color=color, corner_radius=2)
-        line.pack(fill="x", side="bottom", padx=15, pady=(0, 10))
-        return card
+        try:
+            # users table နှင့် attendance table ကို Join လုပ်ပြီး ယနေ့အတွက် status ယူခြင်း
+            query = """
+                SELECT u.employee_id, u.full_name, u.current_status, u.status as live_stat, a.check_in
+                FROM users u
+                LEFT JOIN attendance a ON u.id = a.user_id AND a.attendance_date = CURDATE()
+                WHERE u.team_id = %s AND u.role = 'member'
+            """
+            self.db.cursor.execute(query, (self.user['team_id'],))
+            members = self.db.cursor.fetchall()
+
+            for m in members:
+                live = m['live_stat'].upper() if m['live_stat'] else "OFFLINE"
+                icon = "🟢" if live == "ACTIVE" else "🟡" if live == "AWAY" else "🔴"
+                
+                self.tree.insert("", "end", values=(
+                    m['employee_id'],
+                    m['full_name'],
+                    m['current_status'],
+                    m['check_in'] if m['check_in'] else "Not Yet",
+                    f"{icon} {live}"
+                ))
+        except Exception as e:
+            print(f"Error loading data: {e}")
+
+    def connect_tracking_server(self):
+        @self.sio.on("status_update")
+        def on_update(data):
+            # Server မှ data အသစ်ရောက်လာတိုင်း Table ကို refresh လုပ်ပေးသည်
+            self.load_initial_data()
+
+        try:
+            # သင့် Server IP သို့ ပြောင်းလဲပါ
+            self.sio.connect("http://192.168.100.174:5000")
+        except:
+            pass
