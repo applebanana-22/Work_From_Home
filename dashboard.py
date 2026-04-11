@@ -56,20 +56,24 @@ class Dashboard(ctk.CTk):
         self.update_attendance_ui(self.att_manager.is_checked_in)
 
     def setup_header(self):
+        """Header with dynamic text colors for Light/Dark mode"""
         for widget in self.header_frame.winfo_children():
             widget.destroy()
 
         ctk.CTkLabel(
             self.header_frame, text="⚡ WorkSync", 
             font=("Arial", 22, "bold"), 
-            text_color=("#3498DB", "#FFFFFF")
+            text_color=("#000000", "#FFFFFF")
         ).pack(side="left", padx=25)
 
+        # Dynamic color for Profile Label: Black in Light, White in Dark
+        profile_text_color = ("#000000", "#FFFFFF")
         role_label = f"👤 {self.user['full_name']} | [{self.user['role'].upper()}]"
+        
         ctk.CTkLabel(
             self.header_frame, text=role_label, 
             font=("Arial", 13, "bold"),
-            text_color=("#3498DB" if self.user['role'].lower() != 'member' else ("#1A1A1A", "#FFFFFF"))
+            text_color=profile_text_color if self.user['role'].lower() == 'member' else ("#000000", "#FFFFFF")
         ).pack(side="right", padx=25)
 
         self.create_status_header(self.header_frame)
@@ -82,10 +86,10 @@ class Dashboard(ctk.CTk):
         status_f.pack(side="right", padx=30)
 
         ctk.CTkLabel(status_f, text="🏢 Office:", font=("Arial", 13, "bold"), text_color="#2ECC71").pack(side="left")
-        ctk.CTkLabel(status_f, text=str(off_count), font=("Arial", 13, "bold"), text_color="#2ECC71").pack(side="left", padx=(5, 15))
+        ctk.CTkLabel(status_f, text=str(off_count), font=("Arial", 13, "bold"), text_color=("#000000", "#FFFFFF")).pack(side="left", padx=(5, 15))
 
         ctk.CTkLabel(status_f, text="🏠 WFH:", font=("Arial", 13, "bold"), text_color="#3498DB").pack(side="left")
-        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 13, "bold"), text_color="#3498DB").pack(side="left", padx=5)
+        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 13, "bold"), text_color=("#000000", "#FFFFFF")).pack(side="left", padx=5)
 
     def setup_bottom_sidebar(self):
         bottom_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
@@ -93,9 +97,11 @@ class Dashboard(ctk.CTk):
 
         ctk.CTkLabel(bottom_frame, text="Attendance", font=("Arial", 11, "bold"), text_color="gray").pack(anchor="w", padx=5)
         
+        # Initializing button with dynamic text color
         self.attendance_btn = ctk.CTkButton(
             bottom_frame, text="📍 Check-in Now", 
-            fg_color=("#2ECC71", "#27AE60"), text_color="#000000",
+            fg_color=("#2ECC71", "#27AE60"), 
+            text_color=("#000000", "#FFFFFF"),
             height=38, font=("Arial", 12, "bold"), command=self.toggle_attendance
         )
         self.attendance_btn.pack(fill="x", pady=(5, 15))
@@ -106,6 +112,7 @@ class Dashboard(ctk.CTk):
         self.status_switch = ctk.CTkSegmentedButton(
             bottom_frame, values=["🏢 Office", "🏠 WFH"],
             font=("Arial", 12, "bold"),
+            text_color=("#000000", "#FFFFFF"),
             state="normal" if not is_member else "disabled",
             command=self.manual_status_change if not is_member else None
         )
@@ -122,33 +129,32 @@ class Dashboard(ctk.CTk):
         self.logout_btn.pack(fill="x")
 
     def apply_segmented_style(self, status):
-        """Uniform styling for all roles: Office (Green/Black) | WFH (Blue/White)"""
+        """Logic for Office (Green) and WFH (Blue) with Mode-Aware Text"""
         if status == "Office":
             bg_color = ("#2ECC71", "#2ECC71")
-            txt_color = ("#000000", "#000000")
         else:
             bg_color = ("#3498DB", "#1FAEE9")
-            txt_color = ("#FFFFFF", "#FFFFFF")
 
+        # Fixed: selected text stays white/black based on mode
         self.status_switch.configure(
             selected_color=bg_color,
-            text_color=txt_color
+            text_color=("#000000", "#FFFFFF")
         )
 
     def update_attendance_ui(self, is_checked_in):
-        """Check-in matches 'Office' design, Check-out matches Warning/Error design"""
+        """Updates Attendance button text color dynamically for Light/Dark mode"""
         if is_checked_in:
             self.attendance_btn.configure(
                 text="🚩 Check-out", 
                 fg_color="#E74C3C", 
                 hover_color="#C0392B", 
-                text_color="#FFFFFF"
+                text_color=("#000000", "#FFFFFF") # Always white on red for visibility
             )
         else:
             self.attendance_btn.configure(
                 text="📍 Check-in Now", 
                 fg_color=("#2ECC71", "#27AE60"), 
-                text_color="#000000"
+                text_color=("#000000", "#FFFFFF") # Dynamic text
             )
 
     def toggle_attendance(self):
@@ -180,7 +186,6 @@ class Dashboard(ctk.CTk):
                 res = self.db.cursor.fetchone()
                 status = res['status'] if res else "Office"
                 
-                # Apply style even if disabled
                 self.status_switch.configure(state="normal")
                 self.status_switch.set("🏢 Office" if status == "Office" else "🏠 WFH")
                 self.apply_segmented_style(status)
@@ -199,6 +204,8 @@ class Dashboard(ctk.CTk):
     def change_appearance_mode(self):
         mode = "dark" if self.theme_switch.get() == 1 else "light"
         ctk.set_appearance_mode(mode)
+        # Refresh header to apply new dynamic text colors immediately
+        self.setup_header()
 
     def load_role_content(self, user):
         role = user['role'].lower()

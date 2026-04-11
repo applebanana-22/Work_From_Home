@@ -15,7 +15,6 @@ class AdminMenu:
         # Navigation Buttons
         self.add_nav_btn("📰   Activity", self.show_activity)
         self.add_nav_btn("👥   User Management", self.show_users)
-        # 2. Add the new Create Team button here
         self.add_nav_btn("🛡️   Team Management", self.show_teams) 
         self.add_nav_btn("📅   Attendance", self.show_attendance)
 

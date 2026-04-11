@@ -15,34 +15,63 @@ class MemberMenu:
         self.nav_buttons = []
 
         self.setup_menu()
-        # Start with Dashboard
-        self.show_dashboard()
+        
+        # 🔥 FIX: Highlight the Dashboard button visually on startup
+        if self.nav_buttons:
+            self.navigate(self.nav_buttons[0], self.show_dashboard)
         
     def setup_menu(self):
-        # We find the buttons and map them
-        self.add_nav_btn("📊 Dashboard", self.show_dashboard)
-        self.add_nav_btn("📰 Activity", self.show_activity)
-        self.add_nav_btn("✅ Tasks", self.show_project)
-        self.add_nav_btn("📝 Daily Report", self.show_report)
-        self.add_nav_btn("⏰ Overtime", self.show_overtime)
-        self.add_nav_btn("📅 Leave Request", self.show_leave_request)
-        self.add_nav_btn("🏠 WFH Schedule", self.show_schedule)
-        self.add_nav_btn("🚪 Attendance", self.show_attendance)
-
+        # Menu definitions
+        menus = [
+            ("📊   Dashboard", self.show_dashboard),
+            ("📰   Activity", self.show_activity),
+            ("✅   Tasks", self.show_project),
+            ("📝   Daily Report", self.show_report),
+            ("⏰   Overtime", self.show_overtime),
+            ("📅   Leave Request", self.show_leave_request),
+            ("🏠   WFH Schedule", self.show_schedule),
+            ("🚪   Attendance", self.show_attendance)
+        ]
+        
+        for text, cmd in menus:
+            self.add_nav_btn(text, cmd)
 
     def add_nav_btn(self, text, command):
-        btn = ctk.CTkButton(self.sidebar, text=text, 
-                            fg_color="transparent", text_color="gray90",
-                            hover_color="#2b2b2b", anchor="w", height=40,
-                            font=("Arial", 13),
-                            command=lambda: self.navigate(btn, command))
-        btn.pack(fill="x", padx=10, pady=2)
+        """Adaptive Sidebar buttons: matches Admin/Leader design"""
+        btn = ctk.CTkButton(
+            self.sidebar, 
+            text=text, 
+            # Capture btn instance correctly for the lambda
+            command=lambda b=None: self.navigate(b, command),
+            fg_color="transparent", 
+            # 🔥 FIX: Adaptive text color (Dark gray for Light mode, Light gray for Dark mode)
+            text_color=("#333333", "#D1D1D1"), 
+            hover_color=("#E0E0E0", "#2B2B2B"), 
+            anchor="w", 
+            height=42,
+            font=("Arial", 13, "bold"),
+            corner_radius=8
+        )
+        # Re-configure to pass the button itself to the navigate function
+        btn.configure(command=lambda b=btn: self.navigate(b, command))
+        
+        btn.pack(fill="x", padx=12, pady=2)
         self.nav_buttons.append(btn)
 
     def navigate(self, active_btn, command):
+        """Visual feedback for selection with Blue highlight"""
         for btn in self.nav_buttons:
-            btn.configure(fg_color="transparent")
-        active_btn.configure(fg_color="#3498DB")
+            # Reset to adaptive colors
+            btn.configure(
+                fg_color="transparent", 
+                text_color=("#333333", "#D1D1D1")
+            )
+            
+        # Highlight active (Blue background, White text)
+        active_btn.configure(
+            fg_color=("#3498DB", "#1F538D"), 
+            text_color="white"
+        )
         command()
 
     def clear(self):
@@ -50,25 +79,39 @@ class MemberMenu:
         for w in self.content.winfo_children(): 
             w.destroy()
 
+    # --- View Switching Logic ---
+
     def show_dashboard(self):
         self.clear()
-        view = MemberDashboard(self.content, self.user, self.db)
-        view.pack(fill="both", expand=True)
+        try:
+            view = MemberDashboard(self.content, self.user, self.db)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Dashboard Error: {e}")
 
     def show_activity(self):
         self.clear()
-        view = MemberActivity(self.content, self.user)
-        view.pack(fill="both", expand=True)
+        try:
+            view = MemberActivity(self.content, self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Activity Error: {e}")
 
     def show_project(self):
         self.clear()
-        view = MemberProject(self.content, self.user)
-        view.pack(fill="both", expand=True)
+        try:
+            view = MemberProject(self.content, self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Tasks Error: {e}")
 
     def show_report(self):
         self.clear()
-        view = MemberReportFrame(self.content, user=self.user)
-        view.pack(fill="both", expand=True)
+        try:
+            view = MemberReportFrame(self.content, user=self.user)
+            view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error(f"Report Error: {e}")
 
     def show_overtime(self):
         self.clear()
@@ -82,26 +125,19 @@ class MemberMenu:
     def show_leave_request(self):
         self.clear()
         try:
-            # Dynamic import to prevent circular dependency
             from Member.member_leave import MemberLeave
             view = MemberLeave(self.content, self.user) 
             view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error(f"Leave View Error: {e}")
 
-    def show_error(self, message):
-        """Helper to show errors on the screen if a module fails to load"""
-        ctk.CTkLabel(self.content, text=message, text_color="red").pack(pady=50)
-        
     def show_schedule(self):
         self.clear()
         try:
-            # Initialize the actual class we built
             view = MemberSchedule(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error(f"Schedule View Error: {e}")
-    
     
     def show_attendance(self):
         self.clear()
@@ -112,5 +148,6 @@ class MemberMenu:
         except Exception as e:
             self.show_error(f"Attendance View Error: {e}")
 
-
-    
+    def show_error(self, message):
+        """Helper to show errors on the screen"""
+        ctk.CTkLabel(self.content, text=message, text_color="#E74C3C", font=("Arial", 14, "bold")).pack(pady=50)
