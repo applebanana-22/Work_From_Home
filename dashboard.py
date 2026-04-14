@@ -225,7 +225,7 @@ class Dashboard(ctk.CTk):
             # server_url နေရာတွင် သင့် Server Laptop ၏ IP ကို ထည့်ရန် မမေ့ပါနှင့်
             self.tracker = MemberTracking(
                 user_id=user['id'], 
-                server_url="http://192.168.43.100:5000" # <-- ဒီနေရာမှာ Server IP ပြင်ပါ
+                server_url="http://172.19.135.113:5000" # <-- ဒီနေရာမှာ Server IP ပြင်ပါ
             )
             
             self.menu_logic = MemberMenu(self.sidebar, self.main_view, user)

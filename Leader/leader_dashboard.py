@@ -113,16 +113,23 @@ class LeaderDashboard(ctk.CTkFrame):
 
     def connect_tracking_server(self):
         try:
-            # reconnection=True ကြောင့် server ပိတ်သွားလည်း app မရပ်တော့ပါ
             if not self.sio.connected:
-                self.sio.connect('http://localhost:5000') 
+                # Localhost နေရာမှာ သင့် Server IP (192.168.43.100) ပြောင်းထည့်ဖို့ မမေ့ပါနဲ့
+                self.sio.connect('http://192.168.43.100:5000') 
             
             @self.sio.on("status_update")
             def on_update(data):
-                # အရေးကြီးသည်: UI thread မှာ data update ဖြစ်အောင် self.after ကို သုံးရပါမည်
-                # Socket thread ကနေ UI ကို တိုက်ရိုက်ထိရင် crash တတ်ပါသည်
                 print(f"🔄 Member Status Updated: {data}")
-                self.after(0, self.load_initial_data) 
+                
+                # အရေးကြီးဆုံးအပိုင်း - UI frame တကယ်ရှိသေးမှ update လုပ်ရန်
+                def safe_update():
+                    try:
+                        if self.winfo_exists(): # Frame ရှိမရှိ အရင်စစ်မယ်
+                            self.load_initial_data()
+                    except Exception:
+                        pass # မရှိတော့ရင် ဘာမှမလုပ်ဘဲ ကျော်သွားမယ်
+
+                self.after(0, safe_update)
                 
         except Exception as e:
             print(f"⚠️ Tracking Server Connection Failed: {e}")
