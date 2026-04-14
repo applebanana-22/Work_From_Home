@@ -7,71 +7,73 @@ from datetime import datetime
 class LeaderDashboard(ctk.CTkFrame):
     def __init__(self, parent, user, db=None):
         super().__init__(parent, fg_color="transparent")
-        self.user = user  # ဝင်ထားတဲ့ user object (dictionary ဖြစ်ရပါမယ်)
+        self.user = user  
         self.db = db if db else Database() 
-        self.sio = socketio.Client()
+        self.sio = socketio.Client(reconnection=True) # Connection ပြတ်ရင် auto ပြန်ချိတ်ရန်
         
         self.setup_ui()
+        self.load_initial_data() # အရင်ဆုံး data အဟောင်းကို ဆွဲထုတ်ထားမည်
         self.connect_tracking_server()
-        self.load_initial_data()
 
     def setup_ui(self):
+        # --- Header Section ---
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=20, pady=20)
         
         ctk.CTkLabel(
             header, 
-            text=f"Team Monitor: {self.user['full_name']}", 
-            font=("Arial", 24, "bold")
+            text=f"📊 Team Real-time Monitor", 
+            font=("Arial", 22, "bold")
         ).pack(side="left")
 
+        ctk.CTkLabel(
+            header, 
+            text=f"Leader: {self.user['full_name']}", 
+            font=("Arial", 14)
+        ).pack(side="right")
+
+        # --- Table Section ---
         self.table_frame = ctk.CTkFrame(self, fg_color=("#DBDBDB", "#2B2B2B"))
         self.table_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
+        # Treeview Customization
         style = ttk.Style()
         style.theme_use("default")
         style.configure("Treeview",
                         background="#2B2B2B",
                         foreground="white",
                         fieldbackground="#2B2B2B",
-                        rowheight=35,
+                        rowheight=40,
                         borderwidth=0)
         style.map("Treeview", background=[('selected', '#3498DB')])
         style.configure("Treeview.Heading", 
                         background="#1A1A1A", 
                         foreground="white", 
                         relief="flat",
-                        font=("Arial", 12, "bold"))
+                        font=("Arial", 11, "bold"))
 
         columns = ("id", "name", "wfh_office", "attendance", "status")
         self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
 
-        self.tree.heading("id", text="Employee ID")
-        self.tree.heading("name", text="Full Name")
-        self.tree.heading("wfh_office", text="Work Mode")
-        self.tree.heading("attendance", text="Check-in Time")
-        self.tree.heading("status", text="Live Status")
+        # Column Headings
+        for col in columns:
+            self.tree.heading(col, text=col.replace("_", " ").title())
+            self.tree.column(col, anchor="center")
 
-        self.tree.column("id", width=100, anchor="center")
-        self.tree.column("name", width=200, anchor="w")
-        self.tree.column("wfh_office", width=120, anchor="center")
-        self.tree.column("attendance", width=150, anchor="center")
-        self.tree.column("status", width=150, anchor="center")
-
+        self.tree.column("name", width=200, anchor="w") # Name ကို ဘယ်ဘက်ကပ်ထားရန်
         self.tree.pack(fill="both", expand=True)
 
     def load_initial_data(self):
-        """Fetch current team status from Database"""
+        """Database မှ Team members များ၏ status ကို refresh လုပ်ခြင်း"""
         try:
-            # Clear existing rows
+            # Table အဟောင်းကို ရှင်းထုတ်ခြင်း
             for item in self.tree.get_children():
                 self.tree.delete(item)
 
-            # Leader ရဲ့ employee_id ကို သတ်မှတ်ပါ
             leader_emp_id = self.user['employee_id'] 
 
-            # Database query - Table structure အမှန်အတိုင်း ပြင်ထားပါသည်
-            query = f"""
+            # Query ကို ပိုမိုကောင်းမွန်အောင် ပြင်ထားပါသည် (Team တွင်းမှ member များသာ)
+            query = """
                 SELECT 
                     u.employee_id, 
                     u.full_name, 
@@ -85,20 +87,19 @@ class LeaderDashboard(ctk.CTkFrame):
                 AND u.role = 'member'
             """
             
-            # self.db.cursor.execute ကို သုံးပြီး leader_id ကို safe ဖြစ်အောင် pass လုပ်ပါ
             self.db.cursor.execute(query, (leader_emp_id,))
             members = self.db.cursor.fetchall()
 
             for m in members:
-                # Live Status Icons
+                # Live Status Icons Logic
                 live = (m['live_status'] or "OFFLINE").upper()
                 if live == "ACTIVE": icon = "🟢"
                 elif live == "AWAY": icon = "🟡"
                 else: icon = "🔴"
                 
-                # Work Mode Display
+                # Work Mode Formatting
                 mode = m['work_mode']
-                display_mode = "🏠 WFH" if mode == "WFH" else "🏢 Office" if mode == "Office" else "N/A"
+                display_mode = "🏠 WFH" if mode == "WFH" else "🏢 Office" if mode == "Office" else "⚪ N/A"
                 
                 self.tree.insert("", "end", values=(
                     m['employee_id'],
@@ -108,21 +109,26 @@ class LeaderDashboard(ctk.CTkFrame):
                     f"{icon} {live}"
                 ))
         except Exception as e:
-            print(f"Error loading initial data: {e}")
+            print(f"❌ Error loading initial data: {e}")
 
     def connect_tracking_server(self):
         try:
-            # Leader Dashboard က Server စက်ထဲမှာပဲ ရှိနေရင် localhost သုံးလို့ရပါတယ်
-            self.sio.connect('http://localhost:5000') 
+            # reconnection=True ကြောင့် server ပိတ်သွားလည်း app မရပ်တော့ပါ
+            if not self.sio.connected:
+                self.sio.connect('http://localhost:5000') 
             
             @self.sio.on("status_update")
             def on_update(data):
-                # Member ဆီက status လာတာနဲ့ table ကို refresh လုပ်မယ်
-                self.after(10, self.load_initial_data)
+                # အရေးကြီးသည်: UI thread မှာ data update ဖြစ်အောင် self.after ကို သုံးရပါမည်
+                # Socket thread ကနေ UI ကို တိုက်ရိုက်ထိရင် crash တတ်ပါသည်
+                print(f"🔄 Member Status Updated: {data}")
+                self.after(0, self.load_initial_data) 
+                
         except Exception as e:
-            print(f"Dashboard Tracking Error: {e}")
+            print(f"⚠️ Tracking Server Connection Failed: {e}")
 
     def __del__(self):
+        """Dashboard ကို ပိတ်လိုက်လျှင် socket connection ဖြတ်ရန်"""
         try:
             if hasattr(self, 'sio') and self.sio.connected:
                 self.sio.disconnect()
