@@ -5,6 +5,7 @@ from Leader.leader_menu import LeaderMenu
 from Member.member_menu import MemberMenu
 from attendance_manager import AttendanceManager
 from tkinter import messagebox
+from member_tracking import MemberTracking
 import datetime
 
 class Dashboard(ctk.CTk):
@@ -207,11 +208,27 @@ class Dashboard(ctk.CTk):
         # Refresh header to apply new dynamic text colors immediately
         self.setup_header()
 
+    # ဖိုင်ရဲ့အပေါ်ဆုံးမှာ import အရင်လုပ်ပါ
+
+
     def load_role_content(self, user):
         role = user['role'].lower()
-        if role == 'admin': self.menu_logic = AdminMenu(self.sidebar, self.main_view, user)
-        elif role == 'leader': self.menu_logic = LeaderMenu(self.sidebar, self.main_view, user)
-        else: self.menu_logic = MemberMenu(self.sidebar, self.main_view, user)
+        if role == 'admin': 
+            self.menu_logic = AdminMenu(self.sidebar, self.main_view, user)
+        elif role == 'leader': 
+            self.menu_logic = LeaderMenu(self.sidebar, self.main_view, user)
+        else: 
+            # --- Member ဖြစ်ခဲ့လျှင် Tracking ကို ဒီမှာ စဖွင့်မည် ---
+            print(f"🚀 Initializing tracking for: {user['full_name']}")
+            
+            # Database ထဲက employee_id (သို့မဟုတ် id) ကို သုံးပြီး tracker စဖွင့်ခြင်း
+            # server_url နေရာတွင် သင့် Server Laptop ၏ IP ကို ထည့်ရန် မမေ့ပါနှင့်
+            self.tracker = MemberTracking(
+                user_id=user['id'], 
+                server_url="http://192.168.43.100:5000" # <-- ဒီနေရာမှာ Server IP ပြင်ပါ
+            )
+            
+            self.menu_logic = MemberMenu(self.sidebar, self.main_view, user)
 
     def logout_event(self):
         if messagebox.askyesno("Logout", "Are you sure?"):

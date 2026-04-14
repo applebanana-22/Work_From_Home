@@ -41,19 +41,25 @@ class MemberTracking:
             print(f"⚠️ Initial Connection Failed: {e}. Will retry automatically...")
 
     def on_activity(self, *args):
-        print("📍 Movement Detected!") # ဒါလေးထည့်ပြီး စမ်းကြည့်ပါ
+        print("📍 Movement Detected!") 
+        
+        # Socket ချိတ်မချိတ် စစ်ဆေးတဲ့ code ထည့်ပါ
+        if not self.sio.connected:
+            print("❌ Socket not connected. Trying to reconnect...")
+            self.connect_to_server()
+            return
+
         current_time = time.time()
         if current_time - self.last_activity_time > 5:
             self.last_activity_time = current_time
-            if self.sio.connected:
-                try:
-                    self.sio.emit('status_change', {
-                        'user_id': self.user_id, 
-                        'status': 'active'
-                    })
-                    print(f"📡 Status Sent: Active ({time.strftime('%H:%M:%S')})")
-                except:
-                    pass
+            try:
+                self.sio.emit('status_change', {
+                    'user_id': self.user_id, 
+                    'status': 'active'
+                })
+                print(f"📡 Status 'active' sent for User: {self.user_id}")
+            except Exception as e:
+                print(f"⚠️ Emit Error: {e}")
 
     # member_tracking.py ထဲတွင် အစားထိုးကြည့်ရန်
     def start_listeners(self):
