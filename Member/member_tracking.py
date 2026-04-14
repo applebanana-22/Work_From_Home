@@ -41,9 +41,8 @@ class MemberTracking:
             print(f"⚠️ Initial Connection Failed: {e}. Will retry automatically...")
 
     def on_activity(self, *args):
-        """Mouse သို့မဟုတ် Keyboard လှုပ်ရှားတိုင်း အလုပ်လုပ်မည်"""
+        print("📍 Movement Detected!") # ဒါလေးထည့်ပြီး စမ်းကြည့်ပါ
         current_time = time.time()
-        # Throttling: ၅ စက္ကန့်ခြားမှ တစ်ခါသာ server ဆီ status ပို့မည် (Network သက်သာစေရန်)
         if current_time - self.last_activity_time > 5:
             self.last_activity_time = current_time
             if self.sio.connected:
@@ -56,20 +55,18 @@ class MemberTracking:
                 except:
                     pass
 
+    # member_tracking.py ထဲတွင် အစားထိုးကြည့်ရန်
     def start_listeners(self):
-        # Listener များကို သီးသန့် thread များဖြင့် run ပါသည်
-        mouse_listener = mouse.Listener(
-            on_move=self.on_activity, 
-            on_click=self.on_activity, 
-            on_scroll=self.on_activity
-        )
+        print("🖱️ Mouse & Keyboard Listeners Starting...")
+        mouse_listener = mouse.Listener(on_move=self.on_activity, on_click=self.on_activity)
         key_listener = keyboard.Listener(on_press=self.on_activity)
-        
-        mouse_listener.daemon = True
-        key_listener.daemon = True
         
         mouse_listener.start()
         key_listener.start()
+        print("✅ Listeners are Active! Try moving your mouse.")
+        
+        # Listener တွေ မရပ်သွားအောင် Join လုပ်ထားဖို့လိုသည် (သို့မဟုတ် while loop သုံးရမည်)
+        # self.is_running while loop က check_inactivity ထဲမှာ ရှိပြီးသားဖြစ်ရမည်
 
     def check_inactivity(self):
         """၅ မိနစ် ငြိမ်နေပါက 'away' status သို့ ပြောင်းမည်"""

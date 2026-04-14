@@ -7,15 +7,14 @@ class MemberDashboard(ctk.CTkFrame):
         self.user = user
         self.db = db
 
-        # --- 1. Welcome Section (Enhanced Navigation) ---
+        # --- 1. Welcome Section ---
         self.welcome_f = ctk.CTkFrame(self, fg_color="transparent")
         self.welcome_f.pack(fill="x", padx=40, pady=(30, 15))
 
-        # Profile Badge + Welcome Text
         self.title_label = ctk.CTkLabel(
             self.welcome_f, 
             text=f"Welcome back, {self.user['full_name']}! 👋", 
-            font=("Arial", 32, "bold"), # Font size မြှင့်ထားသည်
+            font=("Arial", 32, "bold"),
             text_color=("#1A1A1A", "#FFFFFF")
         )
         self.title_label.pack(anchor="w")
@@ -32,11 +31,10 @@ class MemberDashboard(ctk.CTkFrame):
         self.stats_container.pack(fill="x", padx=40, pady=10)
         self.refresh_stats()
 
-        # --- 3. Team Status Table Section (Attractive UI) ---
+        # --- 3. Team Status Table Section ---
         self.setup_modern_table()
 
     def setup_modern_table(self):
-        # Header Area
         header_f = ctk.CTkFrame(self, fg_color="transparent")
         header_f.pack(fill="x", padx=40, pady=(25, 10))
         
@@ -46,7 +44,6 @@ class MemberDashboard(ctk.CTkFrame):
             text_color=("#3498DB", "#5DADE2")
         ).pack(side="left")
 
-        # Table Container
         self.table_bg = ctk.CTkFrame(
             self, fg_color=("#FFFFFF", "#1E1E1E"), 
             corner_radius=15, border_width=1, 
@@ -54,38 +51,39 @@ class MemberDashboard(ctk.CTkFrame):
         )
         self.table_bg.pack(fill="both", expand=True, padx=40, pady=(0, 30))
 
-        # --- Treeview Custom Styling ---
+        # --- Treeview Styling ---
         style = ttk.Style()
-        style.theme_use("clam") # 'clam' is better for custom styling
+        style.theme_use("clam")
         
-        # Table Colors base on Mode
         is_dark = ctk.get_appearance_mode() == "Dark"
         bg_col = "#1E1E1E" if is_dark else "#FFFFFF"
         fg_col = "#FFFFFF" if is_dark else "#000000"
         head_bg = "#2B2B2B" if is_dark else "#F0F2F5"
+        odd_row_bg = "#252525" if is_dark else "#F9F9F9" # Zebra stripe color
 
         style.configure("Treeview", 
                         background=bg_col, foreground=fg_col, 
                         fieldbackground=bg_col, rowheight=45, 
-                        font=("Arial", 12), borderwidth=0)
+                        font=("Arial", 11), borderwidth=0)
         
         style.configure("Treeview.Heading", 
                         background=head_bg, foreground=fg_col, 
-                        font=("Arial", 12, "bold"), borderwidth=0)
+                        font=("Arial", 11, "bold"), borderwidth=0)
         
         style.map("Treeview", background=[('selected', '#3498DB')])
 
-        # Create Treeview
         columns = ("id", "name", "location", "activity")
         self.tree = ttk.Treeview(self.table_bg, columns=columns, show="headings", height=10)
         
-        # Headings setup
         for col in columns:
             self.tree.heading(col, text=col.replace("_", " ").upper())
             self.tree.column(col, anchor="center")
 
-        self.tree.column("name", width=250, anchor="w") # Name ကို ပိုကျယ်ပေးထားသည်
+        self.tree.column("name", width=250, anchor="w")
         self.tree.pack(fill="both", expand=True, padx=15, pady=15)
+        
+        # Zebra Stripes Tag Configuration (Fixed: Only one color string)
+        self.tree.tag_configure('odd', background=odd_row_bg)
         
         self.load_team_data()
 
@@ -93,8 +91,9 @@ class MemberDashboard(ctk.CTkFrame):
         for item in self.tree.get_children(): self.tree.delete(item)
 
         try:
+            # Table Structure အမှန်အတိုင်း 'status' ဟု ပြင်ထားပါသည်
             query = """
-                SELECT id, full_name, role, current_status, activity_status 
+                SELECT employee_id, full_name, role, current_status, status 
                 FROM users WHERE team_id = %s 
                 ORDER BY CASE WHEN role = 'leader' THEN 1 ELSE 2 END
             """
@@ -102,29 +101,29 @@ class MemberDashboard(ctk.CTkFrame):
             members = self.db.cursor.fetchall()
 
             for i, m in enumerate(members):
-                # UI Formatting
                 role_icon = "👑 " if m['role'] == 'leader' else "👤 "
-                name_val = f"{role_icon}{m['full_name']}"
+                name_val = f" {role_icon}{m['full_name']}"
                 
-                # Location Styling (Office/WFH)
-                loc_val = f"🏢 {m['current_status']}" if m['current_status'] == "Office" else f"🏠 {m['current_status']}"
+                # Location (Current_status)
+                loc = m['current_status'] or "Office"
+                loc_val = f"🏢 {loc}" if loc == "Office" else f"🏠 {loc}"
                 
-                # Activity Status Styling
-                act_status = m['activity_status'].upper() if m['activity_status'] else "OFFLINE"
+                # Activity Status (Live status)
+                # သင့် Table တွင် 'activity_status' မဟုတ်ဘဲ 'status' ဖြစ်သည်ကို သတိပြုပါ
+                raw_status = m['status'] or "offline"
+                act_status = raw_status.upper()
                 act_icon = "🟢" if act_status == "ACTIVE" else "🟡" if act_status == "AWAY" else "🔴"
                 act_val = f"{act_icon} {act_status}"
 
-                # Insert with alternating row colors (Zebra stripes)
-                tag = 'even' if i % 2 == 0 else 'odd'
-                self.tree.insert("", "end", values=(m['id'], name_val, loc_val, act_val), tags=(tag,))
+                tag = 'odd' if i % 2 != 0 else 'even'
+                self.tree.insert("", "end", values=(m['employee_id'], name_val, loc_val, act_val), tags=(tag,))
 
-            self.tree.tag_configure('odd', background=("#F9F9F9", "#252525"))
-            
         except Exception as e:
             print(f"Table Error: {e}")
 
     def refresh_stats(self):
         for w in self.stats_container.winfo_children(): w.destroy()
+        # ဤနေရာတွင် Database မှ တကယ့် Team Size ကို Count လုပ်နိုင်သည်
         stats = [
             {"title": "Team Size", "value": "11", "color": "#3498DB"},
             {"title": "Active Tasks", "value": "5", "color": "#10B981"},
