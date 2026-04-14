@@ -114,25 +114,32 @@ class LeaderDashboard(ctk.CTkFrame):
     def connect_tracking_server(self):
         try:
             if not self.sio.connected:
-                # Localhost နေရာမှာ သင့် Server IP (192.168.43.100) ပြောင်းထည့်ဖို့ မမေ့ပါနဲ့
                 self.sio.connect('http://192.168.43.100:5000') 
             
             @self.sio.on("status_update")
             def on_update(data):
-                print(f"🔄 Member Status Updated: {data}")
-                
-                # အရေးကြီးဆုံးအပိုင်း - UI frame တကယ်ရှိသေးမှ update လုပ်ရန်
-                def safe_update():
-                    try:
-                        if self.winfo_exists(): # Frame ရှိမရှိ အရင်စစ်မယ်
-                            self.load_initial_data()
-                    except Exception:
-                        pass # မရှိတော့ရင် ဘာမှမလုပ်ဘဲ ကျော်သွားမယ်
-
-                self.after(0, safe_update)
-                
+                # load_initial_data အစား update_row_only ကို ပြောင်းသုံးမယ်
+                self.after(0, lambda: self.update_row_only(data))
         except Exception as e:
-            print(f"⚠️ Tracking Server Connection Failed: {e}")
+            print(f"⚠️ Connection Failed: {e}")
+
+    def update_row_only(self, data):
+        """Database ကို မသွားတော့ဘဲ UI Table ထဲက Row ကိုပဲ တိုက်ရိုက်ပြင်တဲ့ logic"""
+        if not self.winfo_exists(): return
+        
+        user_id = str(data.get('user_id'))
+        new_status = data.get('status').upper()
+        
+        # Icon သတ်မှတ်ခြင်း
+        icon = "🟢" if new_status == "ACTIVE" else "🟡" if new_status == "AWAY" else "🔴"
+
+        # Treeview ထဲမှာ ပတ်ရှာမယ်
+        for item in self.tree.get_children():
+            # အကယ်၍ ပထမဆုံး column (index 0) က employee_id ဖြစ်ရင်
+            if str(self.tree.item(item)['values'][0]) == user_id:
+                # Status column (index 4) ကိုပဲ update လုပ်မယ်
+                self.tree.set(item, column="status", value=f"{icon} {new_status}")
+                return # ရှာတွေ့ရင် ဆက်မပတ်တော့ဘူး
 
     def __del__(self):
         """Dashboard ကို ပိတ်လိုက်လျှင် socket connection ဖြတ်ရန်"""

@@ -77,10 +77,10 @@ class MemberTracking:
     def check_inactivity(self):
         """၅ မိနစ် ငြိမ်နေပါက 'away' status သို့ ပြောင်းမည်"""
         while self.is_running:
-            time.sleep(30) # ၃၀ စက္ကန့်တစ်ခါ စစ်ဆေးမည်
+            time.sleep(5) # ၃၀ စက္ကန့်တစ်ခါ စစ်ဆေးမည်
             inactive_duration = time.time() - self.last_activity_time
             
-            if inactive_duration > 300: # ၅ မိနစ် (300 seconds)
+            if inactive_duration > 30: # ၅ မိနစ် (300 seconds)
                 if self.sio.connected:
                     try:
                         self.sio.emit('status_change', {
