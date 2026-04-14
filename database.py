@@ -74,15 +74,12 @@ class Database:
 
     # --- Live Tracking Update ---
     def update_live_status(self, user_id, status):
-        """Member ၏ Live status (ACTIVE, AWAY, OFFLINE) ကို Database တွင် update လုပ်ရန်"""
         try:
-            # သင့် database structure အရ status column သည် live tracking အတွက်ဖြစ်ပါသည်
-            query = "UPDATE users SET status = %s WHERE id = %s"
-            self.cursor.execute(query, (status, user_id))
-            return True
+            query = "UPDATE users SET status = %s WHERE id = %s OR employee_id = %s"
+            self.cursor.execute(query, (status, user_id, user_id))
+            self.conn.commit()
         except Exception as e:
-            print(f"Live Status Update Error: {e}")
-            return False
+            print(f"DB Status Update Error: {e}")
 
     def close(self):
         """Database ချိတ်ဆက်မှုကို စနစ်တကျပိတ်သိမ်းခြင်း"""

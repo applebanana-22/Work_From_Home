@@ -112,15 +112,15 @@ class LeaderDashboard(ctk.CTkFrame):
 
     def connect_tracking_server(self):
         try:
+            # Leader Dashboard က Server စက်ထဲမှာပဲ ရှိနေရင် localhost သုံးလို့ရပါတယ်
             self.sio.connect('http://localhost:5000') 
             
             @self.sio.on("status_update")
             def on_update(data):
-                # UI thread မှာ refresh ဖြစ်အောင် schedule လုပ်ပါ
-                self.after(100, self.load_initial_data)
-                
+                # Member ဆီက status လာတာနဲ့ table ကို refresh လုပ်မယ်
+                self.after(10, self.load_initial_data)
         except Exception as e:
-            print(f"Tracking Server Connection Failed: {e}")
+            print(f"Dashboard Tracking Error: {e}")
 
     def __del__(self):
         try:

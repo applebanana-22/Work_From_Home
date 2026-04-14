@@ -5,7 +5,7 @@ from pynput import mouse, keyboard
 
 # In member_tracking.py
 class MemberTracking:
-    def __init__(self, user_id, server_url="http://192.168.1.50:5000"): # Replace with your Host IP
+    def __init__(self, user_id, server_url="http://192.168.43.100:5000"): # ပြင်ရန်!
         self.user_id = user_id
         self.server_url = server_url
         self.sio = socketio.Client()
