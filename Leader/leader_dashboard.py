@@ -9,10 +9,12 @@ class LeaderDashboard(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self.user = user  
         self.db = db if db else Database() 
-        self.sio = socketio.Client(reconnection=True) # Connection ပြတ်ရင် auto ပြန်ချိတ်ရန်
+        
+        # Connection ပြတ်ရင် auto ပြန်ချိတ်ရန် reconnection=True ထားပါသည်
+        self.sio = socketio.Client(reconnection=True, reconnection_delay=5)
         
         self.setup_ui()
-        self.load_initial_data() # အရင်ဆုံး data အဟောင်းကို ဆွဲထုတ်ထားမည်
+        self.load_initial_data() # ပထမဆုံးအကြိမ်တွင်သာ DB မှ data အကုန်ဆွဲမည်
         self.connect_tracking_server()
 
     def setup_ui(self):
@@ -36,14 +38,14 @@ class LeaderDashboard(ctk.CTkFrame):
         self.table_frame = ctk.CTkFrame(self, fg_color=("#DBDBDB", "#2B2B2B"))
         self.table_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
-        # Treeview Customization
+        # Treeview Customization (Modern Dark Look)
         style = ttk.Style()
         style.theme_use("default")
         style.configure("Treeview",
                         background="#2B2B2B",
                         foreground="white",
                         fieldbackground="#2B2B2B",
-                        rowheight=40,
+                        rowheight=45,
                         borderwidth=0)
         style.map("Treeview", background=[('selected', '#3498DB')])
         style.configure("Treeview.Heading", 
@@ -58,13 +60,13 @@ class LeaderDashboard(ctk.CTkFrame):
         # Column Headings
         for col in columns:
             self.tree.heading(col, text=col.replace("_", " ").title())
-            self.tree.column(col, anchor="center")
+            self.tree.column(col, anchor="center", width=120)
 
-        self.tree.column("name", width=200, anchor="w") # Name ကို ဘယ်ဘက်ကပ်ထားရန်
+        self.tree.column("name", width=220, anchor="w")
         self.tree.pack(fill="both", expand=True)
 
     def load_initial_data(self):
-        """Database မှ Team members များ၏ status ကို refresh လုပ်ခြင်း"""
+        """ပထမဆုံးအကြိမ် DB မှ Team members များ၏ status ကို refresh လုပ်ခြင်း"""
         try:
             # Table အဟောင်းကို ရှင်းထုတ်ခြင်း
             for item in self.tree.get_children():
@@ -72,7 +74,6 @@ class LeaderDashboard(ctk.CTkFrame):
 
             leader_emp_id = self.user['employee_id'] 
 
-            # Query ကို ပိုမိုကောင်းမွန်အောင် ပြင်ထားပါသည် (Team တွင်းမှ member များသာ)
             query = """
                 SELECT 
                     u.employee_id, 
@@ -87,17 +88,15 @@ class LeaderDashboard(ctk.CTkFrame):
                 AND u.role = 'member'
             """
             
+            self.db.ensure_connection() # Connection ရှိမရှိ အရင်စစ်မည်
             self.db.cursor.execute(query, (leader_emp_id,))
             members = self.db.cursor.fetchall()
 
             for m in members:
-                # Live Status Icons Logic
+                # Icon Logic
                 live = (m['live_status'] or "OFFLINE").upper()
-                if live == "ACTIVE": icon = "🟢"
-                elif live == "AWAY": icon = "🟡"
-                else: icon = "🔴"
+                icon = "🟢" if live == "ACTIVE" else "🟡" if live == "AWAY" else "🔴"
                 
-                # Work Mode Formatting
                 mode = m['work_mode']
                 display_mode = "🏠 WFH" if mode == "WFH" else "🏢 Office" if mode == "Office" else "⚪ N/A"
                 
@@ -112,39 +111,49 @@ class LeaderDashboard(ctk.CTkFrame):
             print(f"❌ Error loading initial data: {e}")
 
     def connect_tracking_server(self):
+        """Socket Server နှင့် ချိတ်ဆက်ပြီး Real-time Update ယူခြင်း"""
         try:
             if not self.sio.connected:
-                self.sio.connect('http://192.168.43.100:5000') 
+                # သင့် Server IP ကို ဒီမှာ စစ်ဆေးပါ
+                self.sio.connect('http://192.168.1.4:5000', transports=['websocket', 'polling']) 
             
             @self.sio.on("status_update")
             def on_update(data):
-                # load_initial_data အစား update_row_only ကို ပြောင်းသုံးမယ်
-                self.after(0, lambda: self.update_row_only(data))
+                # UI Thread ပေါ်တွင်သာ Update လုပ်ရန် after() သုံးရပါမည်
+                if self.winfo_exists():
+                    self.after(0, lambda: self.update_row_only(data))
+                    
         except Exception as e:
-            print(f"⚠️ Connection Failed: {e}")
+            print(f"⚠️ Tracking Server Connection Failed: {e}")
 
     def update_row_only(self, data):
-        """Database ကို မသွားတော့ဘဲ UI Table ထဲက Row ကိုပဲ တိုက်ရိုက်ပြင်တဲ့ logic"""
-        if not self.winfo_exists(): return
-        
-        user_id = str(data.get('user_id'))
-        new_status = data.get('status').upper()
-        
-        # Icon သတ်မှတ်ခြင်း
-        icon = "🟢" if new_status == "ACTIVE" else "🟡" if new_status == "AWAY" else "🔴"
+        """DB ကို ထပ်မခေါ်တော့ဘဲ UI Table ထဲက Row ကိုပဲ တိုက်ရိုက်ပြင်သဖြင့် စက်မလေးတော့ပါ"""
+        try:
+            if not self.winfo_exists(): return
+            
+            target_user_id = str(data.get('user_id'))
+            new_status = str(data.get('status')).upper()
+            
+            # Icon သတ်မှတ်ခြင်း
+            icon = "🟢" if new_status == "ACTIVE" else "🟡" if new_status == "AWAY" else "🔴"
 
-        # Treeview ထဲမှာ ပတ်ရှာမယ်
-        for item in self.tree.get_children():
-            # အကယ်၍ ပထမဆုံး column (index 0) က employee_id ဖြစ်ရင်
-            if str(self.tree.item(item)['values'][0]) == user_id:
-                # Status column (index 4) ကိုပဲ update လုပ်မယ်
-                self.tree.set(item, column="status", value=f"{icon} {new_status}")
-                return # ရှာတွေ့ရင် ဆက်မပတ်တော့ဘူး
+            # Treeview ထဲမှာ ပတ်ရှာပြီး သက်ဆိုင်ရာလူကိုပဲ update လုပ်မည်
+            for item in self.tree.get_children():
+                current_row_values = self.tree.item(item)['values']
+                
+                # Column index 0 က Employee ID ဖြစ်ရပါမည်
+                if str(current_row_values[0]) == target_user_id:
+                    self.tree.set(item, column="status", value=f"{icon} {new_status}")
+                    print(f"✨ UI Smooth Update: {target_user_id} -> {new_status}")
+                    break
+        except Exception as e:
+            print(f"⚠️ Row Update Error: {e}")
 
     def __del__(self):
-        """Dashboard ကို ပိတ်လိုက်လျှင် socket connection ဖြတ်ရန်"""
+        """Dashboard ကို ပိတ်လိုက်လျှင် socket connection ကို သေချာဖြတ်ရန်"""
         try:
             if hasattr(self, 'sio') and self.sio.connected:
                 self.sio.disconnect()
+                print("🔌 Dashboard Socket Disconnected Safely.")
         except:
             pass
