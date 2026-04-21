@@ -115,7 +115,7 @@ class LeaderDashboard(ctk.CTkFrame):
         try:
             if not self.sio.connected:
                 # သင့် Server IP ကို ဒီမှာ စစ်ဆေးပါ
-                self.sio.connect('http://192.168.1.4:5000', transports=['websocket', 'polling']) 
+                self.sio.connect('http://192.168.100.83:5000', transports=['websocket', 'polling']) 
             
             @self.sio.on("status_update")
             def on_update(data):

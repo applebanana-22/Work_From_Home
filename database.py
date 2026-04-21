@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
-    def __init__(self, host="192.168.1.4"):
+    def __init__(self, host="192.168.100.83"):
         self.host = host
         self.connect()
 
@@ -62,6 +62,56 @@ class Database:
             return True
         except Exception as e:
             print(f"Check-in Error: {e}")
+            return False
+        
+    def get_all_teams(self):
+        """Team အားလုံးကို database ထဲမှ ဆွဲထုတ်ရန်"""
+        try:
+            self.cursor.execute("SELECT * FROM teams")
+            return self.cursor.fetchall()
+        except Exception as e:
+            print(f"Error fetching teams: {e}")
+            return []
+    
+    def get_status_counts(self):
+        try:
+            self.cursor.execute("SELECT COUNT(*) as count FROM users WHERE current_status = 'Office'")
+            office_count = self.cursor.fetchone()['count']
+ 
+            self.cursor.execute("SELECT COUNT(*) as count FROM users WHERE current_status = 'WFH'")
+            wfh_count = self.cursor.fetchone()['count']
+ 
+            return office_count, wfh_count
+        except Exception as e:
+            print(f"Error counting status: {e}")
+            return 0, 0
+        
+    def check_out_user(self, user_id):
+        """Attendance table တွင် check_out အချိန်ကို update လုပ်ပြီး 
+           users table တွင် live status ကို offline ပြောင်းရန်"""
+        try:
+            self.ensure_connection()
+            
+            # ၁။ Attendance Table ကို Update လုပ်ခြင်း (ယနေ့အတွက်)
+            query_attendance = """
+                UPDATE attendance 
+                SET check_out = CURTIME() 
+                WHERE user_id = %s AND attendance_date = CURDATE() 
+                AND check_out IS NULL
+            """
+            self.cursor.execute(query_attendance, (user_id,))
+            
+            # ၂။ Users Table ရှိ live status ကို offline ပြောင်းခြင်း
+            query_user = "UPDATE users SET status = 'offline' WHERE id = %s"
+            self.cursor.execute(query_user, (user_id,))
+            
+            self.conn.commit()
+            print(f"✅ User ID {user_id} checked out successfully.")
+            return True
+        except Exception as e:
+            print(f"❌ Check-out Error: {e}")
+            if self.conn:
+                self.conn.rollback()
             return False
 
     # --- Live Tracking Update ---

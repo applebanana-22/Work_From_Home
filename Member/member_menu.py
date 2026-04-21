@@ -14,14 +14,22 @@ class MemberMenu:
         self.db = Database() 
         self.nav_buttons = []
 
+        # --- Sidebar Header Section ---
+        self.menu_label = ctk.CTkLabel(
+            self.sidebar, text="MEMBER PANEL", 
+            font=("Arial", 11, "bold"), text_color="gray"
+        )
+        self.menu_label.pack(anchor="w", padx=20, pady=(20, 10))
+
+        # Menu များအားလုံးကို Setup ပြုလုပ်မည်
         self.setup_menu()
         
-        # 🔥 FIX: Highlight the Dashboard button visually on startup
+        # အစဦးတွင် Dashboard ကို Highlight ပြထားမည်
         if self.nav_buttons:
             self.navigate(self.nav_buttons[0], self.show_dashboard)
         
     def setup_menu(self):
-        # Menu definitions
+        # Menu definitions - Sidebar တွင် ပေါ်မည့် အစီအစဉ်
         menus = [
             ("📊   Dashboard", self.show_dashboard),
             ("📰   Activity", self.show_activity),
@@ -41,10 +49,9 @@ class MemberMenu:
         btn = ctk.CTkButton(
             self.sidebar, 
             text=text, 
-            # Capture btn instance correctly for the lambda
+            # command logic ကို navigate function နှင့် ချိတ်ဆက်မည်
             command=lambda b=None: self.navigate(b, command),
             fg_color="transparent", 
-            # 🔥 FIX: Adaptive text color (Dark gray for Light mode, Light gray for Dark mode)
             text_color=("#333333", "#D1D1D1"), 
             hover_color=("#E0E0E0", "#2B2B2B"), 
             anchor="w", 
@@ -52,32 +59,44 @@ class MemberMenu:
             font=("Arial", 13, "bold"),
             corner_radius=8
         )
-        # Re-configure to pass the button itself to the navigate function
+        # Button instance ကို lambda ထဲသို့ ပြန်ထည့်ပေးခြင်း
         btn.configure(command=lambda b=btn: self.navigate(b, command))
         
+        # Responsive ဖြစ်စေရန် pack fill="x" ကို အသုံးပြုပါသည်
         btn.pack(fill="x", padx=12, pady=2)
         self.nav_buttons.append(btn)
 
     def navigate(self, active_btn, command):
         """Visual feedback for selection with Blue highlight"""
         for btn in self.nav_buttons:
-            # Reset to adaptive colors
+            # Unselected buttons များကို reset လုပ်မည်
             btn.configure(
                 fg_color="transparent", 
                 text_color=("#333333", "#D1D1D1")
             )
             
         # Highlight active (Blue background, White text)
-        active_btn.configure(
-            fg_color=("#3498DB", "#1F538D"), 
-            text_color="white"
-        )
+        if active_btn:
+            active_btn.configure(
+                fg_color=("#3498DB", "#1F538D"), 
+                text_color="white"
+            )
         command()
 
     def clear(self):
-        """Safely clear the content area"""
+        """Safely clear the content area (main view)"""
         for w in self.content.winfo_children(): 
             w.destroy()
+
+    def show_error(self, message):
+        """Error ဖြစ်ခဲ့လျှင် screen ပေါ်တွင် ပြသရန် helper function"""
+        self.clear()
+        ctk.CTkLabel(
+            self.content, 
+            text=f"⚠️ {message}", 
+            text_color="#E74C3C", 
+            font=("Arial", 14, "bold")
+        ).pack(pady=50)
 
     # --- View Switching Logic ---
 
@@ -87,7 +106,7 @@ class MemberMenu:
             view = MemberDashboard(self.content, self.user, self.db)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Dashboard Error: {e}")
+            self.show_error(f"Dashboard Error: {str(e)}")
 
     def show_activity(self):
         self.clear()
@@ -95,7 +114,7 @@ class MemberMenu:
             view = MemberActivity(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Activity Error: {e}")
+            self.show_error(f"Activity Error: {str(e)}")
 
     def show_project(self):
         self.clear()
@@ -103,7 +122,7 @@ class MemberMenu:
             view = MemberProject(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Tasks Error: {e}")
+            self.show_error(f"Tasks Error: {str(e)}")
 
     def show_report(self):
         self.clear()
@@ -111,7 +130,7 @@ class MemberMenu:
             view = MemberReportFrame(self.content, user=self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Report Error: {e}")
+            self.show_error(f"Report Error: {str(e)}")
 
     def show_overtime(self):
         self.clear()
@@ -120,7 +139,7 @@ class MemberMenu:
             view = MemberOvertime(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Overtime View Error: {e}")
+            self.show_error(f"Overtime View Error: {str(e)}")
 
     def show_leave_request(self):
         self.clear()
@@ -129,7 +148,7 @@ class MemberMenu:
             view = MemberLeave(self.content, self.user) 
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Leave View Error: {e}")
+            self.show_error(f"Leave View Error: {str(e)}")
 
     def show_schedule(self):
         self.clear()
@@ -137,7 +156,7 @@ class MemberMenu:
             view = MemberSchedule(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Schedule View Error: {e}")
+            self.show_error(f"Schedule View Error: {str(e)}")
     
     def show_attendance(self):
         self.clear()
@@ -146,8 +165,4 @@ class MemberMenu:
             view = MemberAttendance(self.content, self.user)
             view.pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error(f"Attendance View Error: {e}")
-
-    def show_error(self, message):
-        """Helper to show errors on the screen"""
-        ctk.CTkLabel(self.content, text=message, text_color="#E74C3C", font=("Arial", 14, "bold")).pack(pady=50)
+            self.show_error(f"Attendance View Error: {str(e)}")

@@ -1,7 +1,6 @@
 import customtkinter as ctk
 from Admin.admin_users import AdminUsers
 from Admin.admin_activity import AdminAnnouncements 
-# 1. Import your new Team Management class here
 from Admin.admin_teams import AdminTeams
 from Admin.admin_attendance import AdminAttendance
 
@@ -12,12 +11,21 @@ class AdminMenu:
         self.user = user
         self.nav_buttons = [] 
 
-        # Navigation Buttons
+        # --- Sidebar Header Section ---
+        # Sidebar ရဲ့ ထိပ်ဆုံးမှာ Section Title လေးထည့်ပေးခြင်းဖြင့် ပိုကြည့်ကောင်းစေသည်
+        self.menu_label = ctk.CTkLabel(
+            self.sidebar, text="ADMIN CONTROLS", 
+            font=("Arial", 11, "bold"), text_color="gray"
+        )
+        self.menu_label.pack(anchor="w", padx=20, pady=(20, 10))
+
+        # --- Navigation Buttons ---
         self.add_nav_btn("📰   Activity", self.show_activity)
         self.add_nav_btn("👥   User Management", self.show_users)
         self.add_nav_btn("🛡️   Team Management", self.show_teams) 
         self.add_nav_btn("📅   Attendance", self.show_attendance)
 
+        # Default စဖွင့်မည့် Page
         self.show_activity()
 
     def add_nav_btn(self, text, command):
@@ -34,20 +42,23 @@ class AdminMenu:
             font=("Arial", 13, "bold"),
             corner_radius=8
         )
+        # Responsive ဖြစ်စေရန် pack ကို စနစ်တကျသုံးထားခြင်း
         btn.pack(fill="x", padx=12, pady=2)
         self.nav_buttons.append(btn)
 
     def on_btn_click(self, clicked_btn, command):
         """Visual feedback when a button is selected"""
         for btn in self.nav_buttons:
-            # Reset text color to adaptive gray when unselected
+            # Reset unselected buttons
             btn.configure(fg_color="transparent", text_color=("#333333", "#D1D1D1"))
         
-        # Highlight selected
-        clicked_btn.configure(fg_color=("#3498DB", "#1f538d"), text_color="white")
+        # Highlight selected button
+        # Selected color ကို Theme နဲ့ လိုက်ဖက်အောင် Blue ပေးထားသည်
+        clicked_btn.configure(fg_color=("#3498DB", "#1F538D"), text_color="white")
         command()
 
     def clear_content(self):
+        """Main view ကို ရှင်းလင်းခြင်း"""
         for widget in self.content.winfo_children():
             widget.destroy()
 
@@ -67,7 +78,6 @@ class AdminMenu:
         except Exception as e:
             self.show_error("User Management", e)
 
-    # 3. Add the new View Method
     def show_teams(self):
         self.clear_content()
         try:
@@ -76,23 +86,6 @@ class AdminMenu:
         except Exception as e:
             self.show_error("Team Management", e)
 
-    def show_logs(self):
-        self.clear_content()
-        ctk.CTkLabel(
-            self.content, 
-            text="System Logs - Access History", 
-            font=("Arial", 22, "bold"),
-            text_color=("#2C3E50", "#FFFFFF") 
-        ).pack(pady=20)
-
-    def show_error(self, view_name, error):
-        error_lbl = ctk.CTkLabel(
-            self.content, 
-            text=f"Error loading {view_name}: {error}",
-            text_color="#E74C3C"
-        )
-        error_lbl.pack(pady=20)
-    
     def show_attendance(self):
         self.clear_content()
         try:
@@ -100,3 +93,15 @@ class AdminMenu:
             attendance_view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error("Attendance", e)
+
+    def show_error(self, view_name, error):
+        """Error ဖြစ်ခဲ့လျှင် ပြသရန်"""
+        error_lbl = ctk.CTkLabel(
+            self.content, 
+            text=f"⚠️ Error loading {view_name}: {str(error)}",
+            font=("Arial", 14),
+            text_color="#E74C3C"
+        )
+        error_lbl.pack(pady=40)
+
+    # Note: show_logs logic ကို လောလောဆယ် ခလုတ်မထည့်ထားသေးပါ (လိုအပ်လျှင် add_nav_btn တွင် ထပ်ပေါင်းနိုင်သည်)

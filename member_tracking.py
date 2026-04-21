@@ -4,7 +4,7 @@ import time
 from pynput import mouse, keyboard
 
 class MemberTracking:
-    def __init__(self, user_id, server_url="http://192.168.1.4:5000"):
+    def __init__(self, user_id, server_url="http://192.168.100.83:5000"):
         self.user_id = user_id
         self.server_url = server_url
         self.sio = socketio.Client(reconnection=True)

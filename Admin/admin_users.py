@@ -1,180 +1,572 @@
+import re
 import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
-
+ 
 class UserRegisterFrame(ctk.CTkFrame):
-    """The Registration Form UI - Now a Frame instead of a Toplevel"""
+    """The Registration Form UI - Handles dynamic visibility and auto-increment ID"""
     def __init__(self, parent, db, back_callback):
         super().__init__(parent, fg_color="transparent")
         self.db = db
         self.back_callback = back_callback
-        
+       
         # --- Top Navigation ---
         self.nav_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.nav_bar.pack(fill="x", padx=20, pady=10)
-        
+       
         self.back_btn = ctk.CTkButton(
-            self.nav_bar, text="← Back to Users", width=100, 
+            self.nav_bar, text="← Back to Users", width=100,
             fg_color="#4A4A4A", hover_color="#333333",
             command=self.back_callback
         )
         self.back_btn.pack(side="left")
-
+ 
         ctk.CTkLabel(self, text="Register New Account", font=("Arial", 22, "bold")).pack(pady=15)
-
+ 
         # Form Container
-        self.f = ctk.CTkFrame(self, fg_color="transparent")
-        self.f.pack(fill="both", expand=True, padx=40)
-
-        # Entry Fields
-        self.emp_id = ctk.CTkEntry(self.f, placeholder_text="Employee ID", height=45)
-        self.emp_id.pack(fill="x", pady=8)
-
-        self.name = ctk.CTkEntry(self.f, placeholder_text="Full Name", height=45)
-        self.name.pack(fill="x", pady=8)
-
-        self.uname = ctk.CTkEntry(self.f, placeholder_text="Username", height=45)
-        self.uname.pack(fill="x", pady=8)
-
-        self.pwd = ctk.CTkEntry(self.f, placeholder_text="Password", height=45, show="*")
-        self.pwd.pack(fill="x", pady=8)
-
-        # Role Selection
-        ctk.CTkLabel(self.f, text="User Role:", font=("Arial", 12)).pack(anchor="w", padx=5, pady=(10, 0))
+        self.main_container = ctk.CTkFrame(self, fg_color="#252525", border_width=1, corner_radius=10)
+        self.main_container.pack(fill="both", expand=True, padx=100, pady=(10, 40))
+ 
+        # --- The Grid Form ---
+        self.f = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.f.pack(expand=True, padx=50, pady=30)
+       
+        self.f.grid_columnconfigure(0, weight=1, minsize=150)
+        self.f.grid_columnconfigure(1, weight=1)
+ 
+        # 1. Employee ID (Auto-generated & Disabled)
+        ctk.CTkLabel(self.f, text="Employee ID:", font=("Arial", 13)).grid(row=0, column=0, padx=15, pady=10, sticky="e")
+        self.emp_id = ctk.CTkEntry(self.f, height=40, width=400, fg_color="#3d3d3d")
+        self.emp_id.grid(row=0, column=1, padx=15, pady=10, sticky="w")
+       
+        next_id = self.get_next_emp_id()
+        self.emp_id.insert(0, str(next_id))
+        self.emp_id.configure(state="disabled")
+ 
+        # 2. Full Name
+        ctk.CTkLabel(self.f, text="Full Name:", font=("Arial", 13)).grid(row=1, column=0, padx=15, pady=10, sticky="e")
+        self.name = ctk.CTkEntry(self.f, height=40, width=400)
+        self.name.grid(row=1, column=1, padx=15, pady=10, sticky="w")
+ 
+        # 3. Username
+        ctk.CTkLabel(self.f, text="Username:", font=("Arial", 13)).grid(row=2, column=0, padx=15, pady=10, sticky="e")
+        self.uname = ctk.CTkEntry(self.f, height=40, width=400)
+        self.uname.grid(row=2, column=1, padx=15, pady=10, sticky="w")
+ 
+        # 4. Password
+        ctk.CTkLabel(self.f, text="Password:", font=("Arial", 13)).grid(row=3, column=0, padx=15, pady=10, sticky="e")
+        self.pwd = ctk.CTkEntry(self.f, height=40, width=400, show="*")
+        self.pwd.grid(row=3, column=1, padx=15, pady=10, sticky="w")
+ 
+        # 5. Role Selection
+        ctk.CTkLabel(self.f, text="User Role:", font=("Arial", 13)).grid(row=4, column=0, padx=15, pady=10, sticky="e")
         self.role = ctk.CTkOptionMenu(
-            self.f, values=["admin", "leader", "member"], 
-            height=40, command=self.update_ui_by_role
+            self.f,
+            values=["Choose Role", "admin", "leader", "member"],
+            height=40, width=400,
+            command=self.update_ui_by_role
         )
-        self.role.pack(fill="x", pady=(2, 12))
-        self.role.set("member")
-
-        # Team Selection
-        ctk.CTkLabel(self.f, text="Assign Team:", font=("Arial", 12)).pack(anchor="w", padx=5)
+        self.role.grid(row=4, column=1, padx=15, pady=10, sticky="w")
+        self.role.set("Choose Role")
+ 
+        # 6. Team Selection (Hidden by default until role is chosen)
+        self.team_label = ctk.CTkLabel(self.f, text="Assign Team:", font=("Arial", 13))
+       
         teams_data = self.db.get_all_teams()
         self.team_map = {t['team_name']: t['team_id'] for t in teams_data}
-        team_options = list(self.team_map.keys()) if self.team_map else ["No Teams Found"]
-
-        self.team_dropdown = ctk.CTkOptionMenu(self.f, values=team_options, height=40)
-        self.team_dropdown.pack(fill="x", pady=(2, 12))
-
-        # Batch Field
-        self.batch_frame = ctk.CTkFrame(self.f, fg_color="transparent")
-        self.batch_frame.pack(fill="x")
-        ctk.CTkLabel(self.batch_frame, text="Batch Number:", font=("Arial", 12)).pack(anchor="w", padx=5)
-        self.batch = ctk.CTkEntry(self.batch_frame, placeholder_text="e.g. 11, 12", height=45)
-        self.batch.pack(fill="x", pady=(2, 10))
-
-        self.save_btn = ctk.CTkButton(
-            self.f, text="Save Account", height=50, 
-            fg_color="#10B981", hover_color="#059669", 
-            font=("Arial", 15, "bold"), command=self.save_user
-        )
-        self.save_btn.pack(fill="x", pady=30)
-
-    def update_ui_by_role(self, choice):
-        if choice == "member":
-            self.batch_frame.pack(fill="x", after=self.team_dropdown)
-        else:
-            self.batch_frame.pack_forget()
-
-    def save_user(self):
-        role_val = self.role.get()
-        selected_team = self.team_dropdown.get()
-        team_id = self.team_map.get(selected_team)
-        batch_input = self.batch.get().strip() if role_val == "member" else ""
-        formatted_batch = f"Batch {batch_input}" if batch_input else "N/A"
-
-        if not all([self.emp_id.get(), self.name.get(), self.uname.get(), self.pwd.get()]):
-            messagebox.showwarning("Error", "Required fields are empty!")
-            return
-
+        team_options = ["Choose Team"] + list(self.team_map.keys()) if self.team_map else ["Choose Team", "No Teams Found"]
+        self.team_dropdown = ctk.CTkOptionMenu(self.f, values=team_options, height=40, width=400)
+        self.team_dropdown.set("Choose Team")
+ 
+        # 7. Batch Selection (Hidden by default)
+        self.batch_label = ctk.CTkLabel(self.f, text="Batch Number:", font=("Arial", 13))
+        self.batch = ctk.CTkEntry(self.f, height=45, width=400)
+ 
+        # 8. Save Button
+        self.save_btn = ctk.CTkButton(self.f, text="Register", width=150, height=40, fg_color="#10B981", command=self.save_user)
+        self.save_btn.grid(row=10, column=0, columnspan=2, pady=30)
+ 
+    def get_next_emp_id(self):
         try:
-            sql = """INSERT INTO users (employee_id, full_name, username, password, role, team_id, batch) 
+            self.db.cursor.execute("SELECT MAX(CAST(employee_id AS UNSIGNED)) as max_id FROM users")
+            result = self.db.cursor.fetchone()
+            return (int(result['max_id']) + 1) if result and result['max_id'] else 1001
+        except:
+            return 1001
+ 
+    def update_ui_by_role(self, choice):
+        """Hides/Shows fields based on Role"""
+        # Hide everything dynamic first
+        self.batch_label.grid_forget()
+        self.batch.grid_forget()
+        self.team_label.grid_forget()
+        self.team_dropdown.grid_forget()
+ 
+        if choice == "leader":
+            self.team_label.grid(row=5, column=0, padx=15, pady=10, sticky="e")
+            self.team_dropdown.grid(row=5, column=1, padx=15, pady=10, sticky="w")
+        elif choice == "member":
+            self.team_label.grid(row=5, column=0, padx=15, pady=10, sticky="e")
+            self.team_dropdown.grid(row=5, column=1, padx=15, pady=10, sticky="w")
+            self.batch_label.grid(row=6, column=0, padx=15, pady=10, sticky="e")
+            self.batch.grid(row=6, column=1, padx=15, pady=10, sticky="w")
+        # 'admin' remains with them hidden
+ 
+    def validate_inputs(self):
+        full_name = self.name.get().strip()
+        username = self.uname.get().strip()
+        password = self.pwd.get().strip()
+        role_val = self.role.get()
+        batch_val = self.batch.get().strip()
+ 
+        if not all([full_name, username, password]):
+            return False, "All core fields are required!"
+        if full_name.isdigit():
+            return False, "Full Name cannot be numeric."
+        if len(full_name) < 2:
+            return False, "Full Name is too short."
+        if username.isdigit():
+            return False, "User Name cannot be numeric."
+        if " " in username:
+            return False, "Username cannot contain spaces."
+        if len(username) < 4:
+            return False, "Username must be at least 4 characters."
+        if len(password) < 6:
+            return False, "Password must be at least 6 characters long."
+        if not re.search(r"[A-Z]", password) or not re.search(r"[a-z]", password) or not re.search(r"\d", password):
+            return False, "Password must contain uppercase, lowercase, and a number."
+        if len(password) > 20:
+            return False, "Password is too long."
+        if role_val == "Choose Role":
+            return False, "Please select a valid User Role."
+        if role_val != "admin":
+            if self.team_dropdown.get() == "Choose Team":
+                return False, "Please select a valid Team."
+       
+        batch_val = self.batch.get().strip()
+ 
+        # 1. Basic empty check for core fields
+        if not all([full_name, username, password]):          
+            return False, "All fields are required!"
+ 
+        # ... (other validations)
+ 
+        # 2. Batch Number specific validation
+        if batch_val:
+            # Check if it contains ONLY numbers
+            if not batch_val.isdigit():
+                return False, "Batch Number must contain only numbers (no letters or characters)."
+           
+            # Check range
+            if int(batch_val) < 1 or int(batch_val) > 100:
+                return False, "Batch Number must be between 1 and 100."
+       
+        # 3. Required check for members
+        if role_val == "member" and not batch_val:
+            return False, "Batch Number is required for members."
+        return True, "Success"
+ 
+    def save_user(self):
+        is_valid, msg = self.validate_inputs()
+        if not is_valid:
+            messagebox.showwarning("Validation Error", msg)
+            return
+ 
+        role_val = self.role.get()
+        # Admin gets no team, others get selected team
+        team_id = self.team_map.get(self.team_dropdown.get()) if role_val != "admin" else None
+       
+        # Batch formatting
+        batch_input = self.batch.get().strip()
+        formatted_batch = f"Batch {batch_input}" if (role_val == "member" and batch_input) else "N/A"
+ 
+        try:
+            sql = """INSERT INTO users (employee_id, full_name, username, password, role, team_id, batch)
                      VALUES (%s, %s, %s, %s, %s, %s, %s)"""
-            data = (self.emp_id.get(), self.name.get(), self.uname.get(), 
-                    self.pwd.get(), role_val, team_id, formatted_batch)
-            
+            data = (
+                self.emp_id.get(),
+                self.name.get().strip(),
+                self.uname.get().strip(),
+                self.pwd.get(),
+                role_val,
+                team_id,
+                formatted_batch
+            )
             self.db.cursor.execute(sql, data)
             self.db.conn.commit()
-            messagebox.showinfo("Success", f"User {self.name.get()} created!")
-            self.back_callback() # Switch back to list view
+            messagebox.showinfo("Success", f"User {self.name.get()} created successfully!")
+            self.back_callback()
         except Exception as e:
             messagebox.showerror("Database Error", str(e))
-
-
+           
+           
+class UserUpdateFrame(ctk.CTkFrame):
+    """The Update Form UI - Pre-fills data and updates existing records"""
+    def __init__(self, parent, db, user_id, back_callback):
+        super().__init__(parent, fg_color="transparent")
+        self.db = db
+        self.user_id = user_id
+        self.back_callback = back_callback
+       
+        # UI Setup (Similar to Register Frame)
+        self.nav_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self.nav_bar.pack(fill="x", padx=20, pady=10)
+       
+        ctk.CTkButton(self.nav_bar, text="← Back", width=100, fg_color="#4A4A4A",
+                      command=self.back_callback).pack(side="left")
+ 
+        ctk.CTkLabel(self, text="Update User Account", font=("Arial", 22, "bold")).pack(pady=15)
+ 
+        self.main_container = ctk.CTkFrame(self, fg_color="#252525", border_width=1, corner_radius=10)
+        self.main_container.pack(fill="both", expand=True, padx=100, pady=(10, 40))
+ 
+        self.f = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.f.pack(expand=True, padx=50, pady=30)
+ 
+        # Fields (Same as registration, but without password requirement usually)
+        ctk.CTkLabel(self.f, text="Full Name:").grid(row=0, column=0, padx=15, pady=10, sticky="e")
+        self.name = ctk.CTkEntry(self.f, height=40, width=400)
+        self.name.grid(row=0, column=1, padx=15, pady=10)
+ 
+        ctk.CTkLabel(self.f, text="Username:").grid(row=1, column=0, padx=15, pady=10, sticky="e")
+        self.uname = ctk.CTkEntry(self.f, height=40, width=400)
+        self.uname.grid(row=1, column=1, padx=15, pady=10)
+ 
+        ctk.CTkLabel(self.f, text="User Role:").grid(row=2, column=0, padx=15, pady=10, sticky="e")
+        self.role = ctk.CTkOptionMenu(self.f, values=["admin", "leader", "member"], height=40, width=400)
+        self.role.grid(row=2, column=1, padx=15, pady=10)
+       
+        # --- Team ---
+        self.team_label = ctk.CTkLabel(self.f, text="Team:")
+        self.team_dropdown = ctk.CTkOptionMenu(self.f, values=[] , height=40, width=400)
+ 
+        # --- Batch ---
+        self.batch_label = ctk.CTkLabel(self.f, text="Batch:")
+        self.batch = ctk.CTkEntry(self.f, height=40, width=400)
+       
+        teams_data = self.db.get_all_teams()
+        self.team_map = {t['team_name']: t['team_id'] for t in teams_data}
+        team_options = list(self.team_map.keys()) if self.team_map else ["No Teams"]
+        self.team_dropdown.configure(values=team_options)
+ 
+        self.update_btn = ctk.CTkButton(self.f, text="Save Changes", fg_color="#166DBF",
+                                       command=self.perform_update)
+        self.update_btn.grid(row=5, column=0, columnspan=2, pady=30)
+ 
+        self.load_user_data()
+    def update_ui_by_role(self, role):
+        self.team_label.grid_forget()
+        self.team_dropdown.grid_forget()
+        self.batch_label.grid_forget()
+        self.batch.grid_forget()
+ 
+        if role == "leader":
+            self.team_label.grid(row=3, column=0, padx=15, pady=10, sticky="e")
+            self.team_dropdown.grid(row=3, column=1, padx=15, pady=10)
+ 
+        elif role == "member":
+            self.team_label.grid(row=3, column=0, padx=15, pady=10, sticky="e")
+            self.team_dropdown.grid(row=3, column=1, padx=15, pady=10)
+ 
+            self.batch_label.grid(row=4, column=0, padx=15, pady=10, sticky="e")
+            self.batch.grid(row=4, column=1, padx=15, pady=10)
+ 
+    def load_user_data(self):
+        self.db.cursor.execute("SELECT * FROM users WHERE id=%s", (self.user_id,))
+        user = self.db.cursor.fetchone()
+ 
+        if user:
+            self.name.insert(0, user['full_name'])
+            self.uname.insert(0, user['username'])
+            self.role.set(user['role'])
+ 
+            # ✅ ADD THESE BELOW
+            self.update_ui_by_role(user['role'])
+ 
+            if user['team_id']:
+                for name, tid in self.team_map.items():
+                    if tid == user['team_id']:
+                        self.team_dropdown.set(name)
+ 
+            if user['batch'] and user['batch'] != "N/A":
+                self.batch.insert(0, user['batch'].replace("Batch ", ""))
+ 
+    def perform_update(self):
+        try:
+            role = self.role.get()
+            team_id = None
+            batch_val = "N/A"
+ 
+            if role != "admin":
+                team_id = self.team_map.get(self.team_dropdown.get())
+ 
+            if role == "member":
+                batch_input = self.batch.get().strip()
+                batch_val = f"Batch {batch_input}" if batch_input else "N/A"
+ 
+            sql = """
+            UPDATE users
+            SET full_name=%s, username=%s, role=%s, team_id=%s, batch=%s
+            WHERE id=%s
+            """
+ 
+            val = (
+                self.name.get(),
+                self.uname.get(),
+                role,
+                team_id,
+                batch_val,
+                self.user_id
+            )
+ 
+            self.db.cursor.execute(sql, val)
+            self.db.conn.commit()
+ 
+            messagebox.showinfo("Success", "User updated successfully!")
+            self.back_callback()
+ 
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+ 
 class AdminUsers(ctk.CTkFrame):
-    """The Main Controller - Manages switching between List and Register form"""
+    """Main User Management View"""
     def __init__(self, master, user_data):
         super().__init__(master, fg_color="transparent")
         self.db = Database()
         self.user = user_data
-
-        # Single container that we clear and refill
         self.container = ctk.CTkFrame(self, fg_color="transparent")
         self.container.pack(fill="both", expand=True)
-
         self.show_list_view()
-
+ 
     def clear_container(self):
         for widget in self.container.winfo_children():
             widget.destroy()
-
+ 
     def show_list_view(self):
         self.clear_container()
-
-        # Header
         header = ctk.CTkFrame(self.container, fg_color="transparent")
-        header.pack(fill="x", padx=20, pady=20)
+        header.pack(fill="x", padx=100, pady=20)
+       
         ctk.CTkLabel(header, text="User Management", font=("Arial", 24, "bold")).pack(side="left")
-
-        self.add_btn = ctk.CTkButton(
-            header, text="+ Create Account", fg_color="#10B981", 
-            height=38, command=self.show_register_view
+       
+        # --- FILTER BAR ---
+        filter_frame = ctk.CTkFrame(self.container, fg_color="transparent")
+        filter_frame.pack(fill="x", padx=100, pady=(0, 10))
+ 
+        self.search_id = ctk.CTkEntry(filter_frame, placeholder_text="Employee ID", width=120)
+        self.search_id.pack(side="left", padx=5)
+ 
+        self.search_name = ctk.CTkEntry(filter_frame, placeholder_text="Full Name", width=150)
+        self.search_name.pack(side="left", padx=5)
+ 
+        self.search_role = ctk.CTkOptionMenu(
+            filter_frame,
+            values=["All", "admin", "leader", "member"],
+            width=120
         )
-        self.add_btn.pack(side="right")
-
-        # List
-        self.list_frame = ctk.CTkScrollableFrame(self.container, label_text="Active Accounts")
-        self.list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        self.search_role.set("All")
+        self.search_role.pack(side="left", padx=5)
+ 
+        teams = ["All"] + self.get_team_names()
+        self.search_team = ctk.CTkOptionMenu(filter_frame, values=teams, width=120)
+        self.search_team.set("All")
+        self.search_team.pack(side="left", padx=5)
+ 
+        self.search_batch = ctk.CTkEntry(filter_frame, placeholder_text="Batch", width=100)
+        self.search_batch.pack(side="left", padx=5)
+ 
+        ctk.CTkButton(filter_frame, text="Filter", width=90, command=self.filter_users).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="Reset", fg_color="#6B7280", width=90, command=self.reset_filters).pack(side="left", padx=5)
+       
+        ctk.CTkButton(
+            header, text="+ Create Account",
+            fg_color="#10B981", height=38,
+            command=self.show_register_view
+        ).pack(side="right")
+       
+        self.list_frame = ctk.CTkScrollableFrame(self.container, label_text="Our Members",label_font=("Arial", 16, "bold"), label_text_color=("#0E0E0E", "#AAAAAA"), fg_color=("#FFFFFF", "#181818"), border_width=1, border_color=("#E0E0E0", "#2B2B2B"))
+        self.list_frame.pack(fill="both", expand=True, padx=100, pady=10)
         self.refresh_list()
-
+ 
     def show_register_view(self):
         self.clear_container()
-        # Create form and tell it to call 'show_list_view' when finished/canceled
         reg_form = UserRegisterFrame(self.container, self.db, self.show_list_view)
         reg_form.pack(fill="both", expand=True)
-
+       
+    def get_team_names(self):
+        self.db.cursor.execute("SELECT team_name FROM teams")
+        return [t['team_name'] for t in self.db.cursor.fetchall()]
+ 
     def refresh_list(self):
-        for w in self.list_frame.winfo_children(): w.destroy()
-        
+        for w in self.list_frame.winfo_children():
+            w.destroy()
+ 
         sql = """
-            SELECT u.*, t.team_name 
-            FROM users u
-            LEFT JOIN teams t ON u.team_id = t.team_id 
-            ORDER BY u.id DESC
+        SELECT u.*, t.team_name
+        FROM users u
+        LEFT JOIN teams t ON u.team_id = t.team_id
+        ORDER BY u.id DESC
         """
         self.db.cursor.execute(sql)
-        
-        for row in self.db.cursor.fetchall():
-            card = ctk.CTkFrame(self.list_frame, corner_radius=8, border_width=1, fg_color=("#FFFFFF", "#252525"))
-            card.pack(fill="x", pady=5, padx=10)
-            
-            display_info = f"{row['full_name']} ({row['employee_id']})"
-            ctk.CTkLabel(card, text=display_info, font=("Arial", 13, "bold")).pack(side="left", padx=15, pady=12)
-            
-            team_text = row['team_name'] if row['team_name'] else "No Team"
-            ctk.CTkLabel(card, text=f"📍 {team_text}", font=("Arial", 11, "italic"), text_color="#3498DB").pack(side="left", padx=10)
-
+        rows = self.db.cursor.fetchall()
+ 
+        # --- TABLE HEADER ---
+        headers = ["Employee ID", "Full Name", "Role", "Team", "Batch", "Actions"]
+ 
+        for col, header in enumerate(headers):
+            ctk.CTkLabel(
+                self.list_frame,
+                text=header,
+                font=("Arial", 13, "bold")
+            ).grid(row=0, column=col, padx=10, pady=10, sticky="w")
+ 
+        # --- TABLE ROWS ---
+        for i, row in enumerate(rows, start=1):
+            emp_id = row['employee_id']
+            name = row['full_name']
+            role = row['role']
+            team = row['team_name'] if row['team_name'] else "No Team"
+            batch = row['batch'] if row['batch'] else "N/A"
+ 
+            ctk.CTkLabel(self.list_frame, text=emp_id).grid(row=i, column=0, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=name).grid(row=i, column=1, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=role).grid(row=i, column=2, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=team).grid(row=i, column=3, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=batch).grid(row=i, column=4, padx=10, pady=8, sticky="w")
+ 
+            # --- ACTION BUTTONS ---
+            btn_frame = ctk.CTkFrame(self.list_frame, fg_color="transparent")
+            btn_frame.grid(row=i, column=5, padx=10, pady=5)
+ 
             ctk.CTkButton(
-                card, text="Delete", width=70, height=28, fg_color="#C0392B", 
-                command=lambda i=row['id']: self.handle_delete(i)
-            ).pack(side="right", padx=15)
-
+                btn_frame, text="Update", width=70, height=28,
+                fg_color="#166DBF",
+                command=lambda uid=row['id']: self.handle_update(uid)
+            ).pack(side="left", padx=5)
+ 
+            ctk.CTkButton(
+                btn_frame, text="Delete", width=70, height=28,
+                fg_color="#C0392B",
+                command=lambda uid=row['id']: self.handle_delete(uid)
+            ).pack(side="left", padx=5)
+    def filter_users(self):
+        for w in self.list_frame.winfo_children():
+            w.destroy()
+ 
+        conditions = []
+        params = []
+ 
+        if self.search_id.get():
+            conditions.append("u.employee_id LIKE %s")
+            params.append(f"%{self.search_id.get()}%")
+ 
+        if self.search_name.get():
+            conditions.append("u.full_name LIKE %s")
+            params.append(f"%{self.search_name.get()}%")
+ 
+        if self.search_role.get() != "All":
+            conditions.append("u.role = %s")
+            params.append(self.search_role.get())
+ 
+        if self.search_team.get() != "All":
+            conditions.append("t.team_name = %s")
+            params.append(self.search_team.get())
+ 
+        if self.search_batch.get():
+            conditions.append("u.batch LIKE %s")
+            params.append(f"%{self.search_batch.get()}%")
+ 
+        where_clause = " AND ".join(conditions)
+        if where_clause:
+            where_clause = "WHERE " + where_clause
+ 
+        sql = f"""
+        SELECT u.*, t.team_name
+        FROM users u
+        LEFT JOIN teams t ON u.team_id = t.team_id
+        {where_clause}
+        ORDER BY u.id DESC
+        """
+ 
+        self.db.cursor.execute(sql, tuple(params))
+        rows = self.db.cursor.fetchall()
+ 
+        self.render_table(rows)
+    def reset_filters(self):
+        # Clear text fields
+        self.search_id.delete(0, "end" )
+        self.search_name.delete(0, "end" )
+        self.search_batch.delete(0, "end")
+ 
+        # Reset dropdowns
+        self.search_role.set("All")
+        self.search_team.set("All")
+       
+        self.search_id.focus()
+        self.search_name.focus()
+        self.search_batch.focus()
+        self.focus()  # Set focus back to the main frame
+ 
+    # Reload full list
+        self.refresh_list()
+       
+    def render_table(self, rows):
+    # --- TABLE HEADER ---
+        headers = ["Employee ID", "Full Name", "Role", "Team", "Batch", "Actions"]
+ 
+        for col, header in enumerate(headers):
+            ctk.CTkLabel(
+                self.list_frame,
+                text=header,
+                font=("Arial", 13, "bold")
+            ).grid(row=0, column=col, padx=10, pady=10, sticky="w")
+ 
+        # --- TABLE ROWS ---
+        for i, row in enumerate(rows, start=1):
+            emp_id = row['employee_id']
+            name = row['full_name']
+            role = row['role']
+            team = row['team_name'] if row['team_name'] else "No Team"
+            batch = row['batch'] if row['batch'] else "N/A"
+ 
+            ctk.CTkLabel(self.list_frame, text=emp_id).grid(row=i, column=0, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=name).grid(row=i, column=1, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=role).grid(row=i, column=2, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=team).grid(row=i, column=3, padx=10, pady=8, sticky="w")
+            ctk.CTkLabel(self.list_frame, text=batch).grid(row=i, column=4, padx=10, pady=8, sticky="w")
+ 
+            btn_frame = ctk.CTkFrame(self.list_frame, fg_color="transparent")
+            btn_frame.grid(row=i, column=5, padx=10, pady=5)
+ 
+            ctk.CTkButton(
+                btn_frame, text="Update", width=70, height=28,
+                fg_color="#166DBF",
+                command=lambda uid=row['id']: self.handle_update(uid)
+            ).pack(side="left", padx=5)
+ 
+            ctk.CTkButton(
+                btn_frame, text="Delete", width=70, height=28,
+                fg_color="#C0392B",
+                command=lambda uid=row['id']: self.handle_delete(uid)
+            ).pack(side="left", padx=5)
+       
+    def handle_update(self, uid):
+        self.clear_container()
+ 
+        update_form = UserUpdateFrame(
+            self.container,
+            self.db,
+            uid,
+            self.show_list_view
+        )
+ 
+        update_form.pack(fill="both", expand=True)
+ 
     def handle_delete(self, uid):
         if uid == self.user['id']:
             messagebox.showwarning("Denied", "You cannot delete yourself!")
             return
-        if messagebox.askyesno("Confirm", "Are you sure?"):
+        if messagebox.askyesno("Confirm", "Are you sure you want to delete this user?"):
             self.db.cursor.execute("DELETE FROM users WHERE id=%s", (uid,))
             self.db.conn.commit()
             self.refresh_list()
