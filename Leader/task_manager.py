@@ -1,21 +1,18 @@
+from turtle import right
 import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
 from tkcalendar import DateEntry  # Required for calendar selector
 
-class TaskManagerWindow(ctk.CTkToplevel):
-    def __init__(self, parent, project_id, project_name, user_data):
-        super().__init__(parent)
-        self.title(f"Tasks: {project_name}")
-        self.geometry("900x750")
+class TaskManager(ctk.CTkFrame):
+    def __init__(self, master, project_id, project_name, user, back_callback):
+        super().__init__(master)
         self.db = Database()
         self.project_id = project_id
         self.project_name = project_name
-        self.user = user_data 
-        
-        self.attributes("-topmost", True)
-        self.grab_set()
-
+        self.user = user
+        self.back_callback = back_callback
+            
         # --- Header ---
         self.header_f = ctk.CTkFrame(self, fg_color="transparent")
         self.header_f.pack(fill="x", padx=20, pady=15)
@@ -41,7 +38,7 @@ class TaskManagerWindow(ctk.CTkToplevel):
         # CALENDAR SELECTOR
         ctk.CTkLabel(control_f, text="📅").pack(side="left", padx=(5, 0))
         self.deadline_picker = DateEntry(control_f, width=12, background='darkblue',
-                                         foreground='white', borderwidth=2, 
+                                         foreground='white', borderwidth=2,
                                          date_pattern='yyyy-mm-dd')
         self.deadline_picker.pack(side="left", padx=5, pady=15)
 
@@ -56,6 +53,13 @@ class TaskManagerWindow(ctk.CTkToplevel):
         # --- Task List Area ---
         self.list_frame = ctk.CTkScrollableFrame(self, label_text="Task Breakdown", fg_color=("#F5F5F5", "#121212"))
         self.list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        ctk.CTkButton(
+            self,
+            text="← Back",
+            fg_color="gray",
+            command=self.back_callback
+        ).pack(pady=10)
 
         self.refresh_tasks()
 
@@ -90,9 +94,9 @@ class TaskManagerWindow(ctk.CTkToplevel):
                 info_f.pack(side="left", padx=15, pady=8)
                 
                 deadline = row.get('deadline', 'No deadline')
-                ctk.CTkLabel(info_f, text=row['task_name'], font=("Arial", 13, "bold")).pack(anchor="w")
-                ctk.CTkLabel(info_f, text=f"👤 {row['assigned_to']}  |  📅 {deadline}", 
-                             font=("Arial", 11), text_color="gray").pack(anchor="w")
+                ctk.CTkLabel(info_f, text=row['task_name'], font=("Arial", 15, "bold")).pack(anchor="w")
+                ctk.CTkLabel(info_f, text=f"👤 Assigned to: {row['assigned_to']}\n📅 Deadline: {deadline}", 
+                             font=("Arial", 13), text_color="gray").pack(anchor="w")
 
                 actions_f = ctk.CTkFrame(card, fg_color="transparent")
                 actions_f.pack(side="right", padx=10)
@@ -103,14 +107,20 @@ class TaskManagerWindow(ctk.CTkToplevel):
                              text_color=color, width=50).pack(side="right", padx=15)
 
                 # Edit Button (Orange Style)
-                ctk.CTkButton(actions_f, text="Edit", width=60, height=30,
+                ctk.CTkButton(actions_f, text="Edit", width=60, height=32,
                               fg_color="#F39C12", hover_color="#D35400", font=("Arial", 12),
-                              command=lambda r=row: self.open_edit_dialog(r)).pack(side="right", padx=5)
+                              command=lambda r=row: self.open_edit_dialog(r)).pack(side="left", padx=5)
 
                 # Delete Button (Red Style)
-                ctk.CTkButton(actions_f, text="🗑", width=35, height=30,
+                ctk.CTkButton(actions_f, text="Delete", width=60, height=32,
                               fg_color="#C0392B", hover_color="#A93226",
-                              command=lambda tid=row['id']: self.delete_task_with_confirm(tid)).pack(side="right", padx=5)
+                              command=lambda tid=row['id']: self.delete_task_with_confirm(tid)).pack(side="left", padx=5)
+                
+                
+                ctk.CTkButton(actions_f, text="History", width=70,
+                                fg_color="#2980B9",
+                                command=lambda tid=row['id']: self.view_history(tid)).pack(side="left", padx=5)
+                
             
             self.calculate_project_progress()
         except Exception as e: print(f"Refresh Error: {e}")
@@ -175,7 +185,6 @@ class TaskManagerWindow(ctk.CTkToplevel):
                 
             except Exception as e:
                 messagebox.showerror("Update Error", str(e))
-
         ctk.CTkButton(edit_win, text="Save Changes", command=save_changes, 
                       fg_color="#10B981", hover_color="#059669").pack(pady=25)
 
@@ -196,11 +205,28 @@ class TaskManagerWindow(ctk.CTkToplevel):
         member = self.member_dropdown.get()
         deadline = self.deadline_picker.get_date().strftime('%Y-%m-%d')
         
-        if not name or member in ["Select Member", "No Member"]:
-            messagebox.showwarning("Missing Info", "Enter task name and select a member.")
+        # if not name or member in ["Select Member", "No Member"]:
+        #     messagebox.showwarning("Missing Info", "Enter task name and select a member.")
+        #     return
+        
+        errors = []
+
+        if not name:
+            errors.append("• Please enter task name")
+
+        if member == "Select Member" or member == "No Member":
+            errors.append("• Please select a member")
+
+        # If there are errors, show all at once
+        if errors:
+            messagebox.showwarning(
+                "Missing Fields",
+                "\n".join(errors),
+                parent=self
+            )
             return
 
-        if messagebox.askyesno("Confirm", f"Assign '{name}' to {member}?", parent=self):
+        if messagebox.askyesno("Confirm", f"Do you want to assign task '{name}' to {member} with a deadline of {deadline}?", parent=self):
             try:
                 sql = "INSERT INTO tasks (project_id, task_name, assigned_to, deadline, progress) VALUES (%s, %s, %s, %s, 0)"
                 self.db.cursor.execute(sql, (self.project_id, name, member, deadline))
@@ -216,3 +242,85 @@ class TaskManagerWindow(ctk.CTkToplevel):
                 self.db.conn.commit()
                 self.refresh_tasks()
             except Exception as e: messagebox.showerror("Error", str(e), parent=self)
+        
+    def view_history(self, task_id):
+        win = ctk.CTkToplevel(self)
+        win.title("Progress History")
+        win.geometry("500x400")
+        
+        # ✅ IMPORTANT FIX
+        win.transient(self)
+        win.lift()
+        win.attributes("-topmost", True)
+        win.grab_set()
+        
+        ctk.CTkLabel(win, text="📊 Progress History", 
+                    font=("Arial", 18, "bold")).pack(pady=10)
+        
+        
+
+        # frame = ctk.CTkScrollableFrame(win)
+        # frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        try:
+            self.db.cursor.execute("""
+            SELECT *
+            FROM progress_history 
+            WHERE task_id = %s
+            ORDER BY update_date DESC
+            """, (task_id,))   
+
+            rows = self.db.cursor.fetchall()
+            
+            # NAME (MOVE HERE)
+            if rows:
+                member_name = rows[0]["member_name"]
+            #
+
+            ctk.CTkLabel(win, text=f"👤 {member_name}",
+                        font=("Arial", 14, "bold")).pack(pady=(0,10))
+            frame = ctk.CTkScrollableFrame(win)
+            frame.pack(fill="both", expand=True, padx=10, pady=10)
+          
+            # Header
+            header = ctk.CTkFrame(frame, fg_color="transparent")
+            header.pack(fill="x", padx=15, pady=(5,5))
+
+            ctk.CTkLabel(header, text="Date", width=120,
+                        font=("Arial", 13, "bold")).pack(side="left")
+
+            ctk.CTkLabel(header, text="Progress", width=80,
+                        font=("Arial", 13, "bold")).pack(side="left")
+
+            ctk.CTkLabel(header, text="Note",
+                        font=("Arial", 13, "bold")).pack(side="left")
+
+
+            # Divider
+            ctk.CTkFrame(frame, height=2, fg_color="gray").pack(fill="x", padx=15, pady=5)
+
+
+            # Rows
+            if not rows:
+                ctk.CTkLabel(frame, text="No history yet").pack(pady=20)
+            else:
+                for i, record in enumerate(rows):
+                    bg = "#2b2b2b" if i % 2 == 0 else "transparent"
+
+                    row = ctk.CTkFrame(frame, fg_color=bg)
+                    row.pack(fill="x", padx=15, pady=2)
+
+                    # Date
+                    ctk.CTkLabel(row, text=str(record["update_date"]), width=120,
+                                anchor="w").pack(side="left")
+
+                    # Progress
+                    ctk.CTkLabel(row, text=f'{record["progress"]}%', width=80,
+                                anchor="w").pack(side="left")
+
+                    # Note
+                    note_text = record["note"] if record["note"] else "-"
+                    ctk.CTkLabel(row, text=note_text,
+                                anchor="w").pack(side="left")               
+        except Exception as e:
+            print("History Error:", e)

@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
-    def __init__(self, host="192.168.100.83"):
+    def __init__(self, host="192.168.100.137"):
         self.host = host
         self.connect()
 
@@ -125,7 +125,26 @@ class Database:
             print(f"💾 DB Updated: {user_id} -> {status}")
         except Exception as e:
             print(f"DB Status Update Error: {e}")
-
+            
+    def insert_reply(self, announcement_id, user, message):
+        """
+        Insert a reply into the announcement_replies table.
+        """
+        try:
+            query = """
+                INSERT INTO announcement_replies
+                (announcement_id, message, created_by, created_at)
+                VALUES (%s, %s, %s, NOW())
+            """
+            self.cursor.execute(
+                query,
+                (announcement_id, message, user['full_name'])
+            )
+            self.conn.commit()
+        except Exception as e:
+            self.conn.rollback()
+            raise e
+            
     def close(self):
         try:
             if self.conn and self.conn.is_connected():

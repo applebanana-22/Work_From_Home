@@ -1,161 +1,391 @@
+from datetime import datetime
 import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
-from functools import partial
+from tkcalendar import DateEntry
 
 class MemberProject(ctk.CTkFrame):
     def __init__(self, master, user):
         super().__init__(master, fg_color="transparent")
+
         self.db = Database()
         self.user = user
 
-        # --- Header ---
-        self.header = ctk.CTkFrame(self, fg_color="transparent")
-        self.header.pack(fill="x", padx=30, pady=20)
+        # Define Modern Color Palette (Light Mode Color, Dark Mode Color)
+        self.colors = {
+            "main_bg": ("#F8FAFC", "#0F172A"),
+            "card_bg": ("#FFFFFF", "#1E293B"),
+            "text_main": ("#1E293B", "#F8FAFC"),
+            "text_muted": ("#64748B", "#94A3B8"),
+            "accent_blue": "#3B82F6",
+            "accent_green": "#10B981",
+            "accent_red": "#EF4444",
+            "accent_amber": "#F59E0B",
+            "border": ("#E2E8F0", "#334155")
+        }
+
+        # STATE
+        self.current_task = None
+        self.editing_history_id = None
+
+        # ---------------- LAYERS ----------------
+        self.layer1 = ctk.CTkFrame(self, fg_color="transparent")
+        self.layer2 = ctk.CTkFrame(self, fg_color="transparent")
+        self.layer3 = ctk.CTkFrame(self, fg_color="transparent")
+
+        self.layer1.pack(fill="both", expand=True)
+
+        self.build_layer1()
+        self.build_layer2()
+
+    # =========================================================
+    # LAYER SWITCHER
+    # =========================================================
+    def show_layer(self, layer):
+        for l in [self.layer1, self.layer2, self.layer3]:
+            l.pack_forget()
+        layer.pack(fill="both", expand=True, padx=20, pady=10)
+
+    # =========================================================
+    # LAYER 1 - TASK LIST (DASHBOARD)
+    # =========================================================
+    def build_layer1(self):
+        # Header
+        header = ctk.CTkFrame(self.layer1, fg_color="transparent")
+        header.pack(fill="x", pady=(10, 20))
+
+        ctk.CTkLabel(
+            header,
+            text="My Assigned Tasks",
+            font=("Inter", 28, "bold"),
+            text_color=self.colors["text_main"]
+        ).pack(side="left", padx=10)
+
+        ctk.CTkButton(
+            header,
+            text="↻ Refresh",
+            width=100,
+            fg_color=self.colors["accent_blue"],
+            hover_color="#2563EB",
+            corner_radius=8,
+            command=self.refresh_tasks
+        ).pack(side="right", padx=10)
+
+        # Scrollable Area
+        self.scroll = ctk.CTkScrollableFrame(
+            self.layer1, 
+            fg_color="transparent",
+            scrollbar_button_color=self.colors["accent_blue"]
+        )
+        self.scroll.pack(fill="both", expand=True)
+
+        self.refresh_tasks()
+
+    def refresh_tasks(self):
+        for w in self.scroll.winfo_children():
+            w.destroy()
+
+        # self.db.cursor.execute("""
+        #     SELECT t.*, p.project_name
+        #     FROM tasks t
+        #     JOIN projects p ON t.project_id = p.id
+        #     WHERE t.assigned_to = %s
+        #     ORDER BY t.id DESC
+        # """, (self.user['full_name'],))
+
+
+        self.db.cursor.execute("""
+            SELECT 
+                t.*, 
+                p.project_name,
+                t.status,
+                -- Calculate sum from history table for this specific task
+                COALESCE((
+                    SELECT SUM(h.progress) 
+                    FROM progress_history h 
+                    WHERE h.task_id = t.id
+                ), 0) as total_calculated_progress
+            FROM tasks t
+            JOIN projects p ON t.project_id = p.id
+            WHERE t.assigned_to = %s
+            ORDER BY t.id DESC
+        """, (self.user['full_name'],))
+
+        tasks = self.db.cursor.fetchall()
+        for task in tasks:
+            self.create_task_card(task)
+
+    def create_task_card(self, task):
+        card = ctk.CTkFrame(
+            self.scroll, 
+            fg_color=self.colors["card_bg"], 
+            corner_radius=12,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+        card.pack(fill="x", pady=8, padx=5)
+
+        # Left: Info
+        info = ctk.CTkFrame(card, fg_color="transparent")
+        info.pack(side="left", fill="both", expand=True, padx=20, pady=15)
+
+        ctk.CTkLabel(info, text=task['project_name'].upper(), font=("Inter", 11, "bold"), 
+                     text_color=self.colors["accent_blue"]).pack(anchor="w")
         
-        ctk.CTkLabel(self.header, text="My Assigned Tasks", 
-                     font=("Arial", 24, "bold"),
-                     text_color=("#1A1A1A", "#FFFFFF")).pack(side="left")
+        ctk.CTkLabel(info, text="Task Name : "+task['task_name'], font=("Inter", 18, "bold"), 
+                     text_color=self.colors["text_main"]).pack(anchor="w")
 
-        # --- Scrollable Task List ---
-        self.scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", label_text="Your Workload")
-        self.scroll.pack(fill="both", expand=True, padx=20, pady=10)
+        ctk.CTkLabel(info, text=f"DeadLine : {task['deadline']}", font=("Inter", 18, "bold"), 
+                     text_color=self.colors["text_main"]).pack(anchor="w")
 
-        self.refresh_member_tasks()
-
-    def validate_percent(self, value):
-        """Restricts input to numbers 0-100"""
-        if value == "":
-            return True
-        if value.isdigit() and 0 <= int(value) <= 100:
-            return True
-        return False
-
-    def refresh_member_tasks(self):
-        for w in self.scroll.winfo_children(): w.destroy()
+        #progress_val = (task.get("progress") or 0) / 100
+        progress_val = task.get('total_calculated_progress', 0) / 100
+        pbar = ctk.CTkProgressBar(info, width=220, progress_color=self.colors["accent_green"])
+        pbar.set(progress_val)
+        pbar.pack(anchor="w", pady=(12, 5))
         
+        ctk.CTkLabel(info, text=f"{int(progress_val*100)}% Complete", font=("Inter", 12),
+                     text_color=self.colors["text_muted"]).pack(anchor="w")
+
+        # Right: Buttons
+        btns = ctk.CTkFrame(card, fg_color="transparent")
+        btns.pack(side="right", padx=20)
+
+        ctk.CTkButton(
+            btns, text="📝 Report", fg_color=self.colors["accent_blue"],
+            hover_color="#2563EB", width=110, corner_radius=8,
+            command=lambda t=task: self.open_report(t)
+        ).pack(pady=5)
+
+        ctk.CTkButton(
+            btns, text="📜 History", fg_color="transparent", border_width=1,
+            border_color=self.colors["border"], text_color=self.colors["text_main"],
+            hover_color=("#F1F5F9", "#334155"), width=110, corner_radius=8,
+            command=lambda t=task: self.open_history(t)
+        ).pack(pady=5)
+
+    # =========================================================
+    # LAYER 2 - REPORT / EDIT FORM
+    # =========================================================
+    def build_layer2(self):
+        # Centering container
+        form_wrapper = ctk.CTkFrame(self.layer2, fg_color="transparent")
+        form_wrapper.place(relx=0.5, rely=0.5, anchor="center")
+
+        card = ctk.CTkFrame(
+            form_wrapper, 
+            fg_color=self.colors["card_bg"],
+            corner_radius=15,
+            border_width=1,
+            border_color=self.colors["border"]
+        )
+        card.pack(padx=20, pady=20)
+
+        self.title_label = ctk.CTkLabel(card, text="Submit Report", font=("Inter", 22, "bold"))
+        self.title_label.pack(pady=(25, 20), padx=50)
+
+        def create_label(text):
+            ctk.CTkLabel(card, text=text, font=("Inter", 12, "bold"), 
+                         text_color=self.colors["text_muted"]).pack(anchor="w", padx=40)
+
+        create_label("PROGRESS (%)")
+        self.progress_entry = ctk.CTkEntry(card, width=320, height=40, corner_radius=8)
+        self.progress_entry.pack(padx=40, pady=(5, 15))
+
+        create_label("UPDATE DATE")
+        date_frame = ctk.CTkFrame(card, fg_color="transparent")
+        date_frame.pack(padx=40, pady=(5, 15), fill="x")
+        self.date_picker = DateEntry(date_frame, date_pattern='yyyy-mm-dd', background='#3B82F6', foreground='white')
+        self.date_picker.pack(fill="x", ipady=5)
+
+        create_label("NOTES")
+        self.note_box = ctk.CTkTextbox(card, width=320, height=100, corner_radius=8, border_width=1)
+        self.note_box.pack(padx=40, pady=(5, 20))
+
+        btn_f = ctk.CTkFrame(card, fg_color="transparent")
+        btn_f.pack(fill="x", padx=40, pady=(0, 30))
+
+        self.submit_btn = ctk.CTkButton(
+            btn_f, text="💾 Submit", fg_color=self.colors["accent_green"], 
+            hover_color="#059669", height=40, corner_radius=8, command=self.submit_report
+        )
+        self.submit_btn.pack(side="right", expand=True, fill="x", padx=(5, 0))
+
+        cancel_btn = ctk.CTkButton(
+            btn_f, text="Cancel", fg_color="transparent", border_width=1, 
+            text_color=self.colors["text_main"], height=40, corner_radius=8, command=self.back_to_main
+        )
+        cancel_btn.pack(side="left", expand=True, fill="x", padx=(0, 5))
+
+    # =========================================================
+    # LAYER 3 - PROGRESS HISTORY
+    # =========================================================
+    def build_history(self):
+        for w in self.layer3.winfo_children():
+            w.destroy()
+
+        header = ctk.CTkFrame(self.layer3, fg_color="transparent")
+        header.pack(fill="x", pady=10)
+
+        ctk.CTkButton(header, text="← Back", width=80, fg_color="transparent", 
+                      text_color=self.colors["text_main"], command=self.back_from_history).pack(side="left")
+
+        ctk.CTkLabel(header, text="Task History", font=("Inter", 24, "bold")).pack(side="left", padx=20)
+
+        container = ctk.CTkScrollableFrame(self.layer3, fg_color="transparent")
+        container.pack(fill="both", expand=True)
+
+        self.db.cursor.execute("""
+            SELECT * FROM progress_history WHERE task_id=%s ORDER BY update_date DESC, id DESC
+        """, (self.current_task['id'],))
+        
+        rows = self.db.cursor.fetchall()
+        for r in rows:
+            self.create_history_card(container, r)
+
+    def create_history_card(self, parent, row):
+        card = ctk.CTkFrame(parent, fg_color=self.colors["card_bg"], corner_radius=10)
+        card.pack(fill="x", pady=5, padx=5)
+
+        info = ctk.CTkFrame(card, fg_color="transparent")
+        info.pack(side="left", fill="both", expand=True, padx=15, pady=10)
+
+        ctk.CTkLabel(info, text=f"{row['update_date']} — {row['progress']}%", 
+                     font=("Inter", 14, "bold"), text_color=self.colors["accent_blue"]).pack(anchor="w")
+        ctk.CTkLabel(info, text=row['note'], font=("Inter", 12), wraplength=400).pack(anchor="w")
+
+        btn_f = ctk.CTkFrame(card, fg_color="transparent")
+        btn_f.pack(side="right", padx=10)
+
+        ctk.CTkButton(btn_f, text="Edit", width=60, fg_color=self.colors["accent_amber"],
+                      command=lambda r=row: self.edit_history(r)).pack(side="left", padx=2)
+        ctk.CTkButton(btn_f, text="Delete", width=60, fg_color=self.colors["accent_red"],
+                      command=lambda r=row: self.delete_history(r)).pack(side="left", padx=2)
+
+    # =========================================================
+    # CORE LOGIC
+    # =========================================================
+    def open_report(self, task):
+        self.current_task = task
+        self.editing_history_id = None
+        self.title_label.configure(text="Submit Report")
+        self.submit_btn.configure(text="💾 Submit")
+        self.progress_entry.delete(0, "end")
+        self.progress_entry.insert(0, 0)
+
+        # Reset Date Picker to TODAY
+        self.date_picker.set_date(datetime.now())
+        
+        self.note_box.delete("1.0", "end")
+        self.show_layer(self.layer2)
+
+    def open_history(self, task):
+        self.current_task = task
+        self.build_history()
+        self.show_layer(self.layer3)
+
+    def edit_history(self, row):
+        self.editing_history_id = row['id']
+        self.title_label.configure(text="Edit History Record")
+        self.submit_btn.configure(text="💾 Update")
+        self.progress_entry.delete(0, "end")
+        self.progress_entry.insert(0, str(row['progress']))
+
+        # Fill Date Correctly
+        # If row['update_date'] is already a date object, set_date handles it.
+        # If it's a string, we convert it first.
+        db_date = row['update_date']
+        if isinstance(db_date, str):
+            try:
+                db_date = datetime.strptime(db_date, '%Y-%m-%d')
+            except ValueError:
+                db_date = datetime.now() # Fallback
+        
+        self.date_picker.set_date(db_date)
+
+        self.note_box.delete("1.0", "end")
+        self.note_box.insert("1.0", row['note'])
+        self.show_layer(self.layer2)
+
+    def update_task_progress(self, task_id):
+        self.db.cursor.execute("""
+            SELECT COALESCE(SUM(progress), 0) AS total
+            FROM progress_history
+            WHERE task_id = %s
+        """, (task_id,))
+
+        row = self.db.cursor.fetchone()
+
+        # ✅ Safe dictionary access
+        total = int(float(row['total'])) if row and row['total'] is not None else 0
+
+        # Clamp to 100
+        total = min(total, 100)
+
+        self.db.cursor.execute("""
+            UPDATE tasks 
+            SET progress = %s 
+            WHERE id = %s
+        """, (total, task_id))
+
+    def submit_report(self):
         try:
-            query = """
-                SELECT t.*, p.project_name 
-                FROM tasks t 
-                JOIN projects p ON t.project_id = p.id 
-                WHERE t.assigned_to = %s 
-                ORDER BY t.id DESC
-            """
-            self.db.cursor.execute(query, (self.user['full_name'],))
-            my_tasks = self.db.cursor.fetchall()
+            # Common Data Gathering 
+            val = int(self.progress_entry.get() or 0) 
+            note = self.note_box.get("1.0", "end").strip() 
+            # This fetches the date currently selected in the widget 
+            date_str = self.date_picker.get_date().strftime('%Y-%m-%d') 
+            if self.editing_history_id: 
+                ## ✅ edit MODE
+                # --- MODE: EDIT --- 
+                self.db.cursor.execute(""" UPDATE progress_history SET progress=%s, note=%s, update_date=%s WHERE id=%s """, 
+                (val, note, date_str, self.editing_history_id)) 
 
-            if not my_tasks:
-                ctk.CTkLabel(self.scroll, text="No tasks assigned yet.", text_color="gray").pack(pady=30)
-                return
+                #update progress in tasks table
+                self.update_task_progress(self.current_task['id'])
+                self.db.conn.commit()
 
-            for task in my_tasks:
-                card = ctk.CTkFrame(self.scroll, corner_radius=12, border_width=1, 
-                                    fg_color=("#FFFFFF", "#1E1E1E"), 
-                                    border_color=("#E0E0E0", "#333333"))
-                card.pack(fill="x", pady=8, padx=10)
-
-                # --- Left Side: Info ---
-                info_f = ctk.CTkFrame(card, fg_color="transparent")
-                info_f.pack(side="left", padx=20, pady=15)
-                
-                ctk.CTkLabel(info_f, text=task['task_name'], font=("Arial", 15, "bold"),
-                             text_color=("#2D3436", "#ECF0F1")).pack(anchor="w")
-                
-                ctk.CTkLabel(info_f, text=f"📂 Project: {task['project_name']}", 
-                             font=("Arial", 11), text_color="#3498DB").pack(anchor="w")
-                
-                deadline = task.get('deadline', 'No Deadline')
-                ctk.CTkLabel(info_f, text=f"📅 Due: {deadline}", 
-                             font=("Arial", 11), text_color="#E74C3C").pack(anchor="w")
-
-                # --- Right Side: Progress Area (Visual Spinbox) ---
-                prog_f = ctk.CTkFrame(card, fg_color="transparent")
-                prog_f.pack(side="right", padx=20)
-
-                try:
-                    p_val = int(task.get('progress') or 0)
-                except:
-                    p_val = 0
-
-                # 1. Percentage Label
-                display_text = "Not started" if p_val == 0 else f"{p_val}%"
-                color = "#95A5A6" if p_val == 0 else "#10B981"
-                p_lbl = ctk.CTkLabel(prog_f, text=display_text, font=("Arial", 13, "bold"), text_color=color)
-                p_lbl.pack(side="right", padx=10)
-
-                # 2. Spinbox Container (Entry + Buttons)
-                spin_f = ctk.CTkFrame(prog_f, fg_color="transparent")
-                spin_f.pack(side="right", padx=5)
-
-                vcmd = (self.register(self.validate_percent), "%P")
-                p_entry = ctk.CTkEntry(spin_f, width=55, height=32, justify="center", validate="key", validatecommand=vcmd)
-                p_entry.insert(0, "" if p_val == 0 else str(p_val))
-                p_entry.grid(row=0, column=0, rowspan=2, padx=(0, 2))
-
-                # Visual UP Arrow
-                ctk.CTkButton(spin_f, text="▲", width=20, height=15, font=("Arial", 7),
-                              fg_color=("#E0E0E0", "#2B2B2B"), text_color=("#333", "#EEE"),
-                              hover_color="#10B981",
-                              command=lambda tid=task['id'], pid=task['project_id'], ent=p_entry, lbl=p_lbl: 
-                              self.change_val_by_arrow(tid, pid, ent, lbl, 1)).grid(row=0, column=1, pady=(0, 1))
-
-                # Visual DOWN Arrow
-                ctk.CTkButton(spin_f, text="▼", width=20, height=15, font=("Arial", 7),
-                              fg_color=("#E0E0E0", "#2B2B2B"), text_color=("#333", "#EEE"),
-                              hover_color="#E74C3C",
-                              command=lambda tid=task['id'], pid=task['project_id'], ent=p_entry, lbl=p_lbl: 
-                              self.change_val_by_arrow(tid, pid, ent, lbl, -1)).grid(row=1, column=1)
-
-                # Bindings for manual typing and keyboard arrows
-                p_entry.bind("<KeyRelease>", partial(self.update_my_progress, task['id'], task['project_id'], p_entry, p_lbl))
-                p_entry.bind("<Up>", lambda e, tid=task['id'], pid=task['project_id'], ent=p_entry, lbl=p_lbl: self.change_val_by_arrow(tid, pid, ent, lbl, 1))
-                p_entry.bind("<Down>", lambda e, tid=task['id'], pid=task['project_id'], ent=p_entry, lbl=p_lbl: self.change_val_by_arrow(tid, pid, ent, lbl, -1))
-
-        except Exception as e:
-            print(f"Member Task Error: {e}")
-
-    def update_my_progress(self, tid, pid, entry, lbl, event=None):
-        """Updates UI and Database in real-time"""
-        try:
-            val = entry.get().strip()
-            v = int(val) if val.isdigit() else 0
-
-            # Update Label Visuals
-            if v == 0:
-                lbl.configure(text="Not started", text_color="#95A5A6")
+                messagebox.showinfo("Success", "Update complete") 
+                self.open_history(self.current_task) # Go back to history list
             else:
-                lbl.configure(text=f"{v}%", text_color="#10B981")
+                # ✅ CREATE MODE
+                # Update main task status 
+                #self.db.cursor.execute("UPDATE tasks SET progress=%s WHERE id=%s", 
+                #(val, self.current_task['id'])) 
+                # Add new history record 
+                self.db.cursor.execute(""" INSERT INTO progress_history (task_id, project_id, member_name, progress, note, update_date) 
+                VALUES (%s, %s, %s, %s, %s, %s) """, 
+                (self.current_task['id'], self.current_task['project_id'], self.user['full_name'], val, note, date_str)) 
 
-            if v < 0 or v > 100: return
+                #update progress in tasks table
+                self.update_task_progress(self.current_task['id'])
+                self.db.conn.commit()
 
-            # 1. Update individual task
-            self.db.cursor.execute("UPDATE tasks SET progress = %s WHERE id = %s", (v, tid))
+                messagebox.showinfo("Success", "Report added") 
+                self.back_to_main() # Go back to task list 
+                self.refresh_tasks()
 
-            # 2. Update overall project status based on all tasks
-            self.db.cursor.execute("SELECT progress FROM tasks WHERE project_id = %s", (pid,))
-            all_p = self.db.cursor.fetchall()
-            
-            avg_p = int(sum(int(r['progress']) for r in all_p) / len(all_p)) if all_p else 0
-            status = f"In Progress ({avg_p}%)" if avg_p < 100 else "Completed (100%)"
-            
-            self.db.cursor.execute("UPDATE projects SET status = %s WHERE id = %s", (status, pid))
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid number for progress")
+        except Exception as e:
+            print("REAL ERROR:", e)  # 👈 IMPORTANT DEBUG
+            messagebox.showerror("Error", f"Database error: {e}")
+    
+    def delete_history(self, row):
+        if messagebox.askyesno("Confirm", "Are you sure you want to delete this record?"):
+            self.db.cursor.execute("DELETE FROM progress_history WHERE id=%s", (row['id'],))
             self.db.conn.commit()
+            self.build_history()
 
-        except Exception as e:
-            print("Database Update Error:", e)
-        
-    def change_val_by_arrow(self, tid, pid, entry, lbl, delta):
-        """Handles Up/Down (Buttons or Keyboard) to update percentage"""
-        try:
-            current_val = entry.get().strip()
-            v = int(current_val) if current_val.isdigit() else 0
-            new_v = max(0, min(100, v + delta))
-            
-            entry.delete(0, 'end')
-            entry.insert(0, str(new_v) if new_v > 0 else "")
-            
-            # Sync with database and label
-            self.update_my_progress(tid, pid, entry, lbl)
-        except Exception as e:
-            print(f"Arrow Interaction Error: {e}")
+    def back_to_main(self):
+        # If we were editing a history record, go back to the history layer
+        if self.editing_history_id:
+            self.editing_history_id = None # Clear the state
+            self.show_layer(self.layer3)
+        else:
+            # Otherwise, go back to the main task list
+            self.show_layer(self.layer1)
+
+    def back_from_history(self):
+        self.show_layer(self.layer1)
+        self.refresh_tasks()

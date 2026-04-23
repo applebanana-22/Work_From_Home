@@ -1,13 +1,17 @@
 import customtkinter as ctk
 from database import Database
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 from datetime import datetime
 import calendar
+from fpdf import FPDF
+from tkcalendar import DateEntry
+from collections import defaultdict
  
 class LeaderReportView(ctk.CTkFrame):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, user, **kwargs):
         super().__init__(master, **kwargs)
         self.db = Database()
+        self.user = user
         self.configure(fg_color="transparent")
  
         # --- Filter & Calendar State ---
@@ -29,7 +33,8 @@ class LeaderReportView(ctk.CTkFrame):
  
     def get_member_names(self):
         try:
-            self.db.cursor.execute("SELECT full_name FROM users ORDER BY full_name ASC")
+            query = "SELECT full_name FROM users WHERE role = 'member' AND team_id = %s ORDER BY full_name ASC"
+            self.db.cursor.execute(query, (self.user.get('team_id'),))
             return [row['full_name'] for row in self.db.cursor.fetchall()]
         except Exception:
             return []
@@ -52,9 +57,26 @@ class LeaderReportView(ctk.CTkFrame):
         ctk.CTkLabel(header, text="Team Daily Progress",
                      font=("Arial", 24, "bold"), text_color="#00fbff").pack(side="left")
  
-        ctk.CTkButton(header, text="⚙️ Categories", fg_color="#10B981",
-                      width=120, height=35, command=self.show_category_ui).pack(side="right")
- 
+        # Export PDF button
+        ctk.CTkButton(
+            header,
+            text="📄 Export PDF",
+            fg_color="#10B981",
+            width=120,
+            height=35,
+            command=self.export_pdf
+        ).pack(side="right", padx=10)
+
+        # Category button (NEW)
+        ctk.CTkButton(
+            header,
+            text="⚙ Categories",
+            fg_color="#f59e0b",
+            width=130,
+            height=35,
+            command=self.show_category_ui
+        ).pack(side="right", padx=10)
+
         controls = ctk.CTkFrame(self.container, fg_color="transparent")
         controls.pack(fill="x", padx=100, pady=(5, 0))
  
@@ -96,9 +118,11 @@ class LeaderReportView(ctk.CTkFrame):
                 FROM users u
                 JOIN daily_reports dr ON u.id = dr.user_id
                 WHERE dr.report_date = %s
+                  AND u.role = 'member'
+                  AND u.team_id = %s
             """
-            params = [self.filter_date_str]
-            if member_choice:
+            params = [self.filter_date_str, self.user.get('team_id')]
+            if member_choice and member_choice != " ":
                 query += " AND u.full_name = %s"
                 params.append(member_choice)
  
@@ -177,10 +201,10 @@ class LeaderReportView(ctk.CTkFrame):
                 SELECT dr.category, dr.tasks, dr.hours, dr.created_at
                 FROM daily_reports dr
                 JOIN users u ON u.id = dr.user_id
-                WHERE u.full_name = %s AND dr.report_date = %s
+                WHERE u.full_name = %s AND dr.report_date = %s AND u.team_id = %s
                 ORDER BY dr.created_at ASC
             """
-            self.db.cursor.execute(query, (member_name, self.filter_date_str))
+            self.db.cursor.execute(query, (member_name, self.filter_date_str, self.user.get('team_id')))
             rows = self.db.cursor.fetchall()
  
             for r in rows:
@@ -310,3 +334,126 @@ class LeaderReportView(ctk.CTkFrame):
             self.db.cursor.execute("DELETE FROM report_categories WHERE id = %s", (cat_id,))
             self.db.conn.commit()
             self.refresh_categories()
+
+    def export_pdf(self):
+        popup = ctk.CTkToplevel(self)
+        popup.title("Export PDF")
+        popup.geometry("400x300")
+        popup.grab_set()          # force focus
+        popup.resizable(True, True)
+
+        # Start date frame
+        frame1 = ctk.CTkFrame(popup, fg_color="transparent")
+        frame1.pack(pady=(20,5))
+        ctk.CTkLabel(frame1, text="Start Date:", font=("Arial", 12)).pack(side="left")
+        start_date = DateEntry(frame1, date_pattern='yyyy-mm-dd', width=12)
+        start_date.pack(side="left", pady=5)
+
+        # End date frame
+        frame2 = ctk.CTkFrame(popup, fg_color="transparent")
+        frame2.pack(pady=5)
+        ctk.CTkLabel(frame2, text="End Date:", font=("Arial", 12)).pack(side="left")
+        end_date = DateEntry(frame2, date_pattern='yyyy-mm-dd', width=12)
+        end_date.pack(side="left", pady=5)
+
+        # Member frame
+        frame3 = ctk.CTkFrame(popup, fg_color="transparent")
+        frame3.pack(pady=5)
+        ctk.CTkLabel(frame3, text="Member:", font=("Arial", 12)).pack(side="left")
+        members = self.get_member_names()
+        member_var = ctk.StringVar()
+        member_combo = ctk.CTkOptionMenu(frame3, values=members, variable=member_var, width=200)
+        member_combo.pack(side="left", pady=5)
+
+        # Download button
+        ctk.CTkButton(popup, text="Download", fg_color="#10B981", command=lambda: self.generate_pdf(start_date.get_date(), end_date.get_date(), member_var.get(), popup)).pack(pady=20)
+
+    def generate_pdf(self, start, end, member, popup):
+        if end < start:
+            messagebox.showerror("Error", "End date must be on or after start date.")
+            return
+        if not member:
+            messagebox.showerror("Error", "Please select a member.")
+            return
+
+        # Query reports
+        query = """
+            SELECT report_date, category, tasks, hours
+            FROM daily_reports dr
+            JOIN users u ON u.id = dr.user_id
+            WHERE u.full_name = %s AND dr.report_date BETWEEN %s AND %s
+            ORDER BY report_date ASC, dr.created_at ASC
+        """
+        self.db.cursor.execute(query, (member, str(start), str(end)))
+        reports = self.db.cursor.fetchall()
+
+        if not reports:
+            messagebox.showinfo("No Data", "No reports found for the selected member and date range.")
+            return
+
+        # Group by date
+        grouped = defaultdict(list)
+        for r in reports:
+            grouped[str(r['report_date'])].append(r)
+
+        # Generate PDF
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, f"Daily Reports for {member}", ln=True, align='C')
+        pdf.set_font("Arial", '', 12)
+        pdf.cell(0, 10, f"From {start} to {end}", ln=True, align='C')
+        pdf.ln(10)
+
+        # Table headers
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(30, 10, "Date", border=1, align='C')
+        pdf.cell(35, 10, "Category", border=1, align='C')
+        pdf.cell(25, 10, "Duration", border=1, align='C')
+        pdf.cell(100, 10, "Task Description", border=1, align='C')
+        pdf.ln()
+
+        # Table rows
+
+        pdf.set_font("Arial", '', 12)
+        for date in sorted(grouped.keys()):
+            rows = grouped[date]
+            total_rows = len(rows)
+
+            for i, r in enumerate(rows):
+
+                # DATE COLUMN (merged look)
+                if i == 0:
+                    pdf.cell(30, 10, date, border='LTR', align='C')
+                elif i == total_rows - 1:
+                    pdf.cell(30, 10, "", border='LBR', align='C')
+                else:
+                    pdf.cell(30, 10, "", border='LR', align='C')
+
+                # border style for other columns
+                if i == 0:
+                    border_style = 'LTR'
+                elif i == total_rows - 1:
+                    border_style = 'LBR'
+                else:
+                    border_style = 'LR'
+
+                pdf.cell(35, 10, r['category'], border=border_style, align='C')
+                pdf.cell(25, 10, f"{r['hours']}h", border=border_style, align='C')
+                pdf.cell(100, 10, r['tasks'], border=border_style, align='C')
+
+                pdf.ln()
+
+        # Save file
+        default_name = f"Daily reports for {member}.pdf"
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            initialfile=default_name,
+            filetypes=[("PDF files", "*.pdf")],
+            title="Save PDF"
+        )
+        if file_path:
+            pdf.output(file_path)
+            messagebox.showinfo("Success", f"PDF saved to {file_path}")
+            popup.destroy()

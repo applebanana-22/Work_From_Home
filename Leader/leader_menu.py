@@ -136,9 +136,9 @@ class LeaderMenu:
     def show_reports_list(self):
         self.clear_content()
         try:
-            LeaderReportView(self.content).pack(fill="both", expand=True)
+            LeaderReportView(self.content, self.user).pack(fill="both", expand=True)
         except Exception as e:
-            self.show_error("Daily Report", e)
+            ctk.CTkLabel(self.content, text=f"Error: {e}", text_color="red").pack(pady=20)
 
     def show_schedule(self):
         self.clear_content()

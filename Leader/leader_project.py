@@ -2,7 +2,7 @@ import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
 # Ensure this import matches your actual file structure for the TaskManager
-from Leader.task_manager import TaskManagerWindow
+#from Leader.task_manager import TaskManagerWindow
 
 class LeaderProject(ctk.CTkFrame):
     def __init__(self, master, user):
@@ -30,6 +30,27 @@ class LeaderProject(ctk.CTkFrame):
         self.list_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.refresh_projects()
+
+    def open_task_manager(self, proj):
+        # clear current view (safe way)
+        for w in self.master.winfo_children():
+            w.destroy()
+
+        from Leader.task_manager import TaskManager
+
+        TaskManager(
+            self.master,
+            proj['id'],
+            proj['project_name'],
+            self.user,
+            back_callback=self.back_to_projects
+        ).pack(fill="both", expand=True)
+
+    def back_to_projects(self):
+        for w in self.master.winfo_children():
+            w.destroy()
+
+        LeaderProject(self.master, self.user).pack(fill="both", expand=True)
 
     def refresh_projects(self):
         """Clears and re-populates the project list filtered by the leader's team_id"""
@@ -62,7 +83,10 @@ class LeaderProject(ctk.CTkFrame):
                 
                 ctk.CTkLabel(info_f, text=proj['project_name'], font=("Arial", 16, "bold"),
                              text_color=("#2D3436", "#ECF0F1")).pack(anchor="w")
-                
+
+
+                #print(f"status = {proj['status']}")
+
                 # Dynamic status color based on progress string
                 status_color = "#F1C40F" if "Pending" in proj['status'] else "#2ECC71"
                 ctk.CTkLabel(info_f, text=f"● {proj['status']}", font=("Arial", 12),
@@ -79,12 +103,7 @@ class LeaderProject(ctk.CTkFrame):
                     width=80, 
                     height=32, 
                     fg_color="#3498DB", 
-                    command=lambda p=proj: TaskManagerWindow(
-                        self, 
-                        p['id'], 
-                        p['project_name'], 
-                        self.user
-                    )
+                    command=lambda p=proj: self.open_task_manager(p)
                 ).pack(side="left", padx=5)
 
                 # 2. Edit Project Button
@@ -104,9 +123,7 @@ class LeaderProject(ctk.CTkFrame):
                     text="Delete", 
                     width=60, 
                     height=32, 
-                    fg_color="transparent", 
-                    text_color="#E74C3C", 
-                    hover_color=("#FEE2E2", "#2D1A1A"),
+                    fg_color="#E74C3C",
                     command=lambda pid=proj['id']: self.delete_project(pid)
                 ).pack(side="left", padx=5)
                 

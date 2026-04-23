@@ -37,7 +37,7 @@ class MemberReportFrame(ctk.CTkFrame):
     def show_history_view(self):
         self.clear_view()
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=30, pady=20)
+        header.pack(fill="x", padx=100, pady=20)
         ctk.CTkLabel(header, text="Daily Report History", font=("Arial", 24, "bold"), text_color="#00fbff").pack(side="left")
         ctk.CTkButton(header, text="+ Add Daily Report", fg_color="#1f538d", height=35, command=self.show_form_view).pack(side="right")
         ctk.CTkButton(
@@ -47,13 +47,13 @@ class MemberReportFrame(ctk.CTkFrame):
             command=self.export_pdf_reports
         ).pack(side="right", padx=10)
         list_header = ctk.CTkFrame(self, fg_color="#2b2b2b", height=40)
-        list_header.pack(fill="x", padx=30, pady=(10, 0))
+        list_header.pack(fill="x", padx=100, pady=(10, 0))
         ctk.CTkLabel(list_header, text="Date", width=120).pack(side="left", padx=10)
         ctk.CTkLabel(list_header, text="Total Hrs", width=100).pack(side="left", padx=10)
         ctk.CTkLabel(list_header, text="Title", width=200).pack(side="left", padx=20)
  
         scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        scroll.pack(fill="both", expand=True, padx=25, pady=10)
+        scroll.pack(fill="both", expand=True, padx=90, pady=10)
  
         try:
             # SQL groups entries by date so history is clean
@@ -524,79 +524,116 @@ class MemberReportFrame(ctk.CTkFrame):
        
     def export_pdf_reports(self):
         try:
-            from reportlab.lib import colors
-            from reportlab.lib.pagesizes import letter
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+            from fpdf import FPDF
+            from tkcalendar import DateEntry
             from tkinter import filedialog
+            from collections import defaultdict
         except Exception as e:
             messagebox.showerror("Missing Dependency", f"{e}")
             return
- 
-        # Fetch data
-        try:
-            query = """
-                SELECT report_date, category, tasks, hours
-                FROM daily_reports
-                WHERE user_id = %s
-                ORDER BY report_date DESC
-            """
-            self.db.cursor.execute(query, (self.user['id'],))
-            rows = self.db.cursor.fetchall()
- 
-            if not rows:
-                messagebox.showwarning("No Data", "No reports to export.")
+
+        popup = ctk.CTkToplevel(self)
+        popup.title("Export PDF")
+        popup.geometry("400x250")
+        popup.grab_set()
+        popup.resizable(False, False)
+
+        frame1 = ctk.CTkFrame(popup, fg_color="transparent")
+        frame1.pack(pady=(20, 5), padx=20, fill="x")
+        ctk.CTkLabel(frame1, text="Start Date:", font=("Arial", 12)).pack(side="left")
+        start_date = DateEntry(frame1, date_pattern='yyyy-mm-dd', width=12)
+        start_date.pack(side="left", padx=10)
+
+        frame2 = ctk.CTkFrame(popup, fg_color="transparent")
+        frame2.pack(pady=5, padx=20, fill="x")
+        ctk.CTkLabel(frame2, text="End Date:", font=("Arial", 12)).pack(side="left")
+        end_date = DateEntry(frame2, date_pattern='yyyy-mm-dd', width=12)
+        end_date.pack(side="left", padx=32)
+
+        ctk.CTkButton(
+            popup,
+            text="Download",
+            fg_color="#10B981",
+            width=120,
+            command=lambda: generate_pdf(start_date.get_date(), end_date.get_date(), popup)
+        ).pack(pady=25)
+
+        def generate_pdf(start, end, popup_window):
+            if end < start:
+                messagebox.showerror("Error", "End date must be on or after start date.")
                 return
- 
-        except Exception as e:
-            messagebox.showerror("Database Error", str(e))
-            return
- 
-        # Save file dialog
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".pdf",
-            initialfile="Daily_Report.pdf",
-            filetypes=[("PDF files", "*.pdf")],
-        )
- 
-        if not file_path:
-            return
- 
-        # Create PDF
-        try:
-            doc = SimpleDocTemplate(file_path, pagesize=letter)
-            styles = getSampleStyleSheet()
-            elements = []
- 
-            elements.append(Paragraph("Daily Report", styles["Title"]))
-            elements.append(Paragraph(f"User: {self.user.get('full_name', 'Unknown')}", styles["Normal"]))
-            elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
- 
-            # Table
-            table_data = [["Date", "Category", "Hours", "Tasks"]]
- 
+
+            try:
+                query = """
+                    SELECT report_date, category, tasks, hours
+                    FROM daily_reports
+                    WHERE user_id = %s AND report_date BETWEEN %s AND %s
+                    ORDER BY report_date ASC, created_at ASC
+                """
+                self.db.cursor.execute(query, (self.user['id'], str(start), str(end)))
+                rows = self.db.cursor.fetchall()
+
+                if not rows:
+                    messagebox.showinfo("No Data", "No reports found for the selected date range.")
+                    return
+
+            except Exception as e:
+                messagebox.showerror("Database Error", str(e))
+                return
+
+            grouped = defaultdict(list)
             for r in rows:
-                table_data.append([
-                    str(r["report_date"]),
-                    str(r["category"]),
-                    str(r["hours"]),
-                    str(r["tasks"]),
-                ])
- 
-            table = Table(table_data, repeatRows=1)
- 
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-            ]))
- 
-            elements.append(table)
- 
-            doc.build(elements)
- 
-            messagebox.showinfo("Success", "PDF exported successfully!")
- 
-        except Exception as e:
-            messagebox.showerror("Export Error", str(e))
+                grouped[str(r['report_date'])].append(r)
+
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                initialfile=f"Daily_Report_{self.user.get('full_name', 'Me')}_{start}_{end}.pdf",
+                filetypes=[("PDF files", "*.pdf")],
+            )
+            if not file_path:
+                return
+
+            try:
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(0, 10, f"Daily Reports for {self.user.get('full_name', 'Unknown')}", ln=True, align='C')
+                pdf.set_font("Arial", '', 12)
+                pdf.cell(0, 10, f"From {start} to {end}", ln=True, align='C')
+                pdf.ln(10)
+
+                pdf.set_font("Arial", 'B', 12)
+                pdf.cell(30, 10, "Date", border=1, align='C')
+                pdf.cell(35, 10, "Category", border=1, align='C')
+                pdf.cell(25, 10, "Duration", border=1, align='C')
+                pdf.cell(100, 10, "Task Description", border=1, align='C')
+                pdf.ln()
+
+                pdf.set_font("Arial", '', 12)
+                for date in sorted(grouped.keys()):
+                    rows_for_date = grouped[date]
+                    total_rows = len(rows_for_date)
+
+                    for i, r in enumerate(rows_for_date):
+                        if i == 0:
+                            pdf.cell(30, 10, date, border='LTR', align='C')
+                        elif i == total_rows - 1:
+                            pdf.cell(30, 10, "", border='LBR', align='C')
+                        else:
+                            pdf.cell(30, 10, "", border='LR', align='C')
+
+                        border_style = 'LTR' if i == 0 else 'LR'
+                        if i == total_rows - 1:
+                            border_style = 'LBR'
+
+                        pdf.cell(35, 10, str(r['category']), border=border_style, align='C')
+                        pdf.cell(25, 10, f"{r['hours']}h", border=border_style, align='C')
+                        pdf.cell(100, 10, str(r['tasks']), border=border_style, align='C')
+                        pdf.ln()
+
+                pdf.output(file_path)
+                messagebox.showinfo("Success", "PDF exported successfully!")
+                popup_window.destroy()
+
+            except Exception as e:
+                messagebox.showerror("Export Error", str(e))

@@ -15,7 +15,7 @@ class Dashboard(ctk.CTk):
         # --- Window Configuration ---
         ctk.set_appearance_mode("dark") 
         ctk.set_default_color_theme("blue")
-        self.title("WorkSync - Modern Dashboard")
+        self.title("GIC Myanmar Work Sync")
         
         # Screen size အလိုက် Responsive ဖြစ်စေရန် geometry သတ်မှတ်ခြင်း
         self.geometry("1100x700")
@@ -80,7 +80,7 @@ class Dashboard(ctk.CTk):
             widget.destroy()
 
         ctk.CTkLabel(
-            self.header_frame, text="⚡ WorkSync", 
+            self.header_frame, text="GIC Myanmar", 
             font=("Arial", 24, "bold"), 
             text_color=("#000000", "#FFFFFF")
         ).pack(side="left", padx=25)
@@ -203,7 +203,7 @@ class Dashboard(ctk.CTk):
         elif role == 'leader': 
             self.menu_logic = LeaderMenu(self.sidebar_scroll, self.main_view, user)
         else: 
-            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.83:5000")
+            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.137:5000")
             self.tracker.set_tracking_state(False) 
             self.menu_logic = MemberMenu(self.sidebar_scroll, self.main_view, user)
 
