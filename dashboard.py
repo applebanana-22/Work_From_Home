@@ -203,7 +203,7 @@ class Dashboard(ctk.CTk):
         elif role == 'leader': 
             self.menu_logic = LeaderMenu(self.sidebar_scroll, self.main_view, user)
         else: 
-            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.137:5000")
+            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.83:5000")
             self.tracker.set_tracking_state(False) 
             self.menu_logic = MemberMenu(self.sidebar_scroll, self.main_view, user)
 
