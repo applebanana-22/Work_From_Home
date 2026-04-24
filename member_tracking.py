@@ -12,8 +12,7 @@ class MemberTracking:
         self.is_running = True
         self.last_sent_status = None
         
-        # --- အသစ်ထည့်သွင်းထားသော Logic ---
-        self.is_active_session = False # Check-in ဝင်မှ True ဖြစ်မည်
+        self.is_active_session = False 
         
         self.setup_socket_events()
         self.connect_to_server()
@@ -22,12 +21,29 @@ class MemberTracking:
         threading.Thread(target=self.check_inactivity, daemon=True).start()
 
     def set_tracking_state(self, state: bool):
-        """Check-in ဝင်လျှင် True, Check-out ထွက်လျှင် False လှမ်းခေါ်ပေးရန်"""
+        """
+        Check-in ဝင်လျှင် True (Active) ပို့မည်။
+        Check-out ထွက်လျှင် False (Offline) ပို့မည်။
+        """
         self.is_active_session = state
+        
         if not state:
-            self.last_sent_status = 'offline' # Session ပိတ်လျှင် status ပြန်သတ်မှတ်
+            # Check-out လုပ်လိုက်တဲ့အချိန်မှာ Server ကို Offline ဖြစ်ကြောင်း ချက်ချင်း အကြောင်းကြားရပါမယ်
+            if self.sio.connected:
+                try:
+                    self.sio.emit('status_change', {
+                        'user_id': self.user_id, 
+                        'status': 'offline'
+                    })
+                    self.last_sent_status = 'offline'
+                    print("🔴 Check-out: Sending Offline Status")
+                except:
+                    pass
             print("⏸️ Tracking Paused: Outside of working session.")
         else:
+            # Check-in ဝင်လိုက်လျှင် Active ဖြစ်ကြောင်း အကြောင်းကြားမည်
+            self.last_activity_time = time.time() # Reset activity time
+            self.on_activity() # Trigger active status immediately
             print("▶️ Tracking Active: Working session started.")
 
     def setup_socket_events(self):
@@ -44,13 +60,14 @@ class MemberTracking:
             pass
 
     def on_activity(self, *args):
-        # Working session မဟုတ်လျှင် ဘာမှဆက်မလုပ်ဘဲ ပြန်ထွက်မည်
+        # Session မရှိလျှင် သို့မဟုတ် Connect မဖြစ်လျှင် ဘာမှမလုပ်ပါ
         if not self.is_active_session or not self.sio.connected:
             return
 
         current_time = time.time()
         self.last_activity_time = current_time
 
+        # Status က 'active' မဟုတ်သေးမှသာ အသစ်ပို့မည်
         if self.last_sent_status != 'active':
             try:
                 self.sio.emit('status_change', {
@@ -72,11 +89,13 @@ class MemberTracking:
         while self.is_running:
             time.sleep(10)
             
-            # Session မရှိလျှင် inactivity စစ်စရာမလိုပါ
-            if not self.is_active_session:
+            # Session မရှိလျှင် သို့မဟုတ် Offline ဖြစ်နေလျှင် စစ်စရာမလိုပါ
+            if not self.is_active_session or self.last_sent_status == 'offline':
                 continue
 
             inactive_duration = time.time() - self.last_activity_time
+            
+            # 30 seconds ထက်ကျော်လျှင် Away ပို့မည်
             if inactive_duration > 30 and self.last_sent_status != 'away':
                 if self.sio.connected:
                     try:
@@ -90,6 +109,8 @@ class MemberTracking:
                         pass
 
     def stop(self):
+        # Program ပိတ်ချိန်တွင် Offline ပို့ပေးခြင်း
+        self.set_tracking_state(False)
         self.is_running = False
         if self.sio.connected:
             self.sio.disconnect()
