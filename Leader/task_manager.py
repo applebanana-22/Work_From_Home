@@ -3,6 +3,111 @@ import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
 from tkcalendar import DateEntry  # Required for calendar selector
+from tkinter import ttk # for calendar styling
+from datetime import datetime
+from tkcalendar import Calendar
+import calendar
+
+class DatePickerButton(ctk.CTkFrame):
+    def __init__(self, master, initial_date=None):
+        super().__init__(master, fg_color="transparent")
+
+        self._date = initial_date or datetime.today().date()
+        self._open = False
+
+        # -------- STYLE (THIS FIXES YOUR DESIGN) --------
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        style.configure("Custom.Calendar",
+            background="#1A1A2E",
+            foreground="white",
+            headersbackground="#16213E",
+            headersforeground="#4FC3F7",
+            selectbackground="#3498DB",
+            selectforeground="white",
+            normalbackground="#1A1A2E",
+            normalforeground="#CCCCCC",
+            weekendbackground="#1A1A2E",
+            weekendforeground="#F39C12",
+            othermonthforeground="#555555",
+            bordercolor="#2A2A4A",
+            relief="flat"
+        )
+
+        # -------- INPUT BUTTON --------
+        self.btn = ctk.CTkButton(
+            self,
+            text=self._fmt(),
+            width=170,
+            height=36,
+            corner_radius=10,
+            fg_color="#1E2A3A",
+            hover_color="#2C3E50",
+            border_width=1,
+            border_color="#3D5166",
+            anchor="w",
+            command=self.toggle
+        )
+        self.btn.pack()
+
+        # -------- FLOATING PANEL --------
+        self.panel = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color="#141E2B",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2A3A4A"
+        )
+
+        # -------- REAL CALENDAR --------
+        self.cal = Calendar(
+            self.panel,
+            style="Custom.Calendar",
+            selectmode="day",
+            date_pattern="yyyy-mm-dd",
+            year=self._date.year,
+            month=self._date.month,
+            day=self._date.day,
+            showweeknumbers=False,
+            firstweekday="monday",
+            font=("Arial", 11),
+            cursor="hand2"
+        )
+        self.cal.pack(padx=8, pady=8)
+
+        # 🔥 SELECT IMMEDIATELY (no button)
+        self.cal.bind("<<CalendarSelected>>", self._select)
+
+    # -------- FUNCTIONS --------
+    def toggle(self):
+        if self._open:
+            self.panel.place_forget()
+        else:
+            self.panel.lift()
+            self.panel.place(
+                in_=self,
+                x=0,
+                y=self.btn.winfo_height() + 2
+            )
+        self._open = not self._open
+
+    def _select(self, event):
+        selected = self.cal.get_date()
+        self._date = datetime.strptime(selected, "%Y-%m-%d").date()
+        self.btn.configure(text=self._fmt())
+        self.toggle()
+
+    def _fmt(self):
+        return f" 📅 {self._date.strftime('%Y-%m-%d')}"
+
+    def get_date(self):
+        return self._date
+
+    def set_date(self, d):
+        self._date = d
+        self.cal.selection_set(d)
+        self.btn.configure(text=self._fmt())
 
 class TaskManager(ctk.CTkFrame):
     def __init__(self, master, project_id, project_name, user, back_callback):
@@ -36,11 +141,63 @@ class TaskManager(ctk.CTkFrame):
         self.task_entry.pack(side="left", padx=5)
 
         # CALENDAR SELECTOR
-        ctk.CTkLabel(control_f, text="📅").pack(side="left", padx=(5, 0))
-        self.deadline_picker = DateEntry(control_f, width=12, background='darkblue',
-                                         foreground='white', borderwidth=2,
-                                         date_pattern='yyyy-mm-dd')
-        self.deadline_picker.pack(side="left", padx=5, pady=15)
+        # style = ttk.Style()
+        # style.theme_use("clam")
+
+        # style.configure("Custom.DateEntry",
+        #         fieldbackground="#16213E",   # main box color
+        #         background="#16213E",
+        #         foreground="white",
+
+        #         bordercolor="#2A2A4A",
+        #         lightcolor="#2A2A4A",
+        #         darkcolor="#2A2A4A",
+
+        #         arrowcolor="#4FC3F7",        # calendar icon color
+        #         relief="flat",
+        #         padding=(10, 6)              # 🔥 makes it look like a rounded input
+        #     )
+
+        # style.map("Custom.DateEntry",
+        #         fieldbackground=[("active", "#1A1A2E")],
+        #         bordercolor=[("focus", "#4FC3F7")]
+        #     )
+
+        # # Calendar dropdown styling
+        # style.configure("Custom.Calendar",
+        #     background="#1A1A2E",
+        #     foreground="white",
+        #     headersbackground="#16213E",
+        #     headersforeground="#4FC3F7",
+        #     selectbackground="#3498DB",
+        #     selectforeground="white",
+        #     normalbackground="#1A1A2E",
+        #     normalforeground="#CCCCCC",
+        #     weekendbackground="#1A1A2E",
+        #     weekendforeground="#F39C12",
+        #     othermonthforeground="#555555",
+        #     bordercolor="#2A2A4A",
+        #     relief="flat"
+        # )
+
+        # ctk.CTkLabel(control_f, text="📅", font=("Arial", 14)).pack(side="left", padx=(10, 0))
+        # wrapper = ctk.CTkFrame(control_f, fg_color="#16213E", corner_radius=12)
+        # wrapper.pack(side="left", padx=8, pady=8)
+
+        # self.deadline_picker = DateEntry(
+        #     control_f,
+        #     style="Custom.DateEntry",# 🔥 key change
+        #     date_pattern='yyyy-mm-dd',
+        #     font=("Arial", 11),
+        #     cursor="hand2",
+        #     showweeknumbers=False,
+        #     firstweekday='monday'
+        # )
+
+        # self.deadline_picker.pack(side="left", padx=8, pady=8)
+        ctk.CTkLabel(control_f, text="Deadline").pack(side="left", padx=(10, 4))
+        self.deadline_picker = DatePickerButton(control_f, initial_date=datetime.today().date())
+        self.deadline_picker.pack(side="left", padx=8, pady=8)
 
         members = self.get_team_members()
         self.member_dropdown = ctk.CTkOptionMenu(control_f, values=members if members else ["No Member"], width=140)
@@ -48,7 +205,7 @@ class TaskManager(ctk.CTkFrame):
         self.member_dropdown.pack(side="left", padx=5)
 
         ctk.CTkButton(control_f, text="Add", fg_color="#10B981", hover_color="#059669", width=70,
-                      font=("Arial", 12, "bold"), command=self.add_task_with_confirm).pack(side="left", padx=10)
+                      font=("Arial", 12, "bold"),text_color=("#2D3436", "#ECF0F1"), command=self.add_task_with_confirm).pack(side="left", padx=10)
 
         # --- Task List Area ---
         self.list_frame = ctk.CTkScrollableFrame(self, label_text="Task Breakdown", fg_color=("#F5F5F5", "#121212"))
@@ -58,10 +215,12 @@ class TaskManager(ctk.CTkFrame):
             self,
             text="← Back",
             fg_color="gray",
+            text_color=("#2D3436", "#ECF0F1"),
             command=self.back_callback
         ).pack(pady=10)
 
         self.refresh_tasks()
+
 
     def get_team_members(self):
         try:
@@ -108,17 +267,17 @@ class TaskManager(ctk.CTkFrame):
 
                 # Edit Button (Orange Style)
                 ctk.CTkButton(actions_f, text="Edit", width=60, height=32,
-                              fg_color="#F39C12", hover_color="#D35400", font=("Arial", 12),
+                              fg_color="#F39C12", hover_color="#D35400", font=("Arial", 12),text_color=("#2D3436", "#ECF0F1"),
                               command=lambda r=row: self.open_edit_dialog(r)).pack(side="left", padx=5)
 
                 # Delete Button (Red Style)
                 ctk.CTkButton(actions_f, text="Delete", width=60, height=32,
-                              fg_color="#C0392B", hover_color="#A93226",
+                              fg_color="#C0392B", hover_color="#A93226",text_color=("#2D3436", "#ECF0F1"),
                               command=lambda tid=row['id']: self.delete_task_with_confirm(tid)).pack(side="left", padx=5)
                 
                 
                 ctk.CTkButton(actions_f, text="History", width=70,
-                                fg_color="#2980B9",
+                                fg_color="#2980B9",text_color=("#2D3436", "#ECF0F1"),
                                 command=lambda tid=row['id']: self.view_history(tid)).pack(side="left", padx=5)
                 
             

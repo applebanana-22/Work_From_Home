@@ -1,10 +1,132 @@
 import customtkinter as ctk
 from database import Database
 from datetime import datetime, timedelta
-from tkinter import filedialog, messagebox
-from tkcalendar import DateEntry
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from tkinter import filedialog, messagebox, ttk
+from xml.sax.saxutils import escape
+from tkcalendar import Calendar
+import tkinter as tk
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+
+
+class DatePickerButton(ctk.CTkFrame):
+    def __init__(self, master, initial_date=None, **kwargs):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self._date = initial_date or datetime.today().date()
+        self._callback = None
+
+        self._field = ctk.CTkFrame(
+            self,
+            width=140,
+            height=32,
+            corner_radius=10,
+            fg_color=("#F9F9FA", "#343638"),
+            border_width=0,
+        )
+        self.configure(
+            width=140,
+            height=32,
+            corner_radius=10,
+            fg_color="transparent",
+            border_width=1,
+            border_color=("#979DA2", "#565B5E"),
+        )
+        self._field.pack_propagate(False)
+        self._field.pack(fill="both", expand=True)
+
+        self._date_lbl = ctk.CTkLabel(
+            self._field,
+            text=self._fmt(),
+            font=("Arial", 12),
+            text_color=("#1A1A1A", "#DCE4EE"),
+        )
+        self._date_lbl.pack(side="left", padx=(10, 0))
+
+        self._arrow_lbl = ctk.CTkLabel(
+            self._field,
+            text="▼",
+            font=("Arial", 11),
+            text_color="#A7B4C2",
+        )
+        self._arrow_lbl.pack(side="right", padx=(0, 10))
+
+        for w in (self._field, self._date_lbl, self._arrow_lbl):
+            w.bind("<Button-1>", self._open_picker)
+
+    def _fmt(self):
+        return self._date.strftime('%Y-%m-%d')
+
+    def _open_picker(self, _event=None):
+        top = tk.Toplevel(self)
+        top.overrideredirect(True)
+        top.resizable(False, False)
+        top.attributes("-topmost", True)
+        top.configure(bg="#1A1A2E")
+
+        x = self._field.winfo_rootx()
+        y = self._field.winfo_rooty() + self._field.winfo_height() + 4
+        top.geometry(f"280x280+{x}+{y}")
+
+        style = ttk.Style(top)
+        style.theme_use("clam")
+        style.configure(
+            "custom.Calendar",
+            background="#1A1A2E",
+            foreground="white",
+            headersbackground="#16213E",
+            headersforeground="#4FC3F7",
+            selectbackground="#3498DB",
+            selectforeground="white",
+            normalbackground="#1A1A2E",
+            normalforeground="#CCCCCC",
+            weekendbackground="#1A1A2E",
+            weekendforeground="#F39C12",
+            othermonthforeground="#555555",
+            bordercolor="#2A2A4A",
+            relief="flat",
+        )
+
+        cal = Calendar(
+            top,
+            style="custom.Calendar",
+            selectmode="day",
+            year=self._date.year,
+            month=self._date.month,
+            day=self._date.day,
+            date_pattern="yyyy-mm-dd",
+            showweeknumbers=False,
+            firstweekday="monday",
+            font="Arial 11",
+            cursor="hand2",
+        )
+        cal.pack(fill="both", expand=True, padx=8, pady=8)
+
+        def select_and_close(_event=None):
+            selected = cal.get_date()
+            self._date = datetime.strptime(selected, "%Y-%m-%d").date()
+            self._date_lbl.configure(text=self._fmt())
+            top.destroy()
+            if self._callback:
+                self._callback(self._date)
+
+        cal.bind("<<CalendarSelected>>", select_and_close)
+        top.bind("<FocusOut>", lambda _e: top.destroy())
+        top.focus_force()
+
+    def get_date(self):
+        return self._date
+
+    def set_date(self, value):
+        if isinstance(value, datetime):
+            value = value.date()
+        self._date = value
+        self._date_lbl.configure(text=self._fmt())
+
+    def on_change(self, callback):
+        self._callback = callback
 
 
 class MemberAttendance(ctk.CTkFrame):
@@ -31,7 +153,7 @@ class MemberAttendance(ctk.CTkFrame):
     # ---------------- UI ----------------
     def setup_ui(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=30, pady=20)
+        header.pack(fill="x", padx=100, pady=20)
 
         ctk.CTkLabel(
             header,
@@ -47,7 +169,7 @@ class MemberAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#3A4656"),
         )
-        filter_frame.pack(fill="x", padx=30, pady=(0, 18))
+        filter_frame.pack(fill="x", padx=100, pady=(0, 18))
 
         ctk.CTkLabel(filter_frame, text="Search").grid(row=0, column=0, padx=(20, 6), pady=10, sticky="w")
 
@@ -61,22 +183,20 @@ class MemberAttendance(ctk.CTkFrame):
 
         ctk.CTkLabel(filter_frame, text="Date").grid(row=0, column=2, padx=(18, 6), pady=8, sticky="w")
 
-        self.date_picker = DateEntry(filter_frame, date_pattern="yyyy-mm-dd")
-        self.date_picker.configure(width=18)
+        self.date_picker = DatePickerButton(filter_frame, initial_date=datetime.today().date())
         self.date_picker.grid(row=0, column=3, padx=6, pady=8)
-        self.date_picker.bind("<<DateEntrySelected>>", self._on_date_selected)
+        self.date_picker.on_change(lambda _d: self._on_date_selected())
 
         ctk.CTkLabel(filter_frame, text="Month").grid(row=0, column=4, padx=(18, 6), pady=8, sticky="w")
 
         self.month_filter = ctk.CTkComboBox(
             filter_frame,
-            values=["All Months"],
+            values=[],
             width=180,
             corner_radius=10,
             command=lambda _v: self.load_data()
         )
         self.month_filter.grid(row=0, column=5, padx=6, pady=8)
-        self.month_filter.set("All Months")
 
         ctk.CTkButton(
             filter_frame,
@@ -96,11 +216,11 @@ class MemberAttendance(ctk.CTkFrame):
             hover_color="#B91C1C",
             corner_radius=10,
             command=self.export_pdf
-        ).grid(row=0, column=7, padx=(305, 20), pady=8)
+        ).grid(row=0, column=7, padx=(153, 20), pady=8)
 
         # ---------------- STATS ----------------
         self.stats_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.stats_container.pack(fill="x", padx=60, pady=5)
+        self.stats_container.pack(fill="x", padx=100, pady=5)
 
         self.month_work_lbl = self.create_stat_card("Month Work", "0", self.metric_colors["work"])
         self.working_lbl = self.create_stat_card("Working Days", "0", self.metric_colors["work"])
@@ -116,14 +236,14 @@ class MemberAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#2A3442"),
         )
-        self.table_card.pack(fill="both", expand=True, padx=30, pady=10)
+        self.table_card.pack(fill="both", expand=True, padx=100, pady=10)
 
-        header_row = ctk.CTkFrame(self.table_card, fg_color=("#0F172A", "#334155"))
+        header_row = ctk.CTkFrame(self.table_card, fg_color=("#9CA3AF", "#334155"))
         header_row.pack(fill="x", padx=10, pady=(10, 0))
 
         def h(text, w):
             return ctk.CTkLabel(header_row, text=text, width=w,
-                                text_color="white", font=("Arial", 12, "bold"))
+                                text_color=("#000000", "#FFFFFF"), font=("Arial", 12, "bold"))
 
         h("Date", 140).pack(side="left", padx=10)
         h("Check-In", 120).pack(side="left", padx=10)
@@ -190,17 +310,45 @@ class MemberAttendance(ctk.CTkFrame):
 
     # ---------------- MONTHS ----------------
     def load_months(self):
-        sql = """
-            SELECT DISTINCT DATE_FORMAT(attendance_date,'%Y-%m') ym
-            FROM attendance
-            WHERE user_id=%s
-            ORDER BY ym DESC
+        payroll_calc = """
+            CASE
+                WHEN DAY({col}) >= 26
+                THEN DATE_FORMAT(DATE_ADD({col}, INTERVAL 1 MONTH), '%Y-%m')
+                ELSE DATE_FORMAT({col}, '%Y-%m')
+            END
         """
-        self.db.cursor.execute(sql, (self.user["id"],))
+        sql = """
+            SELECT DISTINCT ym FROM (
+                SELECT {att_ym} AS ym
+                FROM attendance
+                WHERE user_id = %s
+
+                UNION
+
+                SELECT {leave_ym} AS ym
+                FROM leave_requests
+                WHERE user_id = %s
+
+                UNION
+
+                SELECT {ot_ym} AS ym
+                FROM overtime_requests
+                WHERE member_id = %s
+                AND status IN ('Accepted', 'Approved')
+            ) m
+            WHERE ym IS NOT NULL
+            ORDER BY ym DESC
+        """.format(
+            att_ym=payroll_calc.format(col="attendance_date"),
+            leave_ym=payroll_calc.format(col="start_date"),
+            ot_ym=payroll_calc.format(col="ot_date"),
+        )
+
+        self.db.cursor.execute(sql, (self.user["id"], self.user["id"], self.user["id"]))
         rows = self.db.cursor.fetchall()
 
-        values = ["All Months"]
-        self.month_map = {"All Months": ""}
+        values = []
+        self.month_map = {}
 
         for r in rows:
             ym = r["ym"]
@@ -209,21 +357,36 @@ class MemberAttendance(ctk.CTkFrame):
             self.month_map[label] = ym
             values.append(label)
 
+        # apply values
         self.month_filter.configure(values=values)
+        self.update_idletasks()
 
+        # ===== CURRENT PAYROLL MONTH =====
         today = datetime.now()
         if today.day >= 26:
-            current_ym = f"{today.year + (today.month == 12)}-{(today.month % 12 + 1):02d}"
+            if today.month == 12:
+                current_ym = f"{today.year + 1}-01"
+            else:
+                current_ym = f"{today.year}-{today.month + 1:02d}"
         else:
             current_ym = today.strftime("%Y-%m")
 
-        default = "All Months"
+        # find match
+        selected_label = None
         for label, ym in self.month_map.items():
             if ym == current_ym:
-                default = label
+                selected_label = label
                 break
 
-        self.after(50, lambda: self.month_filter.set(default))
+        # fallback → latest
+        if not selected_label and values:
+            selected_label = values[0]
+
+        # set default
+        if selected_label:
+            self.month_filter.set(selected_label)
+        else:
+            self.month_filter.set("")
 
     def _on_date_selected(self, _event=None):
         self.date_filter_enabled = True
@@ -255,23 +418,23 @@ class MemberAttendance(ctk.CTkFrame):
             WHERE user_id = %s
             UNION
             SELECT DATE(ot_date) AS work_date
-            FROM overtime
-            WHERE TRIM(member_name) = TRIM(%s)
+            FROM overtime_requests
+            WHERE member_id = %s
               AND status IN ('Accepted', 'Approved')
         ) d
         LEFT JOIN attendance a
                ON a.user_id = %s
               AND a.attendance_date = d.work_date
         LEFT JOIN (
-            SELECT DATE(ot_date) AS ot_date, SUM(hours) AS ot_hours
-            FROM overtime
-            WHERE TRIM(member_name) = TRIM(%s)
+            SELECT DATE(ot_date) AS ot_date, ROUND(SUM(COALESCE(hours, 0)), 2) AS ot_hours
+            FROM overtime_requests
+            WHERE member_id = %s
               AND status IN ('Accepted', 'Approved')
             GROUP BY DATE(ot_date)
         ) o ON d.work_date = o.ot_date
         WHERE d.work_date IS NOT NULL
         """
-        params = [user_id, self.user["full_name"], user_id, self.user["full_name"]]
+        params = [user_id, user_id, user_id, user_id]
 
         if month_key:
             sql += """
@@ -294,8 +457,8 @@ class MemberAttendance(ctk.CTkFrame):
             SELECT IFNULL(SUM(
                 CASE
                     WHEN total_days IS NOT NULL THEN total_days
-                    WHEN is_half_day = 1 THEN (DATEDIFF(end_date, start_date) + 1) + 0.5
-                    ELSE DATEDIFF(end_date, start_date) + 1
+                    ELSE (DATEDIFF(end_date, start_date) + 1) *
+                         (CASE WHEN shift_type = 'Full Day' THEN 1.0 ELSE 0.5 END)
                 END
             ), 0) leave_days
             FROM leave_requests
@@ -349,7 +512,7 @@ class MemberAttendance(ctk.CTkFrame):
         self.current_rows = display
 
         for r in display:
-            row = ctk.CTkFrame(self.scroll, fg_color=("white", "#1F2933"), corner_radius=10)
+            row = ctk.CTkFrame(self.scroll, fg_color=("#EEF2F7", "#1F2933"), corner_radius=10)
             row.pack(fill="x", pady=4)
 
             ctk.CTkLabel(row, text=self._dash(r["attendance_date"]), width=140).pack(side="left", padx=10)
@@ -365,9 +528,36 @@ class MemberAttendance(ctk.CTkFrame):
     # ---------------- RESET ----------------
     def reset_filters(self):
         self.search_entry.delete(0, "end")
-        self.month_filter.set("All Months")
+
+        # ===== CURRENT PAYROLL MONTH =====
+        today = datetime.now()
+        if today.day >= 26:
+            if today.month == 12:
+                current_ym = f"{today.year + 1}-01"
+            else:
+                current_ym = f"{today.year}-{today.month + 1:02d}"
+        else:
+            current_ym = today.strftime("%Y-%m")
+
+        # find match
+        selected_label = None
+        all_labels = list(self.month_map.keys())
+
+        for label, ym in self.month_map.items():
+            if ym == current_ym:
+                selected_label = label
+                break
+
+        # fallback
+        if not selected_label and all_labels:
+            selected_label = all_labels[0]
+
+        if selected_label:
+            self.month_filter.set(selected_label)
+
         self.date_filter_enabled = False
-        self.date_picker.set_date(datetime.now())
+        self.date_picker.set_date(datetime.now().date())
+
         self.load_data()
 
     # ---------------- PDF ----------------
@@ -376,29 +566,110 @@ class MemberAttendance(ctk.CTkFrame):
             messagebox.showwarning("No Data", "No records to export.")
             return
 
-        file = filedialog.asksaveasfilename(defaultextension=".pdf")
+        selected_month = self.month_filter.get().replace(" ", "_")
+        selected_member = str(self.user.get("full_name", "Member")).replace(" ", "_")
+        file_name = f"Attendance_{selected_member}_{selected_month}.pdf"
+
+        file = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            initialfile=file_name,
+            filetypes=[("PDF files", "*.pdf")],
+        )
         if not file:
             return
 
-        doc = SimpleDocTemplate(file)
+        doc = SimpleDocTemplate(
+            file,
+            pagesize=letter,
+            leftMargin=28,
+            rightMargin=28,
+            topMargin=28,
+            bottomMargin=28,
+        )
+        styles = getSampleStyleSheet()
+        elements = []
+        safe_member = escape(str(self.user.get("full_name", "Member")))
+        safe_month = escape(self.month_filter.get())
+        safe_month_work = escape(str(self.month_total_workdays))
+
+        title_style = ParagraphStyle(
+            "MemberTitle",
+            parent=styles["Title"],
+            fontName="Helvetica-Bold",
+            fontSize=22,
+            leading=26,
+            textColor=colors.HexColor("#0B1220"),
+            alignment=1,
+            spaceAfter=6,
+        )
+        meta_style = ParagraphStyle(
+            "MemberMeta",
+            parent=styles["Normal"],
+            fontName="Helvetica",
+            fontSize=10,
+            leading=13,
+            textColor=colors.HexColor("#334155"),
+        )
+
+        elements.append(Paragraph("Employee Attendance Report", title_style))
+        elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", meta_style))
+        elements.append(Spacer(1, 10))
+
+        info_table = Table(
+            [[
+                Paragraph(f"<b><font color='#1D4ED8'>Member:</font></b> {safe_member}", meta_style),
+                Paragraph(
+                    f"<b><font color='#1D4ED8'>Month:</font></b> {safe_month}<br/>"
+                    f"<b><font color='#1D4ED8'>Month Work:</font></b> {safe_month_work}",
+                    meta_style
+                ),
+            ]],
+            colWidths=[3.8 * inch, 3.2 * inch],
+        )
+        info_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#E2E8F0")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        elements.append(info_table)
+        elements.append(Spacer(1, 18))
 
         data = [["Date", "In", "Out", "OT", "Remark"]]
         for r in self.current_rows:
             remark = "LATE" if r["check_in"] and str(r["check_in"]) > self.LATE_TIME else "ON TIME"
+            remark_color = "#EA580C" if remark == "LATE" else "#16A34A"
             data.append([
                 self._dash(r["attendance_date"]),
                 self._dash(r["check_in"]),
                 self._dash(r["check_out"]),
                 f"{float(r['ot_hours'] or 0):g}",
-                remark
+                Paragraph(f"<font color='{remark_color}'>{remark}</font>", meta_style)
             ])
 
-        table = Table(data)
+        table = Table(
+            data,
+            repeatRows=1,
+            colWidths=[1.5 * inch, 1.1 * inch, 1.1 * inch, 0.9 * inch, 1.5 * inch],
+        )
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F8FAFC")]),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("TEXTCOLOR", (3, 1), (3, -1), colors.HexColor("#7C3AED")),
         ]))
 
-        doc.build([table])
-        messagebox.showinfo("Success", "PDF exported")
+        elements.append(table)
+        doc.build(elements)
+        messagebox.showinfo("Export Successful", "Attendance PDF exported successfully.")

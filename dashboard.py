@@ -15,11 +15,10 @@ class Dashboard(ctk.CTk):
         # --- Window Configuration ---
         ctk.set_appearance_mode("dark") 
         ctk.set_default_color_theme("blue")
-        self.title("GIC Myanmar Work Sync")
+        self.title("GIC Myanmar Work From Home Tracker")
         
-        # Screen size အလိုက် Responsive ဖြစ်စေရန် geometry သတ်မှတ်ခြင်း
         self.geometry("1100x700")
-        self.minsize(1000, 650) # Resolution နိမ့်သော Laptop များအတွက် အနည်းဆုံး size
+        self.minsize(1000, 650)
         
         self.db = Database()
         self.user = user_data
@@ -39,7 +38,7 @@ class Dashboard(ctk.CTk):
         self.container = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         self.container.pack(side="top", expand=True, fill="both")
 
-        # --- Fixed Sidebar Layout ---
+        # --- Sidebar Layout ---
         self.sidebar_container = ctk.CTkFrame(
             self.container, width=240, corner_radius=0, 
             fg_color=("#FFFFFF", "#1F1F1F"), 
@@ -48,15 +47,22 @@ class Dashboard(ctk.CTk):
         self.sidebar_container.pack(side="left", fill="y")
         self.sidebar_container.pack_propagate(False)
 
-        # --- [NEW] Responsive Scrollable Sidebar Area ---
-        # ဒီ Frame ထဲက Menu တွေ Button တွေက Screen သေးရင် Scroll ဆွဲလို့ရမှာပါ
+        # 1. FIXED BOTTOM AREA (Buttons that don't move)
+        self.fixed_bottom_sidebar = ctk.CTkFrame(
+            self.sidebar_container, 
+            fg_color="transparent",
+            corner_radius=0
+        )
+        self.fixed_bottom_sidebar.pack(side="bottom", fill="x", padx=10, pady=(0, 20))
+
+        # 2. SCROLLABLE TOP AREA (Menus)
         self.sidebar_scroll = ctk.CTkScrollableFrame(
             self.sidebar_container, 
             fg_color="transparent", 
             corner_radius=0,
             label_text=""
         )
-        self.sidebar_scroll.pack(fill="both", expand=True)
+        self.sidebar_scroll.pack(side="top", fill="both", expand=True)
 
         # --- Main View Area ---
         self.main_view = ctk.CTkFrame(
@@ -67,12 +73,11 @@ class Dashboard(ctk.CTk):
 
         # --- Initialize Components ---
         self.setup_header()
-        self.load_role_content(user_data) # parent အဖြစ် sidebar_scroll ကို ပေးမည်
-        self.setup_bottom_sidebar()
+        self.load_role_content(user_data) 
+        self.setup_bottom_sidebar() # Populates the fixed frame
         self.sync_leader_schedule()
         self.update_attendance_ui(self.att_manager.is_checked_in)
         
-        # Window closing logic
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def setup_header(self):
@@ -81,15 +86,15 @@ class Dashboard(ctk.CTk):
 
         ctk.CTkLabel(
             self.header_frame, text="GIC Myanmar", 
-            font=("Arial", 24, "bold"), 
-            text_color=("#000000", "#FFFFFF")
+            font=("Arial", 22, "bold"), 
+            text_color=("#1F538D", "#3498DB")
         ).pack(side="left", padx=25)
 
         role_info = f"👤 {self.user['full_name']}  |  [{self.user['role'].upper()}]"
         ctk.CTkLabel(
             self.header_frame, text=role_info, 
-            font=("Arial", 14, "bold"),
-            text_color=("#000000", "#FFFFFF")
+            font=("Arial", 13, "bold"),
+            text_color=("#333333", "#D1D1D1")
         ).pack(side="right", padx=25)
 
         self.create_status_header(self.header_frame)
@@ -101,23 +106,25 @@ class Dashboard(ctk.CTk):
         status_f = ctk.CTkFrame(parent_frame, fg_color="transparent")
         status_f.pack(side="right", padx=30)
 
-        ctk.CTkLabel(status_f, text="🏢 Office:", font=("Arial", 13, "bold"), text_color="#2ECC71").pack(side="left")
-        ctk.CTkLabel(status_f, text=str(off_count), font=("Arial", 13, "bold"), text_color=("#000000", "#FFFFFF")).pack(side="left", padx=(5, 15))
+        ctk.CTkLabel(status_f, text="🏢 Office:", font=("Arial", 12, "bold"), text_color="#2ECC71").pack(side="left")
+        ctk.CTkLabel(status_f, text=str(off_count), font=("Arial", 12, "bold")).pack(side="left", padx=(5, 15))
 
-        ctk.CTkLabel(status_f, text="🏠 WFH:", font=("Arial", 13, "bold"), text_color="#3498DB").pack(side="left")
-        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 13, "bold"), text_color=("#000000", "#FFFFFF")).pack(side="left", padx=5)
+        ctk.CTkLabel(status_f, text="🏠 WFH:", font=("Arial", 12, "bold"), text_color="#3498DB").pack(side="left")
+        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 12, "bold")).pack(side="left", padx=5)
 
     def setup_bottom_sidebar(self):
-        # Sidebar scroll frame ထဲတွင် ပေါင်းထည့်မည်
-        bottom_frame = ctk.CTkFrame(self.sidebar_scroll, fg_color="transparent")
-        bottom_frame.pack(side="top", fill="x", padx=10, pady=(30, 20))
+        """Populates the fixed bottom frame that does not scroll"""
+        bottom_frame = self.fixed_bottom_sidebar
+
+        # Visual Separator line
+        ctk.CTkFrame(bottom_frame, height=2, fg_color=("#E0E0E0", "#2B2B2B")).pack(fill="x", pady=(0, 15))
 
         # Attendance Section
         ctk.CTkLabel(bottom_frame, text="ATTENDANCE CONTROL", font=("Arial", 10, "bold"), text_color="gray").pack(anchor="w", padx=5)
         
         self.attendance_btn = ctk.CTkButton(
             bottom_frame, text="📍 Check-in Now", 
-            fg_color=("#2ECC71", "#27AE60"), text_color=("#000000", "#FFFFFF"),
+            fg_color=("#2ECC71", "#27AE60"), text_color="white",
             height=40, font=("Arial", 13, "bold"), command=self.toggle_attendance
         )
         self.attendance_btn.pack(fill="x", pady=(8, 15))
@@ -127,31 +134,31 @@ class Dashboard(ctk.CTk):
         
         self.status_switch = ctk.CTkSegmentedButton(
             bottom_frame, values=["🏢 Office", "🏠 WFH"],
-            font=("Arial", 12, "bold"), text_color=("#000000", "#FFFFFF"),
+            font=("Arial", 12, "bold"),
             command=self.manual_status_change
         )
-        self.status_switch.pack(fill="x", pady=(8, 20))
+        self.status_switch.pack(fill="x", pady=(8, 15))
 
-        # Settings
+        # Theme Switch
         self.theme_switch = ctk.CTkSwitch(bottom_frame, text="Dark Mode", font=("Arial", 12), command=self.change_appearance_mode)
         self.theme_switch.select()
-        self.theme_switch.pack(pady=10, padx=5, anchor="w")
+        self.theme_switch.pack(pady=5, padx=5, anchor="w")
 
-        # Logout - ခြားနားသွားစေရန် border ပါသော button သုံးပါမည်
+        # Logout
         self.logout_btn = ctk.CTkButton(
             bottom_frame, text="🚪 Logout Account", 
             fg_color="transparent", border_width=1, border_color="#E74C3C",
             text_color="#E74C3C", hover_color=("#FADBD8", "#2C1A1A"),
             height=35, font=("Arial", 12, "bold"), command=self.logout_event
         )
-        self.logout_btn.pack(fill="x", pady=(20, 10))
+        self.logout_btn.pack(fill="x", pady=(15, 0))
 
     def update_attendance_ui(self, is_checked_in):
         if is_checked_in:
-            self.attendance_btn.configure(text="🚩 Check-out", fg_color="#E74C3C", hover_color="#C0392B", text_color="#FFFFFF")
+            self.attendance_btn.configure(text="🚩 Check-out", fg_color="#E74C3C", hover_color="#C0392B")
             if self.tracker: self.tracker.set_tracking_state(True)
         else:
-            self.attendance_btn.configure(text="📍 Check-in Now", fg_color=("#2ECC71", "#27AE60"), text_color=("#000000", "#FFFFFF"))
+            self.attendance_btn.configure(text="📍 Check-in Now", fg_color=("#2ECC71", "#27AE60"))
             if self.tracker: self.tracker.set_tracking_state(False)
 
     def toggle_attendance(self):
@@ -167,6 +174,7 @@ class Dashboard(ctk.CTk):
             self.db.ensure_connection()
             query = "UPDATE users SET current_status = %s WHERE id = %s"
             self.db.cursor.execute(query, (new_status, self.user['id']))
+            self.db.conn.commit()
             self.setup_header() 
         except: pass
 
@@ -193,11 +201,9 @@ class Dashboard(ctk.CTk):
     def change_appearance_mode(self):
         mode = "dark" if self.theme_switch.get() == 1 else "light"
         ctk.set_appearance_mode(mode)
-        self.setup_header()
 
     def load_role_content(self, user):
         role = user['role'].lower()
-        # Menu Class များသို့ sidebar_scroll ကို parent အဖြစ်ပေးလိုက်ခြင်းဖြင့် responsive ဖြစ်သွားမည်
         if role == 'admin': 
             self.menu_logic = AdminMenu(self.sidebar_scroll, self.main_view, user)
         elif role == 'leader': 

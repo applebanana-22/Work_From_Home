@@ -67,6 +67,7 @@ class MemberProject(ctk.CTkFrame):
             width=100,
             fg_color=self.colors["accent_blue"],
             hover_color="#2563EB",
+            text_color=("#2D3436", "#ECF0F1"),
             corner_radius=8,
             command=self.refresh_tasks
         ).pack(side="right", padx=10)
@@ -75,9 +76,11 @@ class MemberProject(ctk.CTkFrame):
         self.scroll = ctk.CTkScrollableFrame(
             self.layer1, 
             fg_color="transparent",
-            scrollbar_button_color=self.colors["accent_blue"]
+            scrollbar_button_color="#A0A0A0", # Grey scrollbar
+            scrollbar_button_hover_color="#808080"
         )
-        self.scroll.pack(fill="both", expand=True)
+        
+        self.scroll.pack(fill="both", expand=True, anchor="w", padx=100, pady=(10, 0))
 
         self.refresh_tasks()
 
@@ -153,13 +156,13 @@ class MemberProject(ctk.CTkFrame):
 
         ctk.CTkButton(
             btns, text="📝 Report", fg_color=self.colors["accent_blue"],
-            hover_color="#2563EB", width=110, corner_radius=8,
+            hover_color="#2563EB",text_color=("#2D3436", "#ECF0F1"), width=110, corner_radius=8,
             command=lambda t=task: self.open_report(t)
         ).pack(pady=5)
 
         ctk.CTkButton(
             btns, text="📜 History", fg_color="transparent", border_width=1,
-            border_color=self.colors["border"], text_color=self.colors["text_main"],
+            border_color=self.colors["border"], text_color=("#2D3436", "#ECF0F1"),
             hover_color=("#F1F5F9", "#334155"), width=110, corner_radius=8,
             command=lambda t=task: self.open_history(t)
         ).pack(pady=5)
@@ -207,7 +210,7 @@ class MemberProject(ctk.CTkFrame):
 
         self.submit_btn = ctk.CTkButton(
             btn_f, text="💾 Submit", fg_color=self.colors["accent_green"], 
-            hover_color="#059669", height=40, corner_radius=8, command=self.submit_report
+            hover_color="#059669",text_color=("#2D3436", "#ECF0F1"), height=40, corner_radius=8, command=self.submit_report
         )
         self.submit_btn.pack(side="right", expand=True, fill="x", padx=(5, 0))
 
@@ -227,21 +230,32 @@ class MemberProject(ctk.CTkFrame):
         header = ctk.CTkFrame(self.layer3, fg_color="transparent")
         header.pack(fill="x", pady=10)
 
-        ctk.CTkButton(header, text="← Back", width=80, fg_color="transparent", 
-                      text_color=self.colors["text_main"], command=self.back_from_history).pack(side="left")
-
         ctk.CTkLabel(header, text="Task History", font=("Inter", 24, "bold")).pack(side="left", padx=20)
 
-        container = ctk.CTkScrollableFrame(self.layer3, fg_color="transparent")
-        container.pack(fill="both", expand=True)
+        container = ctk.CTkScrollableFrame(self.layer3, fg_color="transparent",
+                                            scrollbar_button_color="#A0A0A0", # Grey scrollbar
+                                            scrollbar_button_hover_color="#808080")
+        container.pack(fill="both", expand=True, padx=100, pady=(10, 0))
 
         self.db.cursor.execute("""
             SELECT * FROM progress_history WHERE task_id=%s ORDER BY update_date DESC, id DESC
         """, (self.current_task['id'],))
         
         rows = self.db.cursor.fetchall()
-        for r in rows:
-            self.create_history_card(container, r)
+
+        if not rows:
+            ctk.CTkLabel(
+                container, text="No history records found.", 
+                font=("Inter", 14), text_color=self.colors["text_muted"]
+            ).pack(pady=40)
+        else:
+            for r in rows:
+                self.create_history_card(container, r)
+
+        ctk.CTkButton(header, text="← Back", width=100, fg_color=self.colors["accent_blue"], hover_color="#2563EB",
+                      text_color=("#2D3436", "#ECF0F1"),corner_radius=8, command=self.back_from_history).pack(side="right", padx=10)
+
+
 
     def create_history_card(self, parent, row):
         card = ctk.CTkFrame(parent, fg_color=self.colors["card_bg"], corner_radius=10)
@@ -257,9 +271,9 @@ class MemberProject(ctk.CTkFrame):
         btn_f = ctk.CTkFrame(card, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
-        ctk.CTkButton(btn_f, text="Edit", width=60, fg_color=self.colors["accent_amber"],
+        ctk.CTkButton(btn_f, text="Edit", width=60, fg_color=self.colors["accent_amber"],text_color=("#2D3436", "#ECF0F1"),
                       command=lambda r=row: self.edit_history(r)).pack(side="left", padx=2)
-        ctk.CTkButton(btn_f, text="Delete", width=60, fg_color=self.colors["accent_red"],
+        ctk.CTkButton(btn_f, text="Delete", width=60, fg_color=self.colors["accent_red"],text_color=("#2D3436", "#ECF0F1"),
                       command=lambda r=row: self.delete_history(r)).pack(side="left", padx=2)
 
     # =========================================================

@@ -13,80 +13,100 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 # ── Reusable modern date-picker ──────────────────────────────────────────────
 class DatePickerButton(ctk.CTkFrame):
-    """A styled button that opens a calendar popup."""
+    """A styled button that opens a compact calendar dropdown."""
     def __init__(self, master, label="Date", initial_date=None, **kwargs):
         super().__init__(master, fg_color="transparent", **kwargs)
         self._date = initial_date or datetime.today().date()
+        self._open = False
         self._callback = None
 
-        self._btn = ctk.CTkButton(
-            self, text=self._fmt(), width=140, height=36,
-            corner_radius=8,
-            font=("Arial", 12),
-            fg_color="#1E2A3A", hover_color="#2C3E50",
-            border_width=1, border_color="#3D5166",
-            anchor="w",
-            command=self._open_picker
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Custom.Calendar",
+            background="#1A1A2E",
+            foreground="white",
+            headersbackground="#16213E",
+            headersforeground="#4FC3F7",
+            selectbackground="#3498DB",
+            selectforeground="white",
+            normalbackground="#1A1A2E",
+            normalforeground="#CCCCCC",
+            weekendbackground="#1A1A2E",
+            weekendforeground="#F39C12",
+            othermonthforeground="#555555",
+            bordercolor="#2A2A4A",
+            relief="flat"
         )
-        self._btn.pack()
+
+        self.btn = ctk.CTkButton(
+            self,
+            text=self._fmt(),
+            width=170,
+            height=36,
+            corner_radius=10,
+            fg_color="#1E2A3A",
+            hover_color="#2C3E50",
+            border_width=1,
+            border_color="#3D5166",
+            anchor="w",
+            command=self.toggle
+        )
+        self.btn.pack()
+
+        self.panel = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color="#141E2B",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2A3A4A"
+        )
+
+        self.cal = Calendar(
+            self.panel,
+            style="Custom.Calendar",
+            selectmode="day",
+            date_pattern="yyyy-mm-dd",
+            year=self._date.year,
+            month=self._date.month,
+            day=self._date.day,
+            showweeknumbers=False,
+            firstweekday="monday",
+            font=("Arial", 11),
+            cursor="hand2"
+        )
+        self.cal.pack(padx=8, pady=8)
+        self.cal.bind("<<CalendarSelected>>", self._select)
 
     def _fmt(self):
         return f"  📅  {self._date.strftime('%Y-%m-%d')}"
 
-    def _open_picker(self):
-        top = tk.Toplevel(self)
-        top.title("")
-        top.resizable(False, False)
-        top.attributes("-topmost", True)
-        top.configure(bg="#1A1A2E")
+    def toggle(self):
+        if self._open:
+            self.panel.place_forget()
+        else:
+            self.panel.lift()
+            self.panel.place(
+                in_=self,
+                x=0,
+                y=self.btn.winfo_height() + 2
+            )
+        self._open = not self._open
 
-        # position near the button
-        x = self._btn.winfo_rootx()
-        y = self._btn.winfo_rooty() + self._btn.winfo_height() + 4
-        top.geometry(f"280x280+{x}+{y}")
-
-        style = ttk.Style(top)
-        style.theme_use("clam")
-        style.configure("custom.Calendar",
-                        background="#1A1A2E", foreground="white",
-                        headersbackground="#16213E", headersforeground="#4FC3F7",
-                        selectbackground="#3498DB", selectforeground="white",
-                        normalbackground="#1A1A2E", normalforeground="#CCCCCC",
-                        weekendbackground="#1A1A2E", weekendforeground="#F39C12",
-                        othermonthforeground="#555555",
-                        bordercolor="#2A2A4A", relief="flat")
-
-        cal = Calendar(top, style="custom.Calendar",
-                       selectmode='day',
-                       year=self._date.year,
-                       month=self._date.month,
-                       day=self._date.day,
-                       date_pattern='yyyy-mm-dd',
-                       showweeknumbers=False,
-                       firstweekday='monday',
-                       font="Arial 11",
-                       cursor="hand2")
-        cal.pack(fill="both", expand=True, padx=8, pady=8)
-
-        def confirm():
-            selected = cal.get_date()
-            self._date = datetime.strptime(selected, "%Y-%m-%d").date()
-            self._btn.configure(text=self._fmt())
-            top.destroy()
-            if self._callback:
-                self._callback(self._date)
-
-        ctk.CTkButton(top, text="✔  Confirm", height=32,
-                      fg_color="#27AE60", hover_color="#1E8449",
-                      font=("Arial", 12, "bold"),
-                      command=confirm).pack(fill="x", padx=8, pady=(0, 8))
+    def _select(self, event):
+        selected = self.cal.get_date()
+        self._date = datetime.strptime(selected, "%Y-%m-%d").date()
+        self.btn.configure(text=self._fmt())
+        self.toggle()
+        if self._callback:
+            self._callback(self._date)
 
     def get_date(self):
         return self._date
 
     def set_date(self, d):
         self._date = d
-        self._btn.configure(text=self._fmt())
+        self.cal.selection_set(d)
+        self.btn.configure(text=self._fmt())
 
     def on_change(self, callback):
         self._callback = callback

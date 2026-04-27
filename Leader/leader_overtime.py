@@ -265,6 +265,7 @@ class LeaderOvertime(ctk.CTkFrame):
     # ================= ADD POPUP =================
     def open_popup(self):
         popup = ctk.CTkToplevel(self)
+        popup.title("Overtime Add")
         popup.geometry("450x620")
         popup.grab_set()
 

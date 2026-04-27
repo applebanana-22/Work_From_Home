@@ -5,95 +5,92 @@ from database import Database
 
 class LeaderDashboard(ctk.CTkFrame):
     def __init__(self, parent, user, db=None):
-        # Background color အတွက် tuple ကို ဆက်သုံးထားပါမယ်
-        super().__init__(parent, fg_color=("#FFFFFF", "#1A1A1A"))
+        # Background: White (#FFFFFF) for light mode, Black (#000000) for dark mode
+        super().__init__(parent, fg_color=("#FFFFFF", "#000000"))
         
         self.user = user  
         self.db = db if db else Database() 
         self.sio = socketio.Client(reconnection=True, reconnection_delay=5)
         
-        # UI ကို အရင်ဆောက်ပါမယ်
         self.setup_ui()
         self.load_initial_data() 
         self.connect_tracking_server()
 
     def setup_ui(self):
-        # Header Section
+        # Header Container
         self.header = ctk.CTkFrame(self, fg_color="transparent")
-        self.header.pack(fill="x", padx=20, pady=20)
+        self.header.pack(fill="x", padx=30, pady=(30, 10))
         
-        label_text_color = ("#000000", "#FFFFFF")
+        # Label: Black in Light, White in Dark
         ctk.CTkLabel(
             self.header, 
-            text="📊 Team Real-time Monitor", 
-            font=("Arial", 24, "bold"),
-            text_color=label_text_color
+            text="Team Real-time Monitor", 
+            font=("Segoe UI", 28, "bold"),
+            text_color=("#000000", "#FFFFFF")
         ).pack(side="left")
 
-        # Table Section Frame
-        self.table_frame = ctk.CTkFrame(self, fg_color=("#FFFFFF", "#1A1A1A"))
-        self.table_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        # Table Container: Matches main frame colors
+        self.table_container = ctk.CTkFrame(
+            self, fg_color=("#FFFFFF", "#000000"), corner_radius=15,
+            border_width=1, border_color=("#D1D1D1", "#2B2B2B")
+        )
+        self.table_container.pack(fill="both", expand=True, padx=30, pady=20)
 
-        # Treeview Setup
-        columns = ("id", "name", "role", "wfh_office", "check_in", "check_out", "status")
-        self.tree = ttk.Treeview(self.table_frame, columns=columns, show="headings")
-        
-        col_settings = {"id": 80, "name": 200, "role": 100, "wfh_office": 100, "check_in": 120, "check_out": 120, "status": 130}
-        for col, width in col_settings.items():
-            self.tree.heading(col, text=col.replace("_", " ").title())
-            self.tree.column(col, anchor="center", width=width)
+        # Trees: Width is set later via .column() to avoid the "-width" error
+        info_cols = ("id", "name", "role", "wfh_office", "check_in", "check_out")
+        self.info_tree = ttk.Treeview(self.table_container, columns=info_cols, show="headings")
+        self.status_tree = ttk.Treeview(self.table_container, columns=("status",), show="headings")
 
-        self.tree.column("name", anchor="w")
-        self.tree.pack(fill="both", expand=True)
+        for col in info_cols:
+            self.info_tree.heading(col, text=col.replace("_", " ").upper())
+            self.info_tree.column(col, anchor="center", width=110)
         
-        # ကနဦး Style ကို apply လုပ်ပါမယ်
+        self.status_tree.heading("status", text="STATUS")
+        self.status_tree.column("status", anchor="center", width=140)
+
+        self.info_tree.pack(side="left", fill="both", expand=True, padx=(10, 0), pady=10)
+        self.status_tree.pack(side="right", fill="y", padx=(0, 10), pady=10)
+
         self.apply_treeview_style()
+        self.sync_scroll()
 
     def apply_treeview_style(self):
-        """Treeview အရောင်ကို manual ပြောင်းပေးသော function"""
+        """Forces the legacy Treeview to match the CustomTkinter theme."""
         style = ttk.Style()
         style.theme_use("default")
+
+        # Detect the current appearance mode
+        is_dark = ctk.get_appearance_mode() == "Dark"
         
-        # Appearance mode ကို တိုက်ရိုက်စစ်မယ်
-        mode = ctk.get_appearance_mode()
-        is_dark = (mode == "Dark")
-        
-        tree_bg = "#2B2B2B" if is_dark else "#FFFFFF"
+        tree_bg = "#000000" if is_dark else "#FFFFFF"
         tree_fg = "#FFFFFF" if is_dark else "#000000"
         header_bg = "#1A1A1A" if is_dark else "#F0F0F0"
 
-        style.configure("Treeview",
-                        background=tree_bg,
-                        foreground=tree_fg,
-                        fieldbackground=tree_bg,
-                        rowheight=45,
+        style.configure("Treeview", 
+                        background=tree_bg, 
+                        foreground=tree_fg, 
+                        fieldbackground=tree_bg, 
+                        rowheight=50, 
                         borderwidth=0)
         
         style.configure("Treeview.Heading", 
                         background=header_bg, 
                         foreground=tree_fg, 
-                        relief="flat",
-                        font=("Arial", 11, "bold"))
-        
-        style.map("Treeview", background=[('selected', '#3498DB')])
+                        relief="flat", 
+                        font=("Segoe UI", 10, "bold"))
 
-        # Tags color update
-        self.tree.tag_configure("normal", foreground=tree_fg)
-        self.tree.tag_configure("ACTIVE", foreground="#2ECC71")  
-        self.tree.tag_configure("AWAY", foreground="#F1C40F")    
-        self.tree.tag_configure("OFFLINE", foreground="#E74C3C") 
+        # Vibrant Status Tags for visibility in both modes
+        self.status_tree.tag_configure("ACTIVE", foreground="#2ECC71", font=("Segoe UI", 11, "bold")) 
+        self.status_tree.tag_configure("AWAY", foreground="#F1C40F", font=("Segoe UI", 11, "bold"))    
+        self.status_tree.tag_configure("OFFLINE", foreground="#E74C3C", font=("Segoe UI", 11, "bold"))
 
-    def _set_appearance_mode(self, mode_string):
-        """Theme ပြောင်းလဲမှုကို ဖမ်းယူရန် override လုပ်ခြင်း"""
-        super()._set_appearance_mode(mode_string)
-        # mode ပြောင်းသွားတာနဲ့ treeview ကိုပါ update လုပ်မယ်
-        self.apply_treeview_style()
-
-    # --- load_initial_data, connect_tracking_server, update_row_only တို့ကို အရင်အတိုင်း ထားနိုင်ပါတယ် ---
     def load_initial_data(self):
         try:
-            for item in self.tree.get_children():
-                self.tree.delete(item)
+            for tree in [self.info_tree, self.status_tree]:
+                tree.delete(*tree.get_children())
+            
+            # Subquery for team_id prevents 'Database object has no attribute get_team_name'
+            # Removed 'updated_at' to prevent the 'Unknown column' error
             query = """
                 SELECT u.employee_id, u.full_name, u.role, u.status,
                 COALESCE(a.location_type, 'N/A') AS mode,
@@ -105,15 +102,34 @@ class LeaderDashboard(ctk.CTkFrame):
             """
             self.db.ensure_connection()
             self.db.cursor.execute(query, (self.user['employee_id'],))
+            
             for m in self.db.cursor.fetchall():
                 live = (m['status'] or "OFFLINE").upper()
-                icon = "🟢" if live == "ACTIVE" else "🟡" if live == "AWAY" else "🔴"
-                self.tree.insert("", "end", values=(
-                    m['employee_id'], m['full_name'], m['role'].title(),
-                    m['mode'], m['in_t'], m['out_t'], f"{icon} {live}"
-                ), tags=("normal", live))
+                self.info_tree.insert("", "end", values=(m['employee_id'], m['full_name'], m['role'].upper(), m['mode'], m['in_t'], m['out_t']))
+                self.status_tree.insert("", "end", values=(f"● {live}",), tags=(live,))
         except Exception as e:
             print(f"❌ Error: {e}")
+
+    def update_row_only(self, data):
+        if not self.winfo_exists(): return
+        try:
+            target_id = str(data.get('user_id'))
+            new_status = str(data.get('status')).upper()
+            for idx, item in enumerate(self.info_tree.get_children()):
+                if str(self.info_tree.item(item)['values'][0]) == target_id:
+                    status_item = self.status_tree.get_children()[idx]
+                    self.status_tree.set(status_item, column="status", value=f"● {new_status}")
+                    self.status_tree.item(status_item, tags=(new_status,))
+                    break
+        except: pass
+
+    def sync_scroll(self):
+        def on_tree_scroll(*args):
+            self.info_tree.yview(*args)
+            self.status_tree.yview(*args)
+        self.scrollbar = ttk.Scrollbar(self.table_container, orient="vertical", command=on_tree_scroll)
+        self.info_tree.configure(yscrollcommand=self.scrollbar.set)
+        self.status_tree.configure(yscrollcommand=self.scrollbar.set)
 
     def connect_tracking_server(self):
         try:
@@ -123,18 +139,4 @@ class LeaderDashboard(ctk.CTkFrame):
             def on_update(data):
                 if self.winfo_exists():
                     self.after(0, lambda: self.update_row_only(data))
-        except: pass
-
-    def update_row_only(self, data):
-        if not self.winfo_exists(): return
-        try:
-            target_id = str(data.get('user_id'))
-            new_status = str(data.get('status')).upper()
-            icon = "🟢" if new_status == "ACTIVE" else "🟡" if new_status == "AWAY" else "🔴"
-            for item in self.tree.get_children():
-                row_vals = self.tree.item(item)['values']
-                if row_vals and str(row_vals[0]) == target_id:
-                    self.tree.set(item, column="status", value=f"{icon} {new_status}")
-                    self.tree.item(item, tags=("normal", new_status))
-                    break
         except: pass

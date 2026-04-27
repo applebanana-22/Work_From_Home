@@ -72,6 +72,16 @@ class Database:
         except Exception as e:
             print(f"Error fetching teams: {e}")
             return []
+        
+    def get_team_name(self, team_id):
+        """Fetch team name from team_id"""
+        try:
+            self.cursor.execute("SELECT team_name FROM teams WHERE team_id = %s", (team_id,))
+            row = self.cursor.fetchone()
+            return row['team_name'] if row else None
+        except Exception as e:
+            print(f"Get team name error: {e}")
+            return None
     
     def get_status_counts(self):
         try:

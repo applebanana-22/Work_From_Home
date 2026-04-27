@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import ttk, filedialog, messagebox
 from datetime import datetime, timedelta
+from xml.sax.saxutils import escape
 
 from database import Database
 
@@ -27,7 +28,7 @@ class LeaderAttendance(ctk.CTkFrame):
         self.after(100, self._load_month_options)
 
         # load data AFTER UI is ready
-        self.after(200, self.load_data)
+        self.after(300, self.load_data)
 
     def _build_ui(self):
         header_f = ctk.CTkFrame(self, fg_color="transparent")
@@ -37,7 +38,7 @@ class LeaderAttendance(ctk.CTkFrame):
             header_f,
             text="Team Attendance Dashboard",
             font=("Arial", 24, "bold"),
-            text_color=("#1E3A5F", "#EAF2FF"),
+            text_color=("#0F161F", "#EAF2FF"),
         ).pack(side="left")
 
         control_card = ctk.CTkFrame(
@@ -64,15 +65,14 @@ class LeaderAttendance(ctk.CTkFrame):
 
         self.month_filter = ctk.CTkComboBox(
         control_card,
-        values=["Choose Month"],   # ✅ declare here
+        values=[],   # ✅ declare here
         width=180,
         corner_radius=10,
         command=lambda v: self.load_data(),
         )
 
         self.month_filter.grid(row=0, column=5, padx=6, pady=8)
-
-        self.month_filter.set("All Months")   # ✅ also here (after creation)
+       # ✅ also here (after creation)
 
         ctk.CTkButton(
             control_card,
@@ -92,9 +92,9 @@ class LeaderAttendance(ctk.CTkFrame):
         fg_color="#DC2626",
         hover_color="#B91C1C",
         command=self.export_pdf,
-    ).grid(row=0, column=8, padx=(345, 20), pady=8) # Changed 6 to 100 for more margin-left
+    ).grid(row=0, column=8, padx=(348, 20), pady=8) # Changed 6 to 100 for more margin-left
 
-        self.result_label = ctk.CTkLabel(self, text="0 records", text_color=("#334155", "#CBD5E1"))
+        self.result_label = ctk.CTkLabel(self, text="0 records | Month Work: -", text_color=("#334155", "#CBD5E1"))
         self.result_label.pack(anchor="w", padx=100, pady=(0, 6))
 
         self._create_table()
@@ -111,7 +111,7 @@ class LeaderAttendance(ctk.CTkFrame):
         self.table_card.pack(fill="both", expand=True, padx=100, pady=(0, 20))
         header = ctk.CTkFrame(
             self.table_card,
-            fg_color=("#0F172A", "#334155"),
+            fg_color=("#9CA3AF", "#334155"),
             corner_radius=8,
         )
         header.pack(fill="x", padx=10, pady=(10, 0))
@@ -121,14 +121,12 @@ class LeaderAttendance(ctk.CTkFrame):
                 header,
                 text=text,
                 width=w,
-                text_color="white",
+                text_color=("#000000", "#FFFFFF"),
                 font=("Arial", 12, "bold")
             )
 
         h("Emp ID", 60).pack(side="left", padx=10)
         h("Name", 180).pack(side="left", padx=10)
-        h("Team", 120).pack(side="left", padx=10)
-        h("Month Work", 95).pack(side="left", padx=10)
         h("Work", 80).pack(side="left", padx=10)
         h("Leave", 80).pack(side="left", padx=10)
         h("Late", 80).pack(side="left", padx=10)
@@ -144,8 +142,6 @@ class LeaderAttendance(ctk.CTkFrame):
 
     def _load_month_options(self):
         try:
-            # 1. Define the SQL logic to get unique payroll months based on 26th-25th cycle
-            # We use the same CASE logic used in your load_data method
             payroll_calc = """
                 CASE 
                     WHEN DAY({col}) >= 26 
@@ -160,7 +156,7 @@ class LeaderAttendance(ctk.CTkFrame):
                     UNION
                     SELECT {payroll_calc.format(col='start_date')} AS ym FROM leave_requests
                     UNION
-                    SELECT {payroll_calc.format(col='ot_date')} AS ym FROM overtime
+                    SELECT {payroll_calc.format(col='ot_date')} AS ym FROM overtime_requests
                 ) x
                 WHERE ym IS NOT NULL
                 ORDER BY ym DESC
@@ -169,8 +165,8 @@ class LeaderAttendance(ctk.CTkFrame):
             self.db.cursor.execute(sql)
             rows = self.db.cursor.fetchall()
 
-            self.month_map = {"All Months": ""}
-            values = ["All Months"]
+            self.month_map = {}
+            values = []
 
             for r in rows:
                 ym = r["ym"]
@@ -179,14 +175,13 @@ class LeaderAttendance(ctk.CTkFrame):
                 self.month_map[label] = ym
                 values.append(label)
 
+            # Apply values
             self.month_filter.configure(values=values)
             self.update_idletasks()
 
-            # ================= DEFAULT = CURRENT PAYROLL MONTH =================
-            # Logic: If today is >= 26, the 'Current Payroll' is NEXT month.
+            # ===== CURRENT PAYROLL MONTH =====
             today = datetime.now()
             if today.day >= 26:
-                # Move to next month
                 if today.month == 12:
                     current_payroll_ym = f"{today.year + 1}-01"
                 else:
@@ -194,22 +189,30 @@ class LeaderAttendance(ctk.CTkFrame):
             else:
                 current_payroll_ym = today.strftime("%Y-%m")
 
-            default_label = "All Months"
+            # Find match
+            selected_label = None
             for label, ym_val in self.month_map.items():
                 if ym_val == current_payroll_ym:
-                    default_label = label
+                    selected_label = label
                     break
 
-            # If the calculated current payroll month isn't in DB yet, 
-            # fall back to the most recent month available in the list
-            if default_label == "All Months" and len(values) > 1:
-                default_label = values[1]
+            # Fallback → latest available
+            if not selected_label and values:
+                selected_label = values[0]
 
-            self.after(50, lambda: self.month_filter.set(default_label))
+            # Set default
+            if selected_label:
+                self.month_filter.set(selected_label)
+            else:
+                self.month_filter.set("")
 
         except Exception as e:
             print("Month filter error:", e)
-            self.month_filter.set("All Months")
+            values = list(self.month_map.keys())
+            if values:
+                self.month_filter.set(values[0])
+            else:
+                self.month_filter.set("")
 
     @staticmethod
     def _pretty_month_label(ym):
@@ -252,43 +255,181 @@ class LeaderAttendance(ctk.CTkFrame):
     @staticmethod
     def _num_or_dash(value):
         return "-" if value in (None, "") else f"{float(value):g}"
+    
+    def _get_employee_attendance_rows(self, user_id, month_key=""):
+        sql = """
+        SELECT
+            d.work_date AS attendance_date,
+            a.check_in,
+            a.check_out,
+            IFNULL(o.ot_hours, 0) AS ot_hours,
+            CASE WHEN a.check_in IS NOT NULL AND a.check_in > '07:45:00' THEN 1 ELSE 0 END AS is_late
+        FROM (
+            SELECT attendance_date AS work_date
+            FROM attendance
+            WHERE user_id = %s
+            UNION
+            SELECT DATE(ot_date) AS work_date
+            FROM overtime_requests
+            WHERE member_id = %s
+            AND status IN ('Accepted', 'Approved')
+        ) d
+        LEFT JOIN attendance a
+            ON a.user_id = %s
+            AND a.attendance_date = d.work_date
+        LEFT JOIN (
+            SELECT DATE(ot_date) AS ot_date, ROUND(SUM(COALESCE(hours, 0)), 2) AS ot_hours
+            FROM overtime_requests
+            WHERE member_id = %s
+            AND status IN ('Accepted', 'Approved')
+            GROUP BY DATE(ot_date)
+        ) o ON d.work_date = o.ot_date
+        WHERE d.work_date IS NOT NULL
+        """
+        params = [user_id, user_id, user_id, user_id]
 
+        if month_key:
+            sql += """
+            AND (
+                CASE
+                    WHEN DAY(d.work_date) >= 26
+                    THEN DATE_FORMAT(DATE_ADD(d.work_date, INTERVAL 1 MONTH), '%Y-%m')
+                    ELSE DATE_FORMAT(d.work_date, '%Y-%m')
+                END
+            ) = %s
+            """
+            params.append(month_key)
+
+        sql += " ORDER BY d.work_date DESC"
+        self.db.cursor.execute(sql, tuple(params))
+        return self.db.cursor.fetchall()
+
+    def _open_employee_attendance_detail(self, user_id, full_name):
+        month_label = self.month_filter.get()
+        month_key = self.month_map.get(month_label, "")
+
+        try:
+            rows = self._get_employee_attendance_rows(user_id, month_key)
+        except Exception as e:
+            messagebox.showerror("Fetch Error", f"Cannot load attendance detail: {e}")
+            return
+
+        detail_win = ctk.CTkToplevel(self)
+        detail_win.title(f"Attendance Detail - {full_name}")
+        detail_win.geometry("860x560")
+        detail_win.transient(self.winfo_toplevel())
+        detail_win.grab_set()
+
+        ctk.CTkLabel(
+            detail_win,
+            text=f"{full_name} (ID: {user_id})",
+            font=("Arial", 18, "bold"),
+        ).pack(anchor="w", padx=20, pady=(18, 4))
+
+        ctk.CTkLabel(
+            detail_win,
+            text=f"Month: {month_label}",
+            text_color=("#334155", "#CBD5E1"),
+        ).pack(anchor="w", padx=20, pady=(0, 10))
+
+        table_card = ctk.CTkFrame(
+            detail_win,
+            fg_color=("#FFFFFF", "#1B1F24"),
+            corner_radius=12,
+            border_width=1,
+            border_color=("#D6DEEB", "#2A3442"),
+        )
+        table_card.pack(fill="both", expand=True, padx=20, pady=(0, 14))
+
+        header = ctk.CTkFrame(table_card, fg_color=("#9CA3AF", "#334155"), corner_radius=8)
+        header.pack(fill="x", padx=10, pady=(10, 0))
+
+        def h(text, w):
+            return ctk.CTkLabel(
+                header,
+                text=text,
+                width=w,
+                text_color=("#000000", "#FFFFFF"),
+                font=("Arial", 12, "bold"),
+            )
+
+        h("Date", 170).pack(side="left", padx=10)
+        h("Check-In", 140).pack(side="left", padx=10)
+        h("Check-Out", 140).pack(side="left", padx=10)
+        h("OT Hours", 120).pack(side="left", padx=10)
+        h("Remark", 120).pack(side="left", padx=10)
+
+        scroll = ctk.CTkScrollableFrame(table_card, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=10, pady=10)
+
+        if not rows:
+            ctk.CTkLabel(
+                scroll,
+                text="No attendance records found for the selected month.",
+                text_color=("#64748B", "#94A3B8"),
+            ).pack(pady=20)
+            return
+
+        for row in rows:
+            card = ctk.CTkFrame(scroll, fg_color=("#EEF2F7", "#1F2933"), corner_radius=10)
+            card.pack(fill="x", pady=4, padx=4)
+
+            date_value = self._dash(row["attendance_date"])
+            check_in_value = self._dash(row["check_in"])
+            check_out_value = self._dash(row["check_out"])
+            ot_value = f"{float(row['ot_hours'] or 0):g}"
+            remark = "LATE" if row["is_late"] else "ON TIME"
+            remark_color = self.metric_colors["late"] if row["is_late"] else self.metric_colors["work"]
+
+            ctk.CTkLabel(card, text=date_value, width=170).pack(side="left", padx=10)
+            ctk.CTkLabel(card, text=check_in_value, width=140).pack(side="left", padx=10)
+            ctk.CTkLabel(card, text=check_out_value, width=140).pack(side="left", padx=10)
+            ctk.CTkLabel(card, text=ot_value, width=120, text_color=self.metric_colors["ot"]).pack(side="left", padx=10)
+            ctk.CTkLabel(card, text=remark, width=120, text_color=remark_color).pack(side="left", padx=10)
+
+    def _leader_team_label(self):
+        for row in self.current_rows:
+            team_name = row.get("team_name")
+            if team_name not in (None, "", "-"):
+                return str(team_name)
+
+        if self.user.get("team_name"):
+            return str(self.user["team_name"])
+        if self.user.get("team_id") is not None:
+            return f"Team_{self.user['team_id']}"
+        return "Team"
     def reset_filters(self):
-        # 1. Clear search box
+        # 1. Clear search
         self.search_entry.delete(0, "end")
-        
-        # 2. Reset team filter
-        self.team_filter.set("All Teams")
-        
-        # 3. Calculate Current Payroll Month (26th to 25th logic)
+
+        # 2. Calculate current payroll month
         today = datetime.now()
         if today.day >= 26:
-            # If today is 26th or later, we are in next month's payroll
             if today.month == 12:
                 current_payroll_ym = f"{today.year + 1}-01"
             else:
                 current_payroll_ym = f"{today.year}-{today.month + 1:02d}"
         else:
-            # If today is 1st to 25th, we are in this month's payroll
             current_payroll_ym = today.strftime("%Y-%m")
-            
-        # 4. Find the matching label in our map (e.g., "April 2026")
-        default_label = "All Months"
+
+        # 3. Find matching label
+        selected_label = None
+        all_labels = list(self.month_map.keys())
+
         for label, ym_val in self.month_map.items():
             if ym_val == current_payroll_ym:
-                default_label = label
+                selected_label = label
                 break
-        
-        # Fallback: if current payroll month has no data yet, pick the latest available
-        if default_label == "All Months" and len(self.month_map) > 1:
-            # Get the first item after "All Months" from values list
-            all_labels = list(self.month_map.keys())
-            if len(all_labels) > 1:
-                default_label = all_labels[1]
 
-        self.month_filter.set(default_label)
-        
-        # 5. Refresh the table
+        # 4. Fallback → latest available
+        if not selected_label and all_labels:
+            selected_label = all_labels[0]
+
+        # 5. Apply selection
+        if selected_label:
+            self.month_filter.set(selected_label)
+
+        # 6. Reload data
         self.load_data()
 
     def load_data(self):
@@ -361,7 +502,6 @@ class LeaderAttendance(ctk.CTkFrame):
                 u.id,
                 u.full_name,
                 IFNULL(t.team_name, '-') AS team_name,
-                IFNULL(a.latest_date, '-') AS latest_date,
                 IFNULL(a.workdays, 0) AS workdays,
                 IFNULL(lr.leaveday, 0) AS leaveday,
                 IFNULL(a.latecount, 0) AS latecount,
@@ -386,8 +526,8 @@ class LeaderAttendance(ctk.CTkFrame):
                     SUM(
                         CASE
                             WHEN total_days IS NOT NULL THEN total_days
-                            WHEN is_half_day = 1 THEN (DATEDIFF(end_date, start_date) + 1) + 0.5
-                            ELSE DATEDIFF(end_date, start_date) + 1
+                            ELSE (DATEDIFF(end_date, start_date) + 1) *
+                                 (CASE WHEN shift_type = 'Full Day' THEN 1.0 ELSE 0.5 END)
                         END
                     ) AS leaveday
                 FROM leave_requests
@@ -397,12 +537,12 @@ class LeaderAttendance(ctk.CTkFrame):
 
             LEFT JOIN (
                 SELECT
-                    member_name,
-                    SUM(hours) AS overtimehour
-                FROM overtime
+                    member_id,
+                    ROUND(SUM(COALESCE(hours, 0)), 2) AS overtimehour
+                FROM overtime_requests
                 {ot_where}
-                GROUP BY member_name
-            ) o ON TRIM(u.full_name) = TRIM(o.member_name)
+                GROUP BY member_id
+            ) o ON u.id = o.member_id
 
             WHERE u.team_id = %s
             AND (a.latest_date IS NOT NULL OR o.overtimehour IS NOT NULL)
@@ -421,16 +561,26 @@ class LeaderAttendance(ctk.CTkFrame):
                 for row in self.current_rows:
                     card = ctk.CTkFrame(
                         self.scroll,
-                        fg_color=("white", "#1F2933"),
+                        fg_color=("#EEF2F7", "#1F2933"),
                         corner_radius=10
                     )
                     card.pack(fill="x", pady=4, padx=5)
 
                     # row content
                     ctk.CTkLabel(card, text=self._dash(row["id"]), width=60).pack(side="left", padx=10)
-                    ctk.CTkLabel(card, text=self._dash(row["full_name"]), width=180, anchor="w").pack(side="left", padx=10)
-                    ctk.CTkLabel(card, text=self._dash(row["team_name"]), width=120).pack(side="left", padx=10)
-                    ctk.CTkLabel(card, text=self._dash(self.month_total_workdays), width=95, text_color=self.metric_colors["work"]).pack(side="left", padx=10)
+                    ctk.CTkButton(
+                            card,
+                            text=self._dash(row["full_name"]),
+                            width=180,
+                            anchor="w",
+                            fg_color="transparent",
+                            hover_color=("#DBEAFE", "#1E3A5F"),
+                            text_color=("#1D4ED8", "#60A5FA"),
+                            font=("Arial", 12, "underline"),
+                            cursor="hand2",
+                            command=lambda user_id=row["id"], full_name=row["full_name"]:
+                                self._open_employee_attendance_detail(user_id, full_name),
+                        ).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._dash(row["workdays"]), width=80, text_color=self.metric_colors["work"]).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._num_or_dash(row["leaveday"]), width=80, text_color=self.metric_colors["leave"]).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._dash(row["latecount"]), width=80, text_color=self.metric_colors["late"]).pack(side="left", padx=10)
@@ -440,19 +590,20 @@ class LeaderAttendance(ctk.CTkFrame):
                     border = ctk.CTkFrame(card, height=1, fg_color=("#D6DEEB", "#334155"))
                     border.pack(fill="x", side="bottom", pady=(6, 0))
 
-                self.result_label.configure(text=f"{len(self.current_rows)} records")
+                self.result_label.configure(text=f"{len(self.current_rows)} records | Month Work: {self.month_total_workdays}")
 
         except Exception as e:
                 print("Fetch Error:", e)
-                self.result_label.configure(text="0 records")
+                self.result_label.configure(text=f"0 records | Month Work: {self.month_total_workdays}")
 
     def export_pdf(self):
         if not self.current_rows:
             messagebox.showwarning("No Data", "No records to export.")
             return
 
+        team_label = self._leader_team_label()
         selected_month = self.month_filter.get().replace(" ", "_")
-        selected_team = self.team_filter.get().split(" (#")[0].replace(" ", "_")
+        selected_team = team_label.replace(" ", "_")
         file_name = f"Attendance_{selected_team}_{selected_month}.pdf"
 
         file_path = filedialog.asksaveasfilename(
@@ -466,29 +617,78 @@ class LeaderAttendance(ctk.CTkFrame):
         try:
             from reportlab.lib import colors
             from reportlab.lib.pagesizes import letter
-            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
             from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         except Exception as e:
             messagebox.showerror("Missing Dependency", f"Cannot export PDF: {e}")
             return
 
         try:
-            doc = SimpleDocTemplate(file_path, pagesize=letter)
+            doc = SimpleDocTemplate(
+                file_path,
+                pagesize=letter,
+                leftMargin=28,
+                rightMargin=28,
+                topMargin=28,
+                bottomMargin=28,
+            )
             styles = getSampleStyleSheet()
             elements = []
+            safe_team_label = escape(team_label)
+            safe_month_label = escape(self.month_filter.get())
+            safe_month_work = escape(str(self.month_total_workdays))
 
-            elements.append(Paragraph("Employee Attendance Report", styles["Title"]))
-            elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
-            elements.append(Paragraph(f"Team Filter: {self.team_filter.get()}", styles["Normal"]))
-            elements.append(Paragraph(f"Month Filter: {self.month_filter.get()}", styles["Normal"]))
-            elements.append(Spacer(1, 12))
+            title_style = ParagraphStyle(
+                "LeaderTitle",
+                parent=styles["Title"],
+                fontName="Helvetica-Bold",
+                fontSize=22,
+                leading=26,
+                textColor=colors.HexColor("#0B1220"),
+                alignment=1,
+                spaceAfter=6,
+            )
+            meta_style = ParagraphStyle(
+                "LeaderMeta",
+                parent=styles["Normal"],
+                fontName="Helvetica",
+                fontSize=10,
+                leading=13,
+                textColor=colors.HexColor("#334155"),
+            )
+
+            elements.append(Paragraph("Employee Attendance Report", title_style))
+            elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", meta_style))
+            elements.append(Spacer(1, 10))
+
+            info_table = Table(
+                [[
+                    Paragraph(f"<b><font color='#1D4ED8'>Team:</font></b> {safe_team_label}", meta_style),
+                    Paragraph(
+                        f"<b><font color='#1D4ED8'>Month:</font></b> {safe_month_label}<br/>"
+                        f"<b><font color='#1D4ED8'>Month Workdays:</font></b> {safe_month_work}",
+                        meta_style
+                    ),
+                ]],
+                colWidths=[3.8 * inch, 3.2 * inch],
+            )
+            info_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#E2E8F0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            elements.append(info_table)
+            elements.append(Spacer(1, 18))
 
             table_data = [[
                 "Emp ID",
                 "Employee",
-                "Team",
-                "Latest Date",
-                "Month Work (26-25)",
                 "Work Days",
                 "Leave Days",
                 "Late Count",
@@ -498,23 +698,33 @@ class LeaderAttendance(ctk.CTkFrame):
                 table_data.append([
                     self._dash(row["id"]),
                     self._dash(row["full_name"]),
-                    self._dash(row["team_name"]),
-                    self._dash(row["latest_date"]),
-                    self._dash(self.month_total_workdays),
                     self._dash(row["workdays"]),
                     self._num_or_dash(row["leaveday"]),
                     self._dash(row["latecount"]),
                     self._num_or_dash(row["overtimehour"]),
                 ])
 
-            table = Table(table_data, repeatRows=1)
+            table = Table(
+                table_data,
+                repeatRows=1,
+                colWidths=[0.9 * inch, 2.4 * inch, 1.15 * inch, 1.05 * inch, 1.0 * inch, 1.0 * inch],
+            )
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, 0), 10),
                 ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("GRID", (0, 0), (-1, -1), 0.35, colors.grey),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.HexColor("#EEF2F7")]),
+                ("ALIGN", (1, 1), (1, -1), "LEFT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F8FAFC")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ("TEXTCOLOR", (2, 1), (2, -1), colors.HexColor("#16A34A")),
+                ("TEXTCOLOR", (3, 1), (3, -1), colors.HexColor("#0284C7")),
+                ("TEXTCOLOR", (4, 1), (4, -1), colors.HexColor("#EA580C")),
+                ("TEXTCOLOR", (5, 1), (5, -1), colors.HexColor("#7C3AED")),
             ]))
             elements.append(table)
 

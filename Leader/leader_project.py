@@ -19,7 +19,7 @@ class LeaderProject(ctk.CTkFrame):
                      text_color=("#1A1A1A", "#FFFFFF")).pack(side="left")
 
         self.add_btn = ctk.CTkButton(self.header, text="+ New Project", 
-                                     fg_color="#10B981", hover_color="#059669",
+                                     fg_color="#10B981", hover_color="#059669",text_color=("#2D3436", "#ECF0F1"),
                                      height=40, font=("Arial", 13, "bold"),
                                      command=self.open_create_project)
         self.add_btn.pack(side="right")
@@ -103,6 +103,7 @@ class LeaderProject(ctk.CTkFrame):
                     width=80, 
                     height=32, 
                     fg_color="#3498DB", 
+                    text_color=("#2D3436", "#ECF0F1"),
                     command=lambda p=proj: self.open_task_manager(p)
                 ).pack(side="left", padx=5)
 
@@ -113,6 +114,7 @@ class LeaderProject(ctk.CTkFrame):
                     width=60, 
                     height=32, 
                     fg_color="#F39C12", 
+                    text_color=("#2D3436", "#ECF0F1"),
                     hover_color="#D35400",
                     command=lambda p=proj: self.update_project(p['id'], p['project_name'])
                 ).pack(side="left", padx=5)
@@ -124,6 +126,7 @@ class LeaderProject(ctk.CTkFrame):
                     width=60, 
                     height=32, 
                     fg_color="#E74C3C",
+                    text_color=("#2D3436", "#ECF0F1"),
                     command=lambda pid=proj['id']: self.delete_project(pid)
                 ).pack(side="left", padx=5)
                 
