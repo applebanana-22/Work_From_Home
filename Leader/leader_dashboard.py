@@ -5,7 +5,7 @@ from database import Database
 
 class LeaderDashboard(ctk.CTkFrame):
     def __init__(self, parent, user, db=None):
-        # Background: White (#FFFFFF) for light mode, Black (#000000) for dark mode
+        # Auto-updating background for the frame itself
         super().__init__(parent, fg_color=("#FFFFFF", "#000000"))
         
         self.user = user  
@@ -16,12 +16,14 @@ class LeaderDashboard(ctk.CTkFrame):
         self.load_initial_data() 
         self.connect_tracking_server()
 
+        # FORCE REFRESH ON THEME CHANGE
+        # This detects the mode change immediately and updates the Treeview colors
+        self.bind("<Expose>", lambda e: self.apply_treeview_style())
+
     def setup_ui(self):
-        # Header Container
         self.header = ctk.CTkFrame(self, fg_color="transparent")
         self.header.pack(fill="x", padx=30, pady=(30, 10))
         
-        # Label: Black in Light, White in Dark
         ctk.CTkLabel(
             self.header, 
             text="Team Real-time Monitor", 
@@ -29,14 +31,12 @@ class LeaderDashboard(ctk.CTkFrame):
             text_color=("#000000", "#FFFFFF")
         ).pack(side="left")
 
-        # Table Container: Matches main frame colors
         self.table_container = ctk.CTkFrame(
             self, fg_color=("#FFFFFF", "#000000"), corner_radius=15,
             border_width=1, border_color=("#D1D1D1", "#2B2B2B")
         )
         self.table_container.pack(fill="both", expand=True, padx=30, pady=20)
 
-        # Trees: Width is set later via .column() to avoid the "-width" error
         info_cols = ("id", "name", "role", "wfh_office", "check_in", "check_out")
         self.info_tree = ttk.Treeview(self.table_container, columns=info_cols, show="headings")
         self.status_tree = ttk.Treeview(self.table_container, columns=("status",), show="headings")
@@ -55,16 +55,18 @@ class LeaderDashboard(ctk.CTkFrame):
         self.sync_scroll()
 
     def apply_treeview_style(self):
-        """Forces the legacy Treeview to match the CustomTkinter theme."""
+        """Redraws the Treeview style based on the current mode instantly."""
         style = ttk.Style()
-        style.theme_use("default")
+        
+        # Use 'clam' as it allows for better color overriding than 'default'
+        style.theme_use("clam")
 
-        # Detect the current appearance mode
         is_dark = ctk.get_appearance_mode() == "Dark"
         
         tree_bg = "#000000" if is_dark else "#FFFFFF"
         tree_fg = "#FFFFFF" if is_dark else "#000000"
         header_bg = "#1A1A1A" if is_dark else "#F0F0F0"
+        border_color = "#2B2B2B" if is_dark else "#D1D1D1"
 
         style.configure("Treeview", 
                         background=tree_bg, 
@@ -78,8 +80,16 @@ class LeaderDashboard(ctk.CTkFrame):
                         foreground=tree_fg, 
                         relief="flat", 
                         font=("Segoe UI", 10, "bold"))
+        
+        # Override the border color for the widget
+        style.configure("Treeview", bordercolor=border_color, lightcolor=tree_bg, darkcolor=tree_bg)
 
-        # Vibrant Status Tags for visibility in both modes
+        # Selection colors
+        style.map("Treeview", 
+                  background=[('selected', '#2980B9')], 
+                  foreground=[('selected', '#FFFFFF')])
+
+        # Refresh status tags
         self.status_tree.tag_configure("ACTIVE", foreground="#2ECC71", font=("Segoe UI", 11, "bold")) 
         self.status_tree.tag_configure("AWAY", foreground="#F1C40F", font=("Segoe UI", 11, "bold"))    
         self.status_tree.tag_configure("OFFLINE", foreground="#E74C3C", font=("Segoe UI", 11, "bold"))
@@ -89,8 +99,6 @@ class LeaderDashboard(ctk.CTkFrame):
             for tree in [self.info_tree, self.status_tree]:
                 tree.delete(*tree.get_children())
             
-            # Subquery for team_id prevents 'Database object has no attribute get_team_name'
-            # Removed 'updated_at' to prevent the 'Unknown column' error
             query = """
                 SELECT u.employee_id, u.full_name, u.role, u.status,
                 COALESCE(a.location_type, 'N/A') AS mode,

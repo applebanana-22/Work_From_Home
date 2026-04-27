@@ -10,7 +10,7 @@ class AdminTeams(ctk.CTkFrame):
         
         # --- Header ---
         self.header = ctk.CTkLabel(
-            self, text="🛡️ Team Management", 
+            self, text="🤝 Team Management", 
             font=("Arial", 24, "bold"), 
             text_color=("#2C3E50", "#FFFFFF")
         )

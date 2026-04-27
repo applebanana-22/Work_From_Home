@@ -571,6 +571,7 @@ class AdminAttendance(ctk.CTkFrame):
                         self.scroll,
                         fg_color=("#EEF2F7", "#1F2933"),
                         corner_radius=10
+                        
                     )
                     card.pack(fill="x", pady=4, padx=5)
 
@@ -584,7 +585,8 @@ class AdminAttendance(ctk.CTkFrame):
                         fg_color="transparent",
                         hover_color=("#DBEAFE", "#1E3A5F"),
                         text_color=("#1D4ED8", "#60A5FA"),
-                        font=("Arial", 12, "underline"),
+                        # font=("Arial", 12, "underline"),
+                        font=("Arial", 12),
                         cursor="hand2",
                         command=lambda user_id=row["id"], full_name=row["full_name"]: self._open_employee_attendance_detail(user_id, full_name),
                     ).pack(side="left", padx=10)

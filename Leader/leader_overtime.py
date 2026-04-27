@@ -13,7 +13,16 @@ class AutocompleteComboBox(ctk.CTkFrame):
         self.values = values
         self.grid_columnconfigure(0, weight=1)
 
-        self.entry = ctk.CTkEntry(self, height=height, width=width, placeholder_text=placeholder_text)
+        # Updated: Added adaptive colors for entry
+        self.entry = ctk.CTkEntry(
+            self, 
+            height=height, 
+            width=width, 
+            placeholder_text=placeholder_text,
+            fg_color=("#FFFFFF", "#2A2A2A"),
+            text_color=("#000000", "#FFFFFF"),
+            border_color=("#CCCCCC", "#2A2A2A")
+        )
         self.entry.grid(row=0, column=0, sticky="ew")
 
         self.button = ctk.CTkButton(
@@ -38,8 +47,13 @@ class AutocompleteComboBox(ctk.CTkFrame):
         self.popup = ctk.CTkToplevel(self)
         self.popup.overrideredirect(True)
         self.popup.attributes("-topmost", True)
+        self.popup.configure(fg_color=("#FFFFFF", "#1E1E1E"))
 
-        self.listbox = ctk.CTkScrollableFrame(self.popup, height=150)
+        self.listbox = ctk.CTkScrollableFrame(
+            self.popup, 
+            height=150,
+            fg_color=("#F0F0F0", "#1E1E1E")
+        )
         self.listbox.pack(fill="both", expand=True)
 
     def show_dropdown(self, data):
@@ -54,8 +68,8 @@ class AutocompleteComboBox(ctk.CTkFrame):
                 text=item,
                 anchor="w",
                 fg_color="transparent",
-                hover_color="#333333",
-                text_color="white",
+                hover_color=("#E0E0E0", "#333333"),
+                text_color=("#000000", "#FFFFFF"),
                 command=lambda v=item: self.select(v)
             ).pack(fill="x", padx=5, pady=2)
 
@@ -105,6 +119,7 @@ class LeaderOvertime(ctk.CTkFrame):
         self.db = Database()
         self.user = user_data
 
+        # Backend Logic: No Change
         self.db.cursor.execute(
             "SELECT team_id FROM users WHERE id = %s",
             (self.user['id'],)
@@ -114,14 +129,15 @@ class LeaderOvertime(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        # HEADER
+        # HEADER: Exact same position
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=120, pady=15)
 
         ctk.CTkLabel(
             header,
             text="🕒 Overtime Management",
-            font=("Arial", 22, "bold")
+            font=("Arial", 22, "bold"),
+            text_color=("#333333", "#FFFFFF") # Adaptive text color
         ).pack(side="left")
 
         ctk.CTkButton(
@@ -133,16 +149,17 @@ class LeaderOvertime(ctk.CTkFrame):
             command=self.open_popup
         ).pack(side="right")
 
-        # FILTER
+        # FILTER: Exact same position
         filter_frame = ctk.CTkFrame(
             self,
-            fg_color="#1E1E1E",
+            fg_color=("#F9F9F9", "#1E1E1E"), # Light: Off-white, Dark: Gray
             corner_radius=12,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=("#E0E0E0", "#2A2A2A")
         )
         filter_frame.grid(row=1, column=0, sticky="ew", padx=115, pady=10)
 
+        # Logic: No Change
         self.db.cursor.execute("""
             SELECT full_name FROM users
             WHERE team_id = %s AND role = 'member'
@@ -190,7 +207,8 @@ class LeaderOvertime(ctk.CTkFrame):
             filter_frame,
             placeholder_text="yyyy-mm-dd",
             width=110,
-            height=35
+            height=35,
+            fg_color=("#FFFFFF", "#2A2A2A") # Adaptive entry
         )
         self.date_filter.pack(side="left", padx=5)
         self.date_filter.bind("<Button-1>", lambda e: self.spawn_calendar(self.date_filter))
@@ -218,11 +236,12 @@ class LeaderOvertime(ctk.CTkFrame):
             command=self.clear_filters
         ).pack(side="right", padx=5)
 
-        # LIST
+        # LIST: Exact same position
         self.list_frame = ctk.CTkScrollableFrame(self)
         self.list_frame.grid(row=2, column=0, sticky="nsew", padx=115, pady=10)
 
-        self.list_frame.configure(fg_color="#121212", corner_radius=12)
+        # Updated: Adaptive list background
+        self.list_frame.configure(fg_color=("#F0F0F0", "#121212"), corner_radius=12)
 
         self.refresh_ui()
 
@@ -233,6 +252,7 @@ class LeaderOvertime(ctk.CTkFrame):
         top.geometry(f"250x280+{x}+{y}")
         top.attributes("-topmost", True)
         top.overrideredirect(True)
+        top.configure(fg_color=("#FFFFFF", "#1E1E1E"))
 
         cal = Calendar(top, selectmode='day', date_pattern='yyyy-mm-dd')
         cal.pack(fill="both", expand=True)
@@ -268,12 +288,14 @@ class LeaderOvertime(ctk.CTkFrame):
         popup.title("Overtime Add")
         popup.geometry("450x620")
         popup.grab_set()
+        popup.configure(fg_color=("#FFFFFF", "#1E1E1E")) # Adaptive Popup
 
-        main_frame = ctk.CTkFrame(popup, fg_color="#1E1E1E", corner_radius=12)
+        main_frame = ctk.CTkFrame(popup, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=12)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(main_frame, text="✨ Add Overtime", font=("Arial", 20, "bold")).pack(pady=(15, 15))
 
+        # Logic: No Change
         self.db.cursor.execute("""
             SELECT id, full_name FROM users
             WHERE team_id = %s AND role = 'member'
@@ -308,11 +330,11 @@ class LeaderOvertime(ctk.CTkFrame):
         date_ent.pack(fill="x", padx=20, ipady=3)
 
         ctk.CTkLabel(main_frame, text="Hours").pack(anchor="w", padx=20, pady=(10, 0))
-        hours_ent = ctk.CTkEntry(main_frame)
+        hours_ent = ctk.CTkEntry(main_frame, fg_color=("#FFFFFF", "#2A2A2A"))
         hours_ent.pack(fill="x", padx=20)
 
         ctk.CTkLabel(main_frame, text="Reason").pack(anchor="w", padx=20, pady=(10, 0))
-        reason_ent = ctk.CTkTextbox(main_frame, height=80, fg_color="#2A2A2A")
+        reason_ent = ctk.CTkTextbox(main_frame, height=80, fg_color=("#FFFFFF", "#2A2A2A"), border_width=1)
         reason_ent.pack(fill="x", padx=20)
 
         def save():
@@ -366,33 +388,32 @@ class LeaderOvertime(ctk.CTkFrame):
         popup = ctk.CTkToplevel(self)
         popup.geometry("450x540")
         popup.grab_set()
+        popup.configure(fg_color=("#FFFFFF", "#1E1E1E"))
 
-        main_frame = ctk.CTkFrame(popup, fg_color="#1E1E1E", corner_radius=12)
+        main_frame = ctk.CTkFrame(popup, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=12)
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
         ctk.CTkLabel(main_frame, text="✏️ Update Overtime", font=("Arial", 20, "bold")).pack(pady=(15, 10))
 
-        # Read-only fields styling
         def create_info_row(label_text, value_text):
             row_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
             row_frame.pack(fill="x", padx=20, pady=4)
-            ctk.CTkLabel(row_frame, text=label_text, font=("Arial", 13, "bold"), text_color="#AAAAAA", width=80, anchor="w").pack(side="left")
-            ctk.CTkLabel(row_frame, text=value_text, font=("Arial", 14), text_color="white", anchor="w").pack(side="left")
+            ctk.CTkLabel(row_frame, text=label_text, font=("Arial", 13, "bold"), text_color=("#555555", "#AAAAAA"), width=80, anchor="w").pack(side="left")
+            ctk.CTkLabel(row_frame, text=value_text, font=("Arial", 14), text_color=("#000000", "#FFFFFF"), anchor="w").pack(side="left")
 
         create_info_row("Member:", row['full_name'])
         create_info_row("Project:", row['project_name'])
         create_info_row("Date:", str(row['ot_date']))
         create_info_row("Status:", row['status'])
 
-        ctk.CTkLabel(main_frame, text="Reason:", font=("Arial", 13, "bold"), text_color="#AAAAAA").pack(anchor="w", padx=20, pady=(10, 0))
-        reason_display = ctk.CTkTextbox(main_frame, height=60, fg_color="#2A2A2A")
+        ctk.CTkLabel(main_frame, text="Reason:", font=("Arial", 13, "bold"), text_color=("#555555", "#AAAAAA")).pack(anchor="w", padx=20, pady=(10, 0))
+        reason_display = ctk.CTkTextbox(main_frame, height=60, fg_color=("#F9F9F9", "#2A2A2A"))
         reason_display.pack(fill="x", padx=20, pady=(5, 0))
         reason_display.insert("0.0", row['reason'] or "-")
         reason_display.configure(state="disabled")
 
-        # Editable field: Hours
         ctk.CTkLabel(main_frame, text="Update Hours:").pack(anchor="w", padx=20, pady=(15, 0))
-        hours_ent = ctk.CTkEntry(main_frame)
+        hours_ent = ctk.CTkEntry(main_frame, fg_color=("#FFFFFF", "#2A2A2A"))
         hours_ent.insert(0, str(row['hours']))
         hours_ent.pack(fill="x", padx=20)
 
@@ -422,6 +443,7 @@ class LeaderOvertime(ctk.CTkFrame):
         for w in self.list_frame.winfo_children():
             w.destroy()
 
+        # Logic: No Change
         query = """
             SELECT o.*, u.full_name, p.project_name
             FROM overtime_requests o
@@ -440,8 +462,6 @@ class LeaderOvertime(ctk.CTkFrame):
         if project_val:
             query += " AND p.project_name LIKE %s"
             params.append(f"%{project_val}%")
-
-        # Reason search removed
 
         status_val = self.status_filter.get()
         if status_val != "All":
@@ -471,20 +491,18 @@ class LeaderOvertime(ctk.CTkFrame):
             card = ctk.CTkFrame(
                 self.list_frame,
                 corner_radius=12,
-                fg_color="#1E1E1E",
+                fg_color=("#FFFFFF", "#1E1E1E"), # Card background
                 border_width=1,
-                border_color="#2A2A2A"
+                border_color=("#E0E0E0", "#2A2A2A")
             )
             card.pack(fill="x", padx=15, pady=10)
 
             main = ctk.CTkFrame(card, fg_color="transparent")
             main.pack(fill="x", padx=15, pady=12)
 
-            # LEFT CONTENT
             left = ctk.CTkFrame(main, fg_color="transparent")
             left.pack(side="left", fill="both", expand=True)
 
-            # NAME + DATE
             top = ctk.CTkFrame(left, fg_color="transparent")
             top.pack(fill="x")
 
@@ -492,36 +510,32 @@ class LeaderOvertime(ctk.CTkFrame):
                 top,
                 text=row['full_name'],
                 font=("Arial", 14, "bold"),
-                text_color="white"
+                text_color=("#000000", "#FFFFFF")
             ).pack(side="left")
 
             ctk.CTkLabel(
                 top,
                 text=str(row['ot_date']),
                 font=("Arial", 10),
-                text_color="#888"
+                text_color=("#666666", "#888888")
             ).pack(side="left", padx=10)
 
-            # PROJECT
             ctk.CTkLabel(
                 left,
                 text=row['project_name'],
                 font=("Arial", 13),
-                text_color="#DDDDDD"
+                text_color=("#444444", "#DDDDDD")
             ).pack(anchor="w", pady=(5, 2))
 
-            # HOURS + STATUS
             ctk.CTkLabel(
                 left,
                 text=f"{row['hours']} hours  •  {row['status']}",
                 font=("Arial", 12),
-                text_color="#AAAAAA"
+                text_color=("#555555", "#AAAAAA")
             ).pack(anchor="w")
 
-            # REASON
             self.create_expandable_message(left, row['reason'] or "-", wrap=600)
 
-            # BUTTONS
             btn_frame = ctk.CTkFrame(main, fg_color="transparent")
             btn_frame.pack(side="right", padx=10)
 
@@ -543,16 +557,13 @@ class LeaderOvertime(ctk.CTkFrame):
 
     def create_expandable_message(self, parent, full_text, wrap=500):
         preview_length = 40
-
         container = ctk.CTkFrame(parent, fg_color="transparent")
         container.pack(fill="x", anchor="w")
-
         is_expanded = False
 
         def toggle():
             nonlocal is_expanded
             is_expanded = not is_expanded
-
             if is_expanded:
                 msg_label.configure(text=full_text)
                 toggle_btn.configure(text="see less")
@@ -566,7 +577,7 @@ class LeaderOvertime(ctk.CTkFrame):
             wraplength=wrap,
             justify="left",
             anchor="w",
-            text_color="#CCCCCC"
+            text_color=("#444444", "#CCCCCC")
         )
         msg_label.pack(anchor="w")
 
