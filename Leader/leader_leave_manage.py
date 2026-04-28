@@ -155,32 +155,36 @@ class LeaderLeaveManage(ctk.CTkFrame):
         self.load_full_history()
 
     def load_full_history(self):
+        """Displays processed history with original request time details"""
         try:
-            self.db.ensure_connection()
             self.db.cursor.execute("""SELECT lr.*, u.full_name FROM leave_requests lr 
-                                      JOIN users u ON lr.user_id = u.id 
-                                      WHERE u.team_id = (SELECT team_id FROM users WHERE id = %s) 
-                                      AND lr.status != 'Pending' 
-                                      ORDER BY lr.id DESC""", (self.user['id'],))
+                                     JOIN users u ON lr.user_id = u.id 
+                                     WHERE u.team_id = %s AND lr.status != 'Pending' 
+                                     ORDER BY lr.id DESC""", (self.user['team_id'],))
             rows = self.db.cursor.fetchall()
             
             for r in rows:
-                color = "#27AE60" if r['status'] == "Approved" else "#E74C3C"
-                row = ctk.CTkFrame(self.history_scroll, fg_color=self.card_bg, 
-                                   corner_radius=12, border_width=1, border_color=self.card_border)
+                row = ctk.CTkFrame(self.history_scroll, fg_color=self.card_bg, corner_radius=12, border_width=1, border_color=self.card_border)
                 row.pack(fill="x", pady=6, padx=5)
                 
+                color = "#27AE60" if r['status'] == "Approved" else "#E74C3C"
                 inner = ctk.CTkFrame(row, fg_color="transparent")
                 inner.pack(fill="x", padx=20, pady=15)
                 
+                # Left Side Data
                 left = ctk.CTkFrame(inner, fg_color="transparent")
                 left.pack(side="left")
                 
-                ctk.CTkLabel(left, text=r['full_name'], font=("Segoe UI", 15, "bold"), 
-                             text_color=self.text_main).pack(anchor="w")
+                ctk.CTkLabel(left, text=r['full_name'], font=("Segoe UI", 15, "bold")).pack(anchor="w")
                 
-                status_f = ctk.CTkFrame(inner, fg_color=color, corner_radius=6)
-                status_f.pack(side="right")
-                ctk.CTkLabel(status_f, text=r['status'].upper(), font=("Segoe UI", 10, "bold"), 
-                             text_color="white", padx=10, pady=2).pack()
-        except Exception as e: print(f"History Load Error: {e}")
+                req_t = r['created_at'].strftime("%b %d, %Y at %I:%M %p") if r['created_at'] else "N/A"
+                ctk.CTkLabel(left, text=f"Request Date: {req_t}", font=("Segoe UI", 11), text_color="#555555").pack(anchor="w")
+                ctk.CTkLabel(left, text=f"{r['leave_type']} • {r['total_days']}d ({r['start_date']} to {r['end_date']})", 
+                             font=("Segoe UI", 12), text_color="#888888").pack(anchor="w")
+                
+                # Right Side: Status Badge
+                badge_f = ctk.CTkFrame(inner, fg_color=color, corner_radius=8)
+                badge_f.pack(side="right")
+                ctk.CTkLabel(badge_f, text=r['status'].upper(), font=("Segoe UI", 10, "bold"), text_color="white", padx=12, pady=4).pack()
+                
+        except Exception as e: print(f"History Load Error: {e}")	
