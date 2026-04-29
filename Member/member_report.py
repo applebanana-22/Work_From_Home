@@ -187,7 +187,7 @@ class MemberReportFrame(ctk.CTkFrame):
             _btn("Edit", "#F39C12", "#D68910", lambda d=date: self.edit_report(d)).pack(side="left", padx=4)
             _btn("Delete", "#E74C3C", "#C0392B", lambda d=date: self.delete_report(d)).pack(side="left", padx=4)
 
-    def show_history_view(self):
+    def show_history_view(self):  
         self.clear_view()
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=80, pady=(10, 20))

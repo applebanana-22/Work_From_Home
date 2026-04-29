@@ -195,7 +195,7 @@ class LeaderSchedule(ctk.CTkFrame):
                     ctk.CTkLabel(card, text=f" {r['status']} ", text_color=accent, fg_color=pill_bg, corner_radius=6).pack(side="right", padx=15)
                     
                     # Edit Button
-                    ctk.CTkButton(card, text="✎", width=30, height=30, fg_color="transparent", text_color="#4A5568",
+                    ctk.CTkButton(card, text="Edit", width=30, height=30, fg_color="transparent", text_color="#4A5568",
                                   command=lambda row=r: self.open_edit_popup(row)).pack(side="right")
 
         except Exception as e: messagebox.showerror("Error", str(e))

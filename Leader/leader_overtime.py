@@ -1,11 +1,104 @@
 import customtkinter as ctk
 from database import Database
 from tkinter import messagebox
-from datetime import date
-from tkcalendar import DateEntry, Calendar
+from tkinter import ttk
+from datetime import date, datetime, timedelta
+from tkcalendar import Calendar
+import threading
 
+class DatePickerButton(ctk.CTkFrame):
+    def __init__(self, master, initial_date=None, min_date=None, allow_past=True):
+        super().__init__(master, fg_color="transparent")
 
-# ================= AUTOCOMPLETE =================
+        self._date = initial_date
+        self._open = False
+        self.allow_past = allow_past
+
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        style.configure("Custom.Calendar",
+            background="#1A1A2E",
+            foreground="white",
+            headersbackground="#16213E",
+            headersforeground="#4FC3F7",
+            selectbackground="#3498DB",
+            selectforeground="white",
+            normalbackground="#1A1A2E",
+            normalforeground="#CCCCCC",
+            weekendbackground="#1A1A2E",
+            weekendforeground="#F39C12",
+            othermonthforeground="#555555",
+            bordercolor="#2A2A4A",
+            relief="flat"
+        )
+
+        self.btn = ctk.CTkButton(
+            self,
+            text=self._fmt(),
+            width=170,
+            height=36,
+            corner_radius=10,
+            fg_color="#1E2A3A",
+            hover_color="#2C3E50",
+            border_width=1,
+            border_color="#3D5166",
+            anchor="w",
+            command=self.toggle
+        )
+        self.btn.pack()
+
+        self.panel = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color="#141E2B",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2A3A4A"
+        )
+
+        today = datetime.today().date()
+        
+        # Set mindate based on allow_past parameter
+        mindate = today if not allow_past else None
+
+        self.cal = Calendar(
+            self.panel,
+            style="Custom.Calendar",
+            selectmode="day",
+            date_pattern="yyyy-mm-dd",
+            year=(self._date or today).year,
+            month=(self._date or today).month,
+            day=(self._date or today).day,
+            mindate=mindate
+        )
+        self.cal.pack(padx=8, pady=8)
+
+        self.cal.bind("<<CalendarSelected>>", self._select)
+
+    def toggle(self):
+        if self._open:
+            self.panel.place_forget()
+        else:
+            self.panel.lift()
+            self.panel.place(in_=self, x=0, y=self.btn.winfo_height() + 2)
+        self._open = not self._open
+
+    def _select(self, event):
+        selected = self.cal.get_date()
+        self._date = datetime.strptime(selected, "%Y-%m-%d").date()
+        self.btn.configure(text=self._fmt())
+        self.toggle()
+
+    def _fmt(self):
+        return f" 📅 {self._date.strftime('%Y-%m-%d')}" if self._date else " 📅 Select Date"
+
+    def get_date(self):
+        return self._date
+
+    def clear(self):
+        self._date = None
+        self.btn.configure(text=" 📅 Select Date")
+
 class AutocompleteComboBox(ctk.CTkFrame):
     def __init__(self, master, values, width=200, height=35, placeholder_text=""):
         super().__init__(master, fg_color="transparent")
@@ -13,16 +106,7 @@ class AutocompleteComboBox(ctk.CTkFrame):
         self.values = values
         self.grid_columnconfigure(0, weight=1)
 
-        # Updated: Added adaptive colors for entry
-        self.entry = ctk.CTkEntry(
-            self, 
-            height=height, 
-            width=width, 
-            placeholder_text=placeholder_text,
-            fg_color=("#FFFFFF", "#2A2A2A"),
-            text_color=("#000000", "#FFFFFF"),
-            border_color=("#CCCCCC", "#2A2A2A")
-        )
+        self.entry = ctk.CTkEntry(self, height=height, width=width, placeholder_text=placeholder_text)
         self.entry.grid(row=0, column=0, sticky="ew")
 
         self.button = ctk.CTkButton(
@@ -47,14 +131,19 @@ class AutocompleteComboBox(ctk.CTkFrame):
         self.popup = ctk.CTkToplevel(self)
         self.popup.overrideredirect(True)
         self.popup.attributes("-topmost", True)
-        self.popup.configure(fg_color=("#FFFFFF", "#1E1E1E"))
 
-        self.listbox = ctk.CTkScrollableFrame(
-            self.popup, 
-            height=150,
-            fg_color=("#F0F0F0", "#1E1E1E")
-        )
+        # Bind mouse wheel to only scroll dropdown, not parent
+        self.popup.bind("<MouseWheel>", self.on_dropdown_scroll)
+
+        self.listbox = ctk.CTkScrollableFrame(self.popup, height=150)
         self.listbox.pack(fill="both", expand=True)
+
+    def on_dropdown_scroll(self, event):
+        """Handle scrolling within dropdown only"""
+        # This prevents the parent frame from scrolling
+        if hasattr(self.listbox, '_parent_canvas'):
+            self.listbox._parent_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        return "break"
 
     def show_dropdown(self, data):
         self.create_dropdown()
@@ -63,15 +152,19 @@ class AutocompleteComboBox(ctk.CTkFrame):
             w.destroy()
 
         for item in data:
-            ctk.CTkButton(
+            btn = ctk.CTkButton(
                 self.listbox,
                 text=item,
                 anchor="w",
                 fg_color="transparent",
-                hover_color=("#E0E0E0", "#333333"),
-                text_color=("#000000", "#FFFFFF"),
+                hover_color="#333333",
+                text_color="white",
                 command=lambda v=item: self.select(v)
-            ).pack(fill="x", padx=5, pady=2)
+            )
+            btn.pack(fill="x", padx=5, pady=2)
+            
+            # Bind mouse wheel to each button to prevent propagation
+            btn.bind("<MouseWheel>", self.on_dropdown_scroll)
 
         self.update_idletasks()
         x = self.entry.winfo_rootx()
@@ -110,72 +203,137 @@ class AutocompleteComboBox(ctk.CTkFrame):
     def get(self):
         return self.entry.get()
 
-
-# ================= MAIN CLASS =================
 class LeaderOvertime(ctk.CTkFrame):
     def __init__(self, master, user_data):
         super().__init__(master, fg_color="transparent")
-
         self.db = Database()
         self.user = user_data
-
-        # Backend Logic: No Change
-        self.db.cursor.execute(
-            "SELECT team_id FROM users WHERE id = %s",
-            (self.user['id'],)
-        )
-        self.team_id = self.db.cursor.fetchone()['team_id']
-
-        self.grid_rowconfigure(2, weight=1)
+        self.team_id = self.get_team_id()
+        
+        # Initialize member and project maps
+        self.member_map = {}
+        self.project_map = {}
+        
+        # Configure grid layout
+        self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
+        
+        # Create pages container with original side margins
+        self.pages = ctk.CTkFrame(self, fg_color="transparent")
+        self.pages.grid(row=0, column=0, sticky="nsew", padx=120, pady=20)
+        self.pages.grid_rowconfigure(0, weight=1)
+        self.pages.grid_columnconfigure(0, weight=1)
+        
+        # Initialize all pages
+        self.create_main_page()
+        self.create_add_page()
+        self.create_edit_page()
+        
+        # Show main page initially
+        self.show_page("main")
+        
+        # Start auto-cancellation check
+        self.check_overdue_requests()
 
-        # HEADER: Exact same position
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=120, pady=15)
+    def get_team_id(self):
+        self.db.cursor.execute("SELECT team_id FROM users WHERE id = %s", (self.user['id'],))
+        return self.db.cursor.fetchone()['team_id']
+
+    def check_overdue_requests(self):
+        """Auto-cancel pending requests that are past their OT date"""
+        try:
+            today = date.today()
+            
+            # Update overdue pending requests to 'Cancelled'
+            self.db.cursor.execute("""
+                UPDATE overtime_requests 
+                SET status = 'Cancelled' 
+                WHERE status = 'Pending' 
+                AND DATE(ot_date) < %s
+            """, (today,))
+            
+            if self.db.cursor.rowcount > 0:
+                self.db.conn.commit()
+                print(f"Auto-cancelled {self.db.cursor.rowcount} overdue requests")
+                # Refresh UI if on main page
+                if hasattr(self, 'main_page') and self.main_page.winfo_viewable():
+                    self.refresh_ui()
+        except Exception as e:
+            print(f"Error checking overdue requests: {e}")
+        
+        # Check again after 1 hour
+        self.after(3600000, self.check_overdue_requests)
+
+    def load_member_project_data(self):
+        """Load member and project data for dropdowns"""
+        # Get member data
+        self.db.cursor.execute("""
+            SELECT id, full_name FROM users
+            WHERE team_id = %s AND role = 'member'
+        """, (self.team_id,))
+        self.member_map = {m['full_name']: m['id'] for m in self.db.cursor.fetchall()}
+        self.member_names = list(self.member_map.keys())
+
+        # Get project data
+        self.db.cursor.execute("""
+            SELECT id, project_name FROM projects
+            WHERE team_id = %s
+        """, (self.team_id,))
+        self.project_map = {p['project_name']: p['id'] for p in self.db.cursor.fetchall()}
+        self.project_names = list(self.project_map.keys())
+
+    def show_page(self, page_name):
+        """Show the specified page and hide others"""
+        for page in [self.main_page, self.add_page, self.edit_page]:
+            page.grid_forget()
+            
+        if page_name == "main":
+            self.main_page.grid(row=0, column=0, sticky="nsew")
+            self.check_overdue_requests()  # Check before refreshing
+            self.refresh_ui()
+        elif page_name == "add":
+            self.add_page.grid(row=0, column=0, sticky="nsew")
+            self.reset_add_form()
+        elif page_name == "edit":
+            self.edit_page.grid(row=0, column=0, sticky="nsew")
+
+    def create_main_page(self):
+        self.main_page = ctk.CTkFrame(self.pages, fg_color="transparent")
+        self.main_page.grid_rowconfigure(2, weight=1)  # List frame
+        
+        # Header with original spacing
+        header = ctk.CTkFrame(self.main_page, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=0, pady=15)
 
         ctk.CTkLabel(
             header,
             text="🕒 Overtime Management",
-            font=("Arial", 22, "bold"),
-            text_color=("#333333", "#FFFFFF") # Adaptive text color
+            font=("Arial", 22, "bold")
         ).pack(side="left")
 
         ctk.CTkButton(
             header,
             text="+ Add Overtime",
-            fg_color="#10B981",
-            hover_color="#059669",
+            fg_color="#2980B9",
+            hover_color="#1F618D",
             height=40,
-            command=self.open_popup
+            command=lambda: self.show_page("add")
         ).pack(side="right")
 
-        # FILTER: Exact same position
+        # Filter section with original design
         filter_frame = ctk.CTkFrame(
-            self,
-            fg_color=("#F9F9F9", "#1E1E1E"), # Light: Off-white, Dark: Gray
+            self.main_page,
+            fg_color="#1E1E1E",
             corner_radius=12,
             border_width=1,
-            border_color=("#E0E0E0", "#2A2A2A")
+            border_color="#2A2A2A"
         )
-        filter_frame.grid(row=1, column=0, sticky="ew", padx=115, pady=10)
+        filter_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=10)
 
-        # Logic: No Change
-        self.db.cursor.execute("""
-            SELECT full_name FROM users
-            WHERE team_id = %s AND role = 'member'
-        """, (self.team_id,))
-
-        members = self.db.cursor.fetchall()
-        self.member_names = [m['full_name'] for m in members]
-
-        self.db.cursor.execute("""
-            SELECT project_name FROM projects
-            WHERE team_id = %s
-        """, (self.team_id,))
-
-        projects = self.db.cursor.fetchall()
-        self.project_names = [p['project_name'] for p in projects]
-
+        # Load member and project data
+        self.load_member_project_data()
+        
+        # Filter widgets with original layout
         self.member_search = AutocompleteComboBox(
             filter_frame,
             values=self.member_names,
@@ -194,7 +352,7 @@ class LeaderOvertime(ctk.CTkFrame):
 
         self.status_filter = ctk.CTkOptionMenu(
             filter_frame,
-            values=["All", "Pending", "Approved", "Rejected"],
+            values=["All", "Pending", "Accepted", "Approved", "Rejected", "Cancelled"],
             width=100,
             height=35,
             fg_color="#2980B9",
@@ -203,24 +361,19 @@ class LeaderOvertime(ctk.CTkFrame):
         self.status_filter.set("All")
         self.status_filter.pack(side="left", padx=5)
 
-        self.date_filter = ctk.CTkEntry(
-            filter_frame,
-            placeholder_text="yyyy-mm-dd",
-            width=110,
-            height=35,
-            fg_color=("#FFFFFF", "#2A2A2A") # Adaptive entry
-        )
+        # Date filter - allow past dates (allow_past=True)
+        self.date_filter = DatePickerButton(filter_frame, allow_past=True)
         self.date_filter.pack(side="left", padx=5)
-        self.date_filter.bind("<Button-1>", lambda e: self.spawn_calendar(self.date_filter))
 
+        # Filter buttons with original design
         btn_frame = ctk.CTkFrame(filter_frame, fg_color="transparent")
         btn_frame.pack(side="right", padx=10)
 
         ctk.CTkButton(
             btn_frame,
             text="Search",
-            fg_color="#10B981",
-            hover_color="#059669",
+            fg_color="#2980B9",
+            hover_color="#1F618D",
             height=35,
             width=70,
             command=self.refresh_ui
@@ -236,214 +389,511 @@ class LeaderOvertime(ctk.CTkFrame):
             command=self.clear_filters
         ).pack(side="right", padx=5)
 
-        # LIST: Exact same position
-        self.list_frame = ctk.CTkScrollableFrame(self)
-        self.list_frame.grid(row=2, column=0, sticky="nsew", padx=115, pady=10)
+        # List frame with original design but improved height
+        self.list_frame = ctk.CTkScrollableFrame(
+            self.main_page,
+            fg_color="#121212",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2A2A2A",
+            height=400  # Fixed height
+        )
+        self.list_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=10)
 
-        # Updated: Adaptive list background
-        self.list_frame.configure(fg_color=("#F0F0F0", "#121212"), corner_radius=12)
+    def create_add_page(self):
+        self.add_page = ctk.CTkFrame(self.pages, fg_color="transparent")
+        self.add_page.grid_rowconfigure(1, weight=1)
+        self.add_page.grid_columnconfigure(0, weight=1)
+        
+        # Back button
+        back_btn = ctk.CTkButton(
+            self.add_page,
+            text="← Back to List",
+            fg_color="transparent",
+            hover_color="#2A2A2A",
+            font=("Arial", 12),
+            height=35,
+            command=lambda: self.show_page("main")
+        )
+        back_btn.grid(row=0, column=0, sticky="nw", padx=20, pady=(10, 0))
 
-        self.refresh_ui()
+        # Create scrollable container for the form
+        self.add_scrollable = ctk.CTkScrollableFrame(
+            self.add_page,
+            fg_color="transparent"
+        )
+        self.add_scrollable.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.add_scrollable.grid_columnconfigure(0, weight=1)
 
-    def spawn_calendar(self, entry_widget):
-        top = ctk.CTkToplevel(self)
-        x = entry_widget.winfo_rootx()
-        y = entry_widget.winfo_rooty() + entry_widget.winfo_height()
-        top.geometry(f"250x280+{x}+{y}")
-        top.attributes("-topmost", True)
-        top.overrideredirect(True)
-        top.configure(fg_color=("#FFFFFF", "#1E1E1E"))
+        # Form frame inside scrollable container
+        form_frame = ctk.CTkFrame(
+            self.add_scrollable,
+            fg_color="#1E1E1E",
+            corner_radius=15,
+            border_width=1,
+            border_color="#2A2A2A"
+        )
+        form_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        form_frame.grid_columnconfigure(0, weight=1)
+        form_frame.grid_columnconfigure(2, weight=1)
 
-        cal = Calendar(top, selectmode='day', date_pattern='yyyy-mm-dd')
-        cal.pack(fill="both", expand=True)
+        # Title
+        title_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        title_frame.grid(row=0, column=0, columnspan=3, sticky="ew", padx=30, pady=(25, 15))
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="➕ Add New Overtime Request",
+            font=("Arial", 20, "bold"),
+            text_color="#4A90E2"
+        ).pack()
 
-        def select_date():
-            entry_widget.delete(0, "end")
-            entry_widget.insert(0, cal.get_date())
-            top.destroy()
-            if entry_widget == getattr(self, "date_filter", None):
-                self.refresh_ui()
+        # Form content
+        content_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        content_frame.grid(row=1, column=1, sticky="nsew", padx=30, pady=10)
+        
+        # Load data if not loaded
+        if not hasattr(self, 'member_map'):
+            self.load_member_project_data()
+        
+        # Member field
+        ctk.CTkLabel(
+            content_frame,
+            text="👤 Member *",
+            font=("Arial", 14, "bold"),
+            anchor="w"
+        ).grid(row=0, column=0, sticky="w", pady=(10, 5))
+        
+        self.member_cb = AutocompleteComboBox(content_frame, self.member_names, width=350, placeholder_text="Select or search member...")
+        self.member_cb.grid(row=1, column=0, sticky="ew", pady=(0, 15))
 
-        def clear_date():
-            entry_widget.delete(0, "end")
-            top.destroy()
-            if entry_widget == getattr(self, "date_filter", None):
-                self.refresh_ui()
+        # Project field
+        ctk.CTkLabel(
+            content_frame,
+            text="📁 Project *",
+            font=("Arial", 14, "bold"),
+            anchor="w"
+        ).grid(row=2, column=0, sticky="w", pady=(5, 5))
+        
+        self.project_cb = AutocompleteComboBox(content_frame, self.project_names, width=350, placeholder_text="Select or search project...")
+        self.project_cb.grid(row=3, column=0, sticky="ew", pady=(0, 15))
 
-        btn_frame = ctk.CTkFrame(top, fg_color="transparent")
-        btn_frame.pack(pady=5, fill="x")
-        ctk.CTkButton(btn_frame, text="Select", command=select_date, width=100).pack(side="left", padx=10)
-        ctk.CTkButton(btn_frame, text="Clear", command=clear_date, width=100, fg_color="#C0392B").pack(side="right", padx=10)
+        # Date field - DO NOT allow past dates (allow_past=False)
+        ctk.CTkLabel(
+            content_frame,
+            text="📅 Date *",
+            font=("Arial", 14, "bold"),
+            anchor="w"
+        ).grid(row=4, column=0, sticky="w", pady=(5, 5))
+        
+        self.date_ent = DatePickerButton(content_frame, initial_date=date.today(), allow_past=False)
+        self.date_ent.grid(row=5, column=0, sticky="ew", pady=(0, 15))
+
+        # Hours field
+        ctk.CTkLabel(
+            content_frame,
+            text="⏱️ Hours * (1-24 hours)",
+            font=("Arial", 14, "bold"),
+            anchor="w"
+        ).grid(row=6, column=0, sticky="w", pady=(5, 5))
+        
+        self.hours_ent = ctk.CTkEntry(content_frame, placeholder_text="e.g., 2.5, 4, 8", width=350, height=40)
+        self.hours_ent.grid(row=7, column=0, sticky="ew", pady=(0, 15))
+
+        # Reason field
+        ctk.CTkLabel(
+            content_frame,
+            text="💬 Reason / Tasks *",
+            font=("Arial", 14, "bold"),
+            anchor="w"
+        ).grid(row=8, column=0, sticky="w", pady=(5, 5))
+        
+        self.reason_ent = ctk.CTkTextbox(content_frame, height=120, fg_color="#2A2A2A", border_width=1, border_color="#3D5166")
+        self.reason_ent.grid(row=9, column=0, sticky="ew", pady=(0, 20))
+
+        # Button frame
+        btn_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(0, 25))
+        
+        button_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        button_container.pack()
+        
+        ctk.CTkButton(
+            button_container,
+            text="Cancel",
+            fg_color="#7F8C8D",
+            hover_color="#616A6B",
+            height=40,
+            width=120,
+            font=("Arial", 13),
+            command=lambda: self.show_page("main")
+        ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            button_container,
+            text="Submit Request",
+            fg_color="#27AE60",
+            hover_color="#1E8449",
+            height=40,
+            width=150,
+            font=("Arial", 13, "bold"),
+            command=self.save_overtime
+        ).pack(side="left", padx=10)
+
+    def reset_add_form(self):
+        """Reset the add form to default values"""
+        self.member_cb.entry.delete(0, "end")
+        self.project_cb.entry.delete(0, "end")
+        self.date_ent.clear()
+        self.date_ent._date = date.today()
+        self.date_ent.btn.configure(text=f" 📅 {date.today().strftime('%Y-%m-%d')}")
+        self.hours_ent.delete(0, "end")
+        self.reason_ent.delete("1.0", "end")
+
+    def save_overtime(self):
+        """Save the new overtime request"""
+        member_name = self.member_cb.get()
+        project_name = self.project_cb.get()
+        member_id = self.member_map.get(member_name)
+        project_id = self.project_map.get(project_name)
+
+        if not member_id:
+            messagebox.showwarning("Validation Error", "Please select a valid member")
+            return
+        
+        if not project_id:
+            messagebox.showwarning("Validation Error", "Please select a valid project")
+            return
+
+        try:
+            hours = float(self.hours_ent.get())
+            if hours <= 0 or hours > 24:
+                messagebox.showwarning("Validation Error", "Hours must be between 1 and 24")
+                return
+        except ValueError:
+            messagebox.showwarning("Validation Error", "Please enter valid hours (e.g., 2.5, 4, 8)")
+            return
+
+        selected_date = self.date_ent.get_date()
+        if not selected_date:
+            messagebox.showwarning("Validation Error", "Please select a date")
+            return
+        
+        # Check if date is in the past
+        if selected_date < date.today():
+            messagebox.showwarning("Validation Error", "Cannot select a past date for overtime request!")
+            return
+
+        ot_date = selected_date.strftime('%Y-%m-%d')
+        reason = self.reason_ent.get("1.0", "end").strip()
+
+        if not reason:
+            messagebox.showwarning("Validation Error", "Please provide reason/tasks for overtime")
+            return
+
+        # Check for duplicate - only check for Pending and Accepted status (not Rejected or Cancelled)
+        self.db.cursor.execute("""
+            SELECT id FROM overtime_requests 
+            WHERE member_id = %s 
+            AND DATE(ot_date) = %s
+            AND status IN ('Pending', 'Accepted')
+        """, (member_id, ot_date))
+        
+        if self.db.cursor.fetchone():
+            messagebox.showwarning("Duplicate Error", 
+                f"Overtime request for {member_name} on {ot_date} already exists with status 'Pending' or 'Accepted'!\n\n"
+                f"Please check existing requests before creating a new one.")
+            return
+
+        # Save to database
+        self.db.cursor.execute("""
+            INSERT INTO overtime_requests
+            (member_id, project_id, ot_date, hours, reason, status)
+            VALUES (%s, %s, %s, %s, %s, 'Pending')
+        """, (member_id, project_id, ot_date, hours, reason))
+
+        self.db.conn.commit()
+        messagebox.showinfo("Success", f"✅ Overtime request for {member_name} has been submitted successfully!")
+        self.show_page("main")
+
+    def create_edit_page(self):
+        self.edit_page = ctk.CTkFrame(self.pages, fg_color="transparent")
+        self.edit_page.grid_rowconfigure(1, weight=1)
+        self.edit_page.grid_columnconfigure(0, weight=1)
+        
+        # Back button
+        back_btn = ctk.CTkButton(
+            self.edit_page,
+            text="← Back to List",
+            fg_color="transparent",
+            hover_color="#2A2A2A",
+            font=("Arial", 12),
+            height=35,
+            command=lambda: self.show_page("main")
+        )
+        back_btn.grid(row=0, column=0, sticky="nw", padx=20, pady=(10, 0))
+
+        # Create scrollable container for the form
+        self.edit_scrollable = ctk.CTkScrollableFrame(
+            self.edit_page,
+            fg_color="transparent"
+        )
+        self.edit_scrollable.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.edit_scrollable.grid_columnconfigure(0, weight=1)
+
+        # Form frame inside scrollable container
+        self.edit_form = ctk.CTkFrame(
+            self.edit_scrollable,
+            fg_color="#1E1E1E",
+            corner_radius=15,
+            border_width=1,
+            border_color="#2A2A2A"
+        )
+        self.edit_form.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+
+    def load_edit_form(self, row):
+        """Load edit form with request data"""
+        for widget in self.edit_form.winfo_children():
+            widget.destroy()
+
+        self.edit_form.grid_columnconfigure(0, weight=1)
+        self.edit_form.grid_columnconfigure(2, weight=1)
+
+        # Title
+        title_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+        title_frame.grid(row=0, column=0, columnspan=3, sticky="ew", padx=30, pady=(25, 15))
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="✏️ Edit Overtime Request",
+            font=("Arial", 20, "bold"),
+            text_color="#4A90E2"
+        ).pack()
+
+        # Content frame
+        content_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+        content_frame.grid(row=1, column=1, sticky="nsew", padx=30, pady=10)
+
+        # Display read-only info with improved styling
+        def create_info_row(label, value, row_num, icon=""):
+            frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+            frame.grid(row=row_num, column=0, sticky="ew", pady=8)
+            
+            ctk.CTkLabel(
+                frame,
+                text=f"{icon} {label}:",
+                font=("Arial", 13, "bold"),
+                text_color="#AAAAAA",
+                width=120,
+                anchor="w"
+            ).pack(side="left")
+            
+            ctk.CTkLabel(
+                frame,
+                text=value,
+                font=("Arial", 13),
+                anchor="w"
+            ).pack(side="left", fill="x", expand=True, padx=(10, 0))
+
+        create_info_row("Member", row['full_name'], 0, "👤")
+        create_info_row("Project", row['project_name'], 1, "📁")
+        create_info_row("Date", str(row['ot_date']), 2, "📅")
+        
+        # Status with color
+        status_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        status_frame.grid(row=3, column=0, sticky="ew", pady=8)
+        
+        ctk.CTkLabel(
+            status_frame,
+            text="📊 Status:",
+            font=("Arial", 13, "bold"),
+            text_color="#AAAAAA",
+            width=120,
+            anchor="w"
+        ).pack(side="left")
+        
+        status_color = {
+            "Pending": "#F39C12",
+            "Accepted": "#27AE60",
+            "Approved": "#2ECC71",
+            "Rejected": "#E74C3C",
+            "Cancelled": "#95A5A6"
+        }.get(row['status'], "#AAAAAA")
+        
+        ctk.CTkLabel(
+            status_frame,
+            text=row['status'],
+            font=("Arial", 13, "bold"),
+            text_color=status_color
+        ).pack(side="left", padx=(10, 0))
+
+        # Reason display
+        ctk.CTkLabel(
+            content_frame,
+            text="💬 Original Reason:",
+            font=("Arial", 13, "bold"),
+            text_color="#AAAAAA"
+        ).grid(row=4, column=0, sticky="w", pady=(15, 5))
+        
+        reason_display = ctk.CTkTextbox(
+            content_frame,
+            height=100,
+            fg_color="#2A2A2A",
+            state="disabled",
+            border_width=1,
+            border_color="#3D5166"
+        )
+        reason_display.grid(row=5, column=0, sticky="ew", pady=(0, 15))
+        reason_display.insert("1.0", row['reason'] or "-")
+
+        # Show rejection reason if exists
+        if row.get('rejected_reason') and row['rejected_reason'].strip():
+            ctk.CTkLabel(
+                content_frame,
+                text="❌ Rejection Reason:",
+                font=("Arial", 13, "bold"),
+                text_color="#E74C3C"
+            ).grid(row=6, column=0, sticky="w", pady=(10, 5))
+            
+            reject_display = ctk.CTkTextbox(
+                content_frame,
+                height=80,
+                fg_color="#2A1A1A",
+                state="disabled",
+                border_width=1,
+                border_color="#5C3A3A"
+            )
+            reject_display.grid(row=7, column=0, sticky="ew", pady=(0, 15))
+            reject_display.insert("1.0", row['rejected_reason'])
+
+        # Only show edit fields if status is Pending and date is not past
+        if row['status'] == 'Pending':
+            # Check if date is past
+            if row['ot_date'] < date.today():
+                ctk.CTkLabel(
+                    content_frame,
+                    text="⚠️ This request is overdue and cannot be edited",
+                    font=("Arial", 12, "bold"),
+                    text_color="#E74C3C"
+                ).grid(row=8, column=0, sticky="w", pady=(15, 10))
+                
+                # Cancel button only
+                btn_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+                btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(20, 25))
+                
+                ctk.CTkButton(
+                    btn_frame,
+                    text="Back to List",
+                    fg_color="#2980B9",
+                    hover_color="#1F618D",
+                    height=40,
+                    width=120,
+                    font=("Arial", 13),
+                    command=lambda: self.show_page("main")
+                ).pack(pady=10)
+            else:
+                # Editable hours
+                hours_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+                hours_frame.grid(row=8, column=0, sticky="ew", pady=(15, 0))
+                
+                ctk.CTkLabel(
+                    hours_frame,
+                    text="⏱️ Update Hours:",
+                    font=("Arial", 13, "bold"),
+                    text_color="#AAAAAA"
+                ).pack(side="left", padx=(0, 15))
+                
+                self.edit_hours = ctk.CTkEntry(hours_frame, width=120, height=40)
+                self.edit_hours.pack(side="left")
+                self.edit_hours.insert(0, str(row['hours']))
+
+                # Save button
+                btn_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+                btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(20, 25))
+                
+                button_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
+                button_container.pack()
+                
+                ctk.CTkButton(
+                    button_container,
+                    text="Cancel",
+                    fg_color="#7F8C8D",
+                    hover_color="#616A6B",
+                    height=40,
+                    width=120,
+                    font=("Arial", 13),
+                    command=lambda: self.show_page("main")
+                ).pack(side="left", padx=10)
+                
+                ctk.CTkButton(
+                    button_container,
+                    text="Save Changes",
+                    fg_color="#2980B9",
+                    hover_color="#1F618D",
+                    height=40,
+                    width=150,
+                    font=("Arial", 13, "bold"),
+                    command=lambda: self.update_overtime(row['id'])
+                ).pack(side="left", padx=10)
+        else:
+            # Show message that request cannot be edited
+            ctk.CTkLabel(
+                content_frame,
+                text="🔒 This request has been processed and cannot be edited",
+                font=("Arial", 12, "italic"),
+                text_color="#888888"
+            ).grid(row=8, column=0, sticky="w", pady=(15, 10))
+            
+            # Cancel button only
+            btn_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+            btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(20, 25))
+            
+            ctk.CTkButton(
+                btn_frame,
+                text="Back to List",
+                fg_color="#2980B9",
+                hover_color="#1F618D",
+                height=40,
+                width=120,
+                font=("Arial", 13),
+                command=lambda: self.show_page("main")
+            ).pack(pady=10)
+
+    def update_overtime(self, ot_id):
+        """Update the overtime record"""
+        try:
+            hours = float(self.edit_hours.get())
+            if hours <= 0 or hours > 24:
+                messagebox.showerror("Validation Error", "Hours must be between 1 and 24")
+                return
+        except ValueError:
+            messagebox.showerror("Validation Error", "Please enter valid hours (e.g., 2.5, 4, 8)")
+            return
+
+        self.db.cursor.execute("""
+            UPDATE overtime_requests
+            SET hours = %s
+            WHERE id = %s AND status = 'Pending'
+        """, (hours, ot_id))
+        
+        self.db.conn.commit()
+        messagebox.showinfo("Success", f"✅ Overtime request has been updated successfully!")
+        self.show_page("main")
 
     def clear_filters(self):
+        """Clear all filter fields"""
         self.member_search.entry.delete(0, "end")
         self.project_search.entry.delete(0, "end")
-        self.date_filter.delete(0, "end")
+        self.date_filter.clear()
         self.status_filter.set("All")
         self.refresh_ui()
 
-    # ================= ADD POPUP =================
-    def open_popup(self):
-        popup = ctk.CTkToplevel(self)
-        popup.title("Overtime Add")
-        popup.geometry("450x620")
-        popup.grab_set()
-        popup.configure(fg_color=("#FFFFFF", "#1E1E1E")) # Adaptive Popup
-
-        main_frame = ctk.CTkFrame(popup, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=12)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        ctk.CTkLabel(main_frame, text="✨ Add Overtime", font=("Arial", 20, "bold")).pack(pady=(15, 15))
-
-        # Logic: No Change
-        self.db.cursor.execute("""
-            SELECT id, full_name FROM users
-            WHERE team_id = %s AND role = 'member'
-        """, (self.team_id,))
-        members = self.db.cursor.fetchall()
-        self.member_map = {m['full_name']: m['id'] for m in members}
-
-        self.db.cursor.execute("""
-            SELECT id, project_name FROM projects
-            WHERE team_id = %s
-        """, (self.team_id,))
-        
-        projects = self.db.cursor.fetchall()
-        self.project_map = {p['project_name']: p['id'] for p in projects}
-
-        ctk.CTkLabel(main_frame, text="Member").pack(anchor="w", padx=20)
-        member_cb = AutocompleteComboBox(main_frame, list(self.member_map.keys()), width=250)
-        member_cb.pack(fill="x", padx=20)
-
-        ctk.CTkLabel(main_frame, text="Project").pack(anchor="w", padx=20, pady=(10, 0))
-        project_cb = AutocompleteComboBox(main_frame, list(self.project_map.keys()), width=250)
-        project_cb.pack(fill="x", padx=20)
-
-        ctk.CTkLabel(main_frame, text="Date").pack(anchor="w", padx=20, pady=(10, 0))
-        date_ent = DateEntry(
-            main_frame,
-            date_pattern="yyyy-mm-dd",
-            mindate=date.today(),
-            background="#2980B9",
-            font=("Arial", 14)
-        )
-        date_ent.pack(fill="x", padx=20, ipady=3)
-
-        ctk.CTkLabel(main_frame, text="Hours").pack(anchor="w", padx=20, pady=(10, 0))
-        hours_ent = ctk.CTkEntry(main_frame, fg_color=("#FFFFFF", "#2A2A2A"))
-        hours_ent.pack(fill="x", padx=20)
-
-        ctk.CTkLabel(main_frame, text="Reason").pack(anchor="w", padx=20, pady=(10, 0))
-        reason_ent = ctk.CTkTextbox(main_frame, height=80, fg_color=("#FFFFFF", "#2A2A2A"), border_width=1)
-        reason_ent.pack(fill="x", padx=20)
-
-        def save():
-            member_id = self.member_map.get(member_cb.get())
-            project_id = self.project_map.get(project_cb.get())
-
-            if not member_id or not project_id:
-                messagebox.showwarning("Error", "Invalid member/project")
-                return
-
-            try:
-                h = float(hours_ent.get())
-                if h <= 0 or h > 24:
-                    messagebox.showwarning("Error", "Hours must be between 0 and 24")
-                    return
-            except ValueError:
-                messagebox.showwarning("Error", "Hours must be a valid number")
-                return
-
-            d_str = date_ent.get_date()
-
-            self.db.cursor.execute("""
-                SELECT id FROM overtime_requests 
-                WHERE member_id = %s AND DATE(ot_date) = %s
-            """, (member_id, d_str))
-            
-            if self.db.cursor.fetchone():
-                messagebox.showwarning("Error", f"Overtime request for this member on {d_str} already exists!")
-                return
-
-            self.db.cursor.execute("""
-                INSERT INTO overtime_requests
-                (member_id, project_id, ot_date, hours, reason, status)
-                VALUES (%s,%s,%s,%s,%s,'Pending')
-            """, (
-                member_id,
-                project_id,
-                d_str,
-                h,
-                reason_ent.get("0.0", "end").strip()
-            ))
-
-            self.db.conn.commit()
-            popup.destroy()
-            self.refresh_ui()
-
-        ctk.CTkButton(main_frame, text="Save", fg_color="#10B981", hover_color="#059669", height=40, command=save).pack(pady=20)
-
-    # ================= UPDATE POPUP =================
-    def open_update_popup(self, row):
-        popup = ctk.CTkToplevel(self)
-        popup.geometry("450x540")
-        popup.grab_set()
-        popup.configure(fg_color=("#FFFFFF", "#1E1E1E"))
-
-        main_frame = ctk.CTkFrame(popup, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=12)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-
-        ctk.CTkLabel(main_frame, text="✏️ Update Overtime", font=("Arial", 20, "bold")).pack(pady=(15, 10))
-
-        def create_info_row(label_text, value_text):
-            row_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-            row_frame.pack(fill="x", padx=20, pady=4)
-            ctk.CTkLabel(row_frame, text=label_text, font=("Arial", 13, "bold"), text_color=("#555555", "#AAAAAA"), width=80, anchor="w").pack(side="left")
-            ctk.CTkLabel(row_frame, text=value_text, font=("Arial", 14), text_color=("#000000", "#FFFFFF"), anchor="w").pack(side="left")
-
-        create_info_row("Member:", row['full_name'])
-        create_info_row("Project:", row['project_name'])
-        create_info_row("Date:", str(row['ot_date']))
-        create_info_row("Status:", row['status'])
-
-        ctk.CTkLabel(main_frame, text="Reason:", font=("Arial", 13, "bold"), text_color=("#555555", "#AAAAAA")).pack(anchor="w", padx=20, pady=(10, 0))
-        reason_display = ctk.CTkTextbox(main_frame, height=60, fg_color=("#F9F9F9", "#2A2A2A"))
-        reason_display.pack(fill="x", padx=20, pady=(5, 0))
-        reason_display.insert("0.0", row['reason'] or "-")
-        reason_display.configure(state="disabled")
-
-        ctk.CTkLabel(main_frame, text="Update Hours:").pack(anchor="w", padx=20, pady=(15, 0))
-        hours_ent = ctk.CTkEntry(main_frame, fg_color=("#FFFFFF", "#2A2A2A"))
-        hours_ent.insert(0, str(row['hours']))
-        hours_ent.pack(fill="x", padx=20)
-
-        def save():
-            try:
-                h = float(hours_ent.get())
-                if h <= 0 or h > 24:
-                    messagebox.showerror("Error", "Hours must be between 0 and 24.")
-                    return
-            except ValueError:
-                messagebox.showerror("Error", "Hours must be a valid number.")
-                return
-
-            self.db.cursor.execute("""
-                UPDATE overtime_requests
-                SET hours=%s
-                WHERE id=%s
-            """, (h, row['id']))
-            self.db.conn.commit()
-            popup.destroy()
-            self.refresh_ui()
-
-        ctk.CTkButton(main_frame, text="Save Changes", fg_color="#2980B9", hover_color="#1F618D", height=40, command=save).pack(pady=20)
-
-    # ================= LIST =================
     def refresh_ui(self):
-        for w in self.list_frame.winfo_children():
-            w.destroy()
+        """Refresh the main list view"""
+        for widget in self.list_frame.winfo_children():
+            widget.destroy()
 
-        # Logic: No Change
+        # Build query with filters
         query = """
             SELECT o.*, u.full_name, p.project_name
             FROM overtime_requests o
@@ -453,148 +903,247 @@ class LeaderOvertime(ctk.CTkFrame):
         """
         params = []
 
-        member_val = self.member_search.get().strip()
-        if member_val:
+        # Apply filters
+        member = self.member_search.get().strip()
+        if member:
             query += " AND u.full_name LIKE %s"
-            params.append(f"%{member_val}%")
+            params.append(f"%{member}%")
 
-        project_val = self.project_search.get().strip()
-        if project_val:
+        project = self.project_search.get().strip()
+        if project:
             query += " AND p.project_name LIKE %s"
-            params.append(f"%{project_val}%")
+            params.append(f"%{project}%")
 
-        status_val = self.status_filter.get()
-        if status_val != "All":
+        status = self.status_filter.get()
+        if status != "All":
             query += " AND o.status = %s"
-            params.append(status_val)
+            params.append(status)
 
-        date_val = self.date_filter.get().strip()
+        date_val = self.date_filter.get_date()
         if date_val:
             query += " AND DATE(o.ot_date) = %s"
-            params.append(date_val)
+            params.append(date_val.strftime('%Y-%m-%d'))
 
         query += " ORDER BY o.created_at DESC"
 
+        # Execute query
         self.db.cursor.execute(query, tuple(params))
         rows = self.db.cursor.fetchall()
 
         if not rows:
             ctk.CTkLabel(
                 self.list_frame,
-                text="No overtime requests found matching your search.",
-                font=("Arial", 14, "italic"),
+                text="📭 No overtime requests found",
+                font=("Arial", 14),
                 text_color="#888888"
             ).pack(pady=40)
             return
 
+        # Display results with improved card design
         for row in rows:
             card = ctk.CTkFrame(
                 self.list_frame,
                 corner_radius=12,
-                fg_color=("#FFFFFF", "#1E1E1E"), # Card background
+                fg_color="#1E1E1E",
                 border_width=1,
-                border_color=("#E0E0E0", "#2A2A2A")
+                border_color="#2A2A2A"
             )
             card.pack(fill="x", padx=15, pady=10)
 
-            main = ctk.CTkFrame(card, fg_color="transparent")
-            main.pack(fill="x", padx=15, pady=12)
+            # Main content
+            content = ctk.CTkFrame(card, fg_color="transparent")
+            content.pack(fill="x", padx=15, pady=12)
 
-            left = ctk.CTkFrame(main, fg_color="transparent")
+            # Left side - info
+            left = ctk.CTkFrame(content, fg_color="transparent")
             left.pack(side="left", fill="both", expand=True)
 
-            top = ctk.CTkFrame(left, fg_color="transparent")
-            top.pack(fill="x")
-
+            # Top row: Name and date
+            top_row = ctk.CTkFrame(left, fg_color="transparent")
+            top_row.pack(fill="x", pady=(0, 8))
+            
             ctk.CTkLabel(
-                top,
-                text=row['full_name'],
-                font=("Arial", 14, "bold"),
-                text_color=("#000000", "#FFFFFF")
+                top_row,
+                text=f"👤 {row['full_name']}",
+                font=("Arial", 14, "bold")
             ).pack(side="left")
-
+            
             ctk.CTkLabel(
-                top,
-                text=str(row['ot_date']),
-                font=("Arial", 10),
-                text_color=("#666666", "#888888")
+                top_row,
+                text=f"📅 {row['ot_date']}",
+                font=("Arial", 11),
+                text_color="#888888"
             ).pack(side="left", padx=10)
 
+            # Project and hours
+            middle_row = ctk.CTkFrame(left, fg_color="transparent")
+            middle_row.pack(fill="x", pady=(0, 5))
+            
             ctk.CTkLabel(
-                left,
-                text=row['project_name'],
-                font=("Arial", 13),
-                text_color=("#444444", "#DDDDDD")
-            ).pack(anchor="w", pady=(5, 2))
-
+                middle_row,
+                text=f"📁 {row['project_name']}",
+                font=("Arial", 12)
+            ).pack(side="left")
+            
             ctk.CTkLabel(
-                left,
-                text=f"{row['hours']} hours  •  {row['status']}",
+                middle_row,
+                text=f"⏱️ {row['hours']} hours",
                 font=("Arial", 12),
-                text_color=("#555555", "#AAAAAA")
-            ).pack(anchor="w")
+                text_color="#AAAAAA"
+            ).pack(side="left", padx=(15, 0))
 
-            self.create_expandable_message(left, row['reason'] or "-", wrap=600)
+            # Show warning if pending and overdue
+            if row['status'] == 'Pending' and row['ot_date'] < date.today():
+                warning_frame = ctk.CTkFrame(left, fg_color="#5C3A3A", corner_radius=6)
+                warning_frame.pack(fill="x", pady=(5, 0))
+                
+                ctk.CTkLabel(
+                    warning_frame,
+                    text="⚠️ Overdue - This request will be auto-cancelled",
+                    font=("Arial", 10, "bold"),
+                    text_color="#E74C3C",
+                    anchor="w"
+                ).pack(fill="x", padx=8, pady=3)
 
-            btn_frame = ctk.CTkFrame(main, fg_color="transparent")
-            btn_frame.pack(side="right", padx=10)
+            # Reason (if available)
+            if row['reason'] and row['reason'].strip():
+                reason_text = row['reason'][:100] + "..." if len(row['reason']) > 100 else row['reason']
+                ctk.CTkLabel(
+                    left,
+                    text=f"💬 {reason_text}",
+                    font=("Arial", 11),
+                    text_color="#888888",
+                    anchor="w"
+                ).pack(fill="x", pady=(5, 0))
 
-            ctk.CTkButton(
-                btn_frame,
-                text="Update",
-                width=70,
-                fg_color="#2980B9",
-                command=lambda r=row: self.open_update_popup(r)
-            ).pack(pady=3)
+            # Show rejection reason if status is Rejected
+            if row['status'] == 'Rejected' and row.get('rejected_reason') and row['rejected_reason'].strip():
+                reject_text = row['rejected_reason'][:100] + "..." if len(row['rejected_reason']) > 100 else row['rejected_reason']
+                reject_frame = ctk.CTkFrame(left, fg_color="#3D1E1E", corner_radius=6)
+                reject_frame.pack(fill="x", pady=(5, 0))
+                
+                ctk.CTkLabel(
+                    reject_frame,
+                    text=f"❌ Rejected: {reject_text}",
+                    font=("Arial", 10),
+                    text_color="#E74C3C",
+                    anchor="w"
+                ).pack(fill="x", padx=8, pady=5)
 
-            ctk.CTkButton(
-                btn_frame,
-                text="Delete",
-                width=70,
-                fg_color="#C0392B",
-                command=lambda rid=row['id']: self.delete_record(rid)
-            ).pack(pady=3)
+            # Right side - Status Badge and Action Buttons
+            right_section = ctk.CTkFrame(content, fg_color="transparent")
+            right_section.pack(side="right", fill="y")
 
-    def create_expandable_message(self, parent, full_text, wrap=500):
-        preview_length = 40
-        container = ctk.CTkFrame(parent, fg_color="transparent")
-        container.pack(fill="x", anchor="w")
-        is_expanded = False
-
-        def toggle():
-            nonlocal is_expanded
-            is_expanded = not is_expanded
-            if is_expanded:
-                msg_label.configure(text=full_text)
-                toggle_btn.configure(text="see less")
-            else:
-                msg_label.configure(text=full_text[:preview_length] + "...")
-                toggle_btn.configure(text="see more")
-
-        msg_label = ctk.CTkLabel(
-            container,
-            text=full_text[:preview_length] + ("..." if len(full_text) > preview_length else ""),
-            wraplength=wrap,
-            justify="left",
-            anchor="w",
-            text_color=("#444444", "#CCCCCC")
-        )
-        msg_label.pack(anchor="w")
-
-        if len(full_text) > preview_length:
-            toggle_btn = ctk.CTkButton(
-                container,
-                text="see more...",
-                font=("Arial", 11),
-                text_color="#2980B9",
-                fg_color="transparent",
-                hover=False,
-                command=toggle
+            # Modern Status Badge
+            status_config = {
+                "Pending": {"color": "#F39C12", "bg": "#3D2E1A", "icon": "⏳", "text": "Pending"},
+                "Accepted": {"color": "#27AE60", "bg": "#1A3D2A", "icon": "✅", "text": "Accepted"},
+                "Approved": {"color": "#2ECC71", "bg": "#1A4D2A", "icon": "✓", "text": "Approved"},
+                "Rejected": {"color": "#E74C3C", "bg": "#4A1A1A", "icon": "✗", "text": "Rejected"},
+                "Cancelled": {"color": "#95A5A6", "bg": "#2A3A3A", "icon": "⊗", "text": "Cancelled"}
+            }
+            
+            config = status_config.get(row['status'], {"color": "#AAAAAA", "bg": "#2A2A2A", "icon": "•", "text": row['status']})
+            
+            # Create badge with icon and text
+            badge_frame = ctk.CTkFrame(
+                right_section,
+                fg_color=config['bg'],
+                corner_radius=15,
+                height=30,
+                width=100
             )
-            toggle_btn.pack(anchor="w")
+            badge_frame.pack(pady=(0, 10))
+            badge_frame.pack_propagate(False)
+            
+            badge_content = ctk.CTkFrame(badge_frame, fg_color="transparent")
+            badge_content.pack(expand=True, fill="both", padx=10, pady=5)
+            
+            ctk.CTkLabel(
+                badge_content,
+                text=f"{config['icon']} {config['text']}",
+                font=("Arial", 11, "bold"),
+                text_color=config['color']
+            ).pack()
 
-    def delete_record(self, rid):
-        if messagebox.askyesno("Confirm", "Delete this record?"):
-            self.db.cursor.execute("DELETE FROM overtime_requests WHERE id=%s", (rid,))
+            # Action Buttons Frame
+            action_frame = ctk.CTkFrame(right_section, fg_color="transparent")
+            action_frame.pack()
+
+            # Delete button for all statuses except Approved
+            if row['status'] in ['Pending', 'Cancelled', 'Rejected', 'Accepted']:
+                delete_btn = ctk.CTkButton(
+                    action_frame,
+                    text="Delete",
+                    width=80,
+                    height=32,
+                    fg_color="#C0392B",
+                    hover_color="#A93226",
+                    font=("Arial", 11),
+                    command=lambda id=row['id']: self.delete_request(id)
+                )
+                delete_btn.pack(pady=3)
+
+            # Edit button only for Pending requests that are not overdue
+            if row['status'] == 'Pending':
+                if row['ot_date'] >= date.today():
+                    edit_btn = ctk.CTkButton(
+                        action_frame,
+                        text="Edit",
+                        width=80,
+                        height=32,
+                        fg_color="#2980B9",
+                        hover_color="#1F618D",
+                        font=("Arial", 11),
+                        command=lambda r=row: self.edit_request(r)
+                    )
+                    edit_btn.pack(pady=3)
+                else:
+                    # Show warning for overdue pending
+                    overdue_badge = ctk.CTkFrame(
+                        action_frame,
+                        fg_color="#4A1A1A",
+                        corner_radius=12,
+                        height=25,
+                        width=80
+                    )
+                    overdue_badge.pack(pady=3)
+                    overdue_badge.pack_propagate(False)
+                    
+                    ctk.CTkLabel(
+                        overdue_badge,
+                        text="⚠️ Overdue",
+                        font=("Arial", 10, "bold"),
+                        text_color="#E74C3C"
+                    ).pack(expand=True)
+
+    def edit_request(self, row):
+        """Load the edit page with request data"""
+        self.load_edit_form(row)
+        self.show_page("edit")
+
+    def delete_request(self, request_id):
+        """Delete an overtime request"""
+        # Get request status for confirmation message
+        self.db.cursor.execute("SELECT status FROM overtime_requests WHERE id = %s", (request_id,))
+        result = self.db.cursor.fetchone()
+        
+        if not result:
+            messagebox.showerror("Error", "Request not found!")
+            return
+        
+        status = result['status']
+        
+        # Custom confirmation message based on status
+        if status == 'Pending':
+            msg = "⚠️ Are you sure you want to delete this PENDING overtime request?\n\nThis action cannot be undone!"
+        elif status in ['Accepted', 'Cancelled', 'Rejected']:
+            msg = f"⚠️ Are you sure you want to delete this {status} overtime request?\n\nThis action cannot be undone!"
+        else:
+            msg = "⚠️ Are you sure you want to delete this overtime request?\n\nThis action cannot be undone!"
+        
+        if messagebox.askyesno("Confirm Delete", msg):
+            self.db.cursor.execute("DELETE FROM overtime_requests WHERE id = %s", (request_id,))
             self.db.conn.commit()
+            messagebox.showinfo("Success", "✅ Overtime request has been deleted successfully!")
             self.refresh_ui()

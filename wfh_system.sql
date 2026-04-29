@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 24, 2026 at 03:40 AM
+-- Generation Time: Apr 29, 2026 at 09:11 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -66,6 +66,13 @@ CREATE TABLE `announcement_replies` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `announcement_replies`
+--
+
+INSERT INTO `announcement_replies` (`id`, `announcement_id`, `message`, `created_by`, `created_at`) VALUES
+(1, 11, 'hiiii', 'Aye', '2026-04-29 04:13:40');
+
 -- --------------------------------------------------------
 
 --
@@ -107,7 +114,18 @@ INSERT INTO `attendance` (`id`, `user_id`, `attendance_date`, `check_in`, `check
 (43, 18, '2026-04-23', '13:37:13', NULL, 'Office', '2026-04-23 07:07:12', 'Office'),
 (44, 13, '2026-04-23', '13:44:50', NULL, 'WFH', '2026-04-23 07:14:50', 'Office'),
 (45, 21, '2026-04-23', '14:01:27', NULL, 'Office', '2026-04-23 07:31:26', 'Office'),
-(46, 27, '2026-04-23', '14:04:45', '14:06:14', 'Office', '2026-04-23 07:34:44', 'Office');
+(46, 27, '2026-04-23', '14:04:45', '14:06:14', 'Office', '2026-04-23 07:34:44', 'Office'),
+(47, 12, '2026-04-24', '08:29:33', '08:30:26', 'Office', '2026-04-24 01:59:32', 'Office'),
+(48, 21, '2026-04-24', '08:31:07', '08:31:45', 'Office', '2026-04-24 02:01:06', 'Office'),
+(49, 13, '2026-04-24', '13:16:30', NULL, 'Office', '2026-04-24 06:46:30', 'Office'),
+(50, 28, '2026-04-24', '13:37:34', NULL, 'Office', '2026-04-24 07:07:34', 'Office'),
+(51, 12, '2026-04-27', '10:23:45', '10:24:47', 'WFH', '2026-04-27 03:53:45', 'Office'),
+(52, 13, '2026-04-27', '10:40:46', NULL, 'Office', '2026-04-27 04:10:46', 'Office'),
+(53, 27, '2026-04-28', '11:33:06', '11:43:34', 'WFH', '2026-04-28 05:03:07', 'Office'),
+(54, 13, '2026-04-28', '11:34:40', NULL, 'WFH', '2026-04-28 05:04:40', 'Office'),
+(55, 18, '2026-04-28', '11:42:51', NULL, 'WFH', '2026-04-28 05:12:50', 'Office'),
+(56, 20, '2026-04-28', '11:44:34', NULL, 'Office', '2026-04-28 05:14:34', 'Office'),
+(57, 28, '2026-04-28', '11:46:42', NULL, 'WFH', '2026-04-28 05:16:42', 'Office');
 
 -- --------------------------------------------------------
 
@@ -132,14 +150,10 @@ CREATE TABLE `daily_reports` (
 INSERT INTO `daily_reports` (`id`, `user_id`, `report_date`, `category`, `tasks`, `hours`, `created_at`) VALUES
 (6, 12, '2026-03-01', 'python', 'afy', 2.00, '2026-04-02 09:14:38'),
 (7, 12, '2026-03-01', 'meeting', 'zhfhz', 6.00, '2026-04-02 09:14:38'),
-(8, 12, '2026-04-08', 'ssssss', 'esf', 2.00, '2026-04-08 02:32:11'),
-(9, 12, '2026-04-08', 'meeting', 'afe', 1.00, '2026-04-08 02:32:11'),
-(10, 12, '2026-04-08', 'python', 'af', 3.00, '2026-04-08 02:32:11'),
-(11, 12, '2026-04-08', 'genexus', 'fea', 1.50, '2026-04-08 02:32:11'),
-(12, 12, '2026-04-08', 'apple', 'affaf', 0.50, '2026-04-08 02:32:11'),
-(13, 12, '2026-04-08', 'Java', 'login', 2.00, '2026-04-08 05:12:10'),
-(14, 12, '2026-04-08', 'meeting', 'ff', 4.00, '2026-04-08 05:12:10'),
-(15, 12, '2026-04-08', 'python', 'ff', 2.00, '2026-04-08 05:12:10');
+(18, 13, '2026-04-27', 'apple', 'e', 4.00, '2026-04-27 14:53:40'),
+(19, 13, '2026-04-27', 'genexus', 'f', 4.00, '2026-04-27 14:53:40'),
+(20, 12, '2026-04-28', 'genexus', 'nnk', 8.00, '2026-04-28 08:04:21'),
+(21, 12, '2026-04-29', 'genexus', 'HI', 8.00, '2026-04-28 09:33:00');
 
 -- --------------------------------------------------------
 
@@ -157,15 +171,23 @@ CREATE TABLE `leave_requests` (
   `reason` text NOT NULL,
   `total_days` decimal(4,1) NOT NULL,
   `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `leave_requests`
 --
 
-INSERT INTO `leave_requests` (`id`, `user_id`, `leave_type`, `shift_type`, `start_date`, `end_date`, `reason`, `total_days`, `status`, `created_at`) VALUES
-(1, 12, 'Casual Leave', '', '2026-04-23', '2026-04-23', 'fff', 1.0, 'Approved', '2026-04-23 09:33:32');
+INSERT INTO `leave_requests` (`id`, `user_id`, `leave_type`, `shift_type`, `start_date`, `end_date`, `reason`, `total_days`, `status`, `created_at`, `updated_at`) VALUES
+(1, 12, 'Casual Leave', '', '2026-04-23', '2026-04-23', 'fff', 1.0, 'Approved', '2026-04-23 09:33:32', '2026-04-27 03:10:31'),
+(2, 12, 'Casual Leave', 'Full Day', '2026-04-27', '2026-04-27', 'ff', 1.0, 'Approved', '2026-04-27 03:10:53', '2026-04-27 03:11:16'),
+(3, 13, 'Sick Leave', '', '2026-04-27', '2026-04-27', 'jj', 1.0, 'Approved', '2026-04-27 04:22:36', '2026-04-27 04:30:24'),
+(4, 12, 'Vacation', '', '2026-04-27', '2026-04-27', 'nn', 1.0, 'Approved', '2026-04-27 04:30:05', '2026-04-27 04:30:20'),
+(5, 12, 'Casual Leave', '', '2026-04-27', '2026-04-27', ',l,', 1.0, 'Approved', '2026-04-27 04:36:44', '2026-04-27 07:47:25'),
+(6, 12, 'Casual Leave', 'Full Day', '2026-04-27', '2026-04-27', 'gg', 1.0, 'Approved', '2026-04-27 07:47:05', '2026-04-27 07:47:21'),
+(7, 12, 'Casual Leave', '', '2026-04-28', '2026-04-29', 'hi', 1.5, 'Pending', '2026-04-28 01:10:49', '2026-04-28 01:10:49'),
+(8, 12, 'Casual Leave', 'Full Day', '2026-04-29', '2026-04-29', 'hii', 1.0, 'Pending', '2026-04-29 04:19:54', '2026-04-29 04:19:54');
 
 -- --------------------------------------------------------
 
@@ -190,7 +212,26 @@ CREATE TABLE `notifications` (
 INSERT INTO `notifications` (`id`, `user_id`, `request_id`, `message`, `notif_type`, `is_read`, `created_at`) VALUES
 (1, 10, 1, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-23 09:33:32'),
 (2, 17, 1, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-23 09:33:32'),
-(4, 12, NULL, 'Your leave request has been Approved.', 'System', 0, '2026-04-23 09:34:02');
+(4, 12, NULL, 'Your leave request has been Approved.', 'System', 1, '2026-04-23 09:34:02'),
+(5, 10, 2, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-27 03:10:53'),
+(6, 17, 2, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-27 03:10:53'),
+(8, 12, NULL, 'Your leave request has been Approved by your Team Leader.', 'System', 1, '2026-04-27 03:11:16'),
+(9, 10, 3, 'HH requested 1.0 days leave.', 'System', 1, '2026-04-27 04:22:36'),
+(10, 17, 3, 'HH requested 1.0 days leave.', 'System', 0, '2026-04-27 04:22:36'),
+(12, 10, 4, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-27 04:30:05'),
+(13, 17, 4, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-27 04:30:05'),
+(15, 12, NULL, 'Your leave request has been Approved by your Team Leader.', 'System', 1, '2026-04-27 04:30:20'),
+(16, 13, NULL, 'Your leave request has been Approved by your Team Leader.', 'System', 1, '2026-04-27 04:30:24'),
+(17, 10, 5, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-27 04:36:44'),
+(18, 17, 5, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-27 04:36:44'),
+(20, 10, 6, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-27 07:47:05'),
+(21, 17, 6, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-27 07:47:05'),
+(23, 12, NULL, 'Leave request Approved by Team Leader.', 'System', 1, '2026-04-27 07:47:21'),
+(24, 12, NULL, 'Leave request Approved by Team Leader.', 'System', 1, '2026-04-27 07:47:25'),
+(25, 10, 7, 'aa requested 1.5 days leave.', 'System', 1, '2026-04-28 01:10:49'),
+(26, 17, 7, 'aa requested 1.5 days leave.', 'System', 0, '2026-04-28 01:10:49'),
+(27, 10, 8, 'aa requested 1.0 days leave.', 'System', 1, '2026-04-29 04:19:54'),
+(28, 17, 8, 'aa requested 1.0 days leave.', 'System', 0, '2026-04-29 04:19:54');
 
 -- --------------------------------------------------------
 
@@ -241,15 +282,16 @@ CREATE TABLE `overtime_requests` (
   `hours` decimal(4,2) DEFAULT NULL,
   `reason` text DEFAULT NULL,
   `status` enum('Pending','Accepted','Rejected') DEFAULT 'Pending',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `rejected_reason` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `overtime_requests`
 --
 
-INSERT INTO `overtime_requests` (`id`, `member_id`, `project_id`, `ot_date`, `hours`, `reason`, `status`, `created_at`) VALUES
-(2, 18, 7, '2026-04-23', 2.00, 'login', 'Pending', '2026-04-23 04:26:38');
+INSERT INTO `overtime_requests` (`id`, `member_id`, `project_id`, `ot_date`, `hours`, `reason`, `status`, `created_at`, `rejected_reason`) VALUES
+(2, 18, 7, '2026-04-23', 2.00, 'login', '', '2026-04-23 04:26:38', NULL);
 
 -- --------------------------------------------------------
 
@@ -266,6 +308,13 @@ CREATE TABLE `progress_history` (
   `update_date` date DEFAULT NULL,
   `note` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `progress_history`
+--
+
+INSERT INTO `progress_history` (`id`, `task_id`, `project_id`, `member_name`, `progress`, `update_date`, `note`) VALUES
+(1, 19, 11, 'member123', 10, '2026-04-29', 'hi');
 
 -- --------------------------------------------------------
 
@@ -294,7 +343,7 @@ INSERT INTO `projects` (`id`, `project_name`, `created_by`, `team_id`, `status`,
 (8, 'vvv', 'Aye', 3, 'In Progress (28%)', '2026-04-02 09:06:19'),
 (9, 'fff', 'Ko', 4, 'In Progress (0%)', '2026-04-07 08:31:32'),
 (10, 'WFH project', 'Aye', 3, 'In Progress (75%)', '2026-04-08 02:33:40'),
-(11, 'Genexus', 'Aye', 3, 'In Progress (23%)', '2026-04-08 05:13:16');
+(11, 'Genexus', 'Aye', 3, 'In Progress (27%)', '2026-04-08 05:13:16');
 
 -- --------------------------------------------------------
 
@@ -354,7 +403,7 @@ INSERT INTO `tasks` (`id`, `project_id`, `task_name`, `assigned_to`, `deadline`,
 (16, 10, 'login', 'aa', '2026-04-30', 100, 'Todo'),
 (17, 10, 'logout', 'member123', '2026-04-28', 50, 'Todo'),
 (18, 11, 'login', 'aung', '2026-04-10', 45, 'Todo'),
-(19, 11, 'logout', 'member123', '2026-04-10', 1, 'Todo');
+(19, 11, 'logout', 'member123', '2026-04-10', 10, 'Todo');
 
 -- --------------------------------------------------------
 
@@ -413,22 +462,22 @@ INSERT INTO `users` (`id`, `employee_id`, `full_name`, `username`, `password`, `
 (1, 'ADM-001', 'Aung Thura Khant', 'admin', 'admin', 'admin', NULL, '2026-03-30 07:02:03', 'WFH', NULL, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (10, 'L-01', 'Aye', 'leader', 'leader', 'leader', 'N/A', '2026-04-02 06:18:12', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (11, 'L-002', 'Ko', 'leader1', 'leader1', 'leader', 'N/A', '2026-04-02 06:18:45', 'Office', 4, 'offline', NULL, 0, 0, 0, 'Office', NULL),
-(12, 'E1', 'aa', 'member', 'member', 'member', 'Batch 1', '2026-04-02 06:19:34', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
+(12, 'E1', 'aa', 'member', 'member', 'member', 'Batch 1', '2026-04-02 06:19:34', 'WFH', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (13, 'E2', 'HH', 'member1', 'member1', 'member', 'Batch 1', '2026-04-02 06:20:02', 'WFH', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (14, 'E3', 'FF', 'member2', 'member2', 'member', 'Batch 1', '2026-04-02 06:20:27', 'Office', 4, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (16, '1', '1', '11', '1', 'member', 'N/A', '2026-04-02 09:20:25', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (17, '100000', 'admin123', 'admin123', 'admin123', 'leader', 'N/A', '2026-04-08 02:20:26', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
-(18, '22222', 'member123', 'member123', 'member123', 'member', 'Batch 12', '2026-04-08 02:21:00', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
+(18, '22222', 'member123', 'member123', 'member123', 'member', 'Batch 12', '2026-04-08 02:21:00', 'WFH', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (19, '111111', 'memeber22', 'memeber22', 'memeber22', 'member', 'Batch 13', '2026-04-08 02:21:36', 'Office', 4, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (20, '1234', 'aung', 'aung', 'aung', 'member', 'Batch 13', '2026-04-08 05:09:29', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
-(21, '111112', 'member20', 'member20', 'Member20', 'member', 'Batch 13', '2026-04-23 07:19:12', 'Office', 3, 'away', NULL, 0, 0, 0, 'Office', NULL),
+(21, '111112', 'member20', 'member20', 'Member20', 'member', 'Batch 13', '2026-04-23 07:19:12', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (22, '111113', 'admin1', 'admin1', 'Admin1', 'admin', 'N/A', '2026-04-23 07:19:30', 'Office', NULL, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (23, '111114', 'member21', 'member21', 'Member21', 'member', 'Batch 13', '2026-04-23 07:21:01', 'Office', 4, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (24, '111115', 'member22', 'member22', 'Member22', 'member', 'Batch 13', '2026-04-23 07:21:41', 'Office', 4, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (25, '111116', 'member23', 'member23', 'Member23', 'member', 'Batch 13', '2026-04-23 07:22:20', 'Office', 6, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (26, '111117', 'member24', 'member24', 'Member24', 'member', 'Batch 13', '2026-04-23 07:23:00', 'Office', 6, 'offline', NULL, 0, 0, 0, 'Office', NULL),
-(27, '111118', 'member25', 'member25', 'Member25', 'member', 'Batch 13', '2026-04-23 07:23:46', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
-(28, '111119', 'member26', 'member26', 'Member26', 'member', 'Batch 13', '2026-04-23 07:24:16', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
+(27, '111118', 'member25', 'member25', 'Member25', 'member', 'Batch 13', '2026-04-23 07:23:46', 'WFH', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
+(28, '111119', 'member26', 'member26', 'Member26', 'member', 'Batch 13', '2026-04-23 07:24:16', 'WFH', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL),
 (29, '111120', 'member27', 'member27', 'Member17', 'member', 'Batch 13', '2026-04-23 07:24:48', 'Office', 3, 'offline', NULL, 0, 0, 0, 'Office', NULL);
 
 -- --------------------------------------------------------
@@ -775,31 +824,31 @@ ALTER TABLE `announcements`
 -- AUTO_INCREMENT for table `announcement_replies`
 --
 ALTER TABLE `announcement_replies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
 
 --
 -- AUTO_INCREMENT for table `daily_reports`
 --
 ALTER TABLE `daily_reports`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `leave_requests`
 --
 ALTER TABLE `leave_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `overtime`
@@ -817,7 +866,7 @@ ALTER TABLE `overtime_requests`
 -- AUTO_INCREMENT for table `progress_history`
 --
 ALTER TABLE `progress_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `projects`
@@ -847,7 +896,7 @@ ALTER TABLE `teams`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=31;
 
 --
 -- AUTO_INCREMENT for table `wfh_schedules`
