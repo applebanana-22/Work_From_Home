@@ -212,7 +212,7 @@ class LeaderReportView(ctk.CTkFrame):
             text_color=("#000000", "#FFFFFF"),
             font=("Arial", 12)
         )
-        self.member_entry.pack(side="left", padx=(0, 16))
+        self.member_entry.pack(side="left", padx=(0, 8))
 
         # Action buttons
         def _btn(parent, text, color, hover, cmd, width=75):

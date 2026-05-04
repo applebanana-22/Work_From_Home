@@ -36,8 +36,8 @@ class DatePickerButton(ctk.CTkFrame):
         self.btn = ctk.CTkButton(
             self,
             text=self._fmt(),
-            width=170,
-            height=36,
+            width=120,
+            height=28,
             corner_radius=10,
             fg_color="#1E2A3A",
             hover_color="#2C3E50",
@@ -210,6 +210,15 @@ class LeaderOvertime(ctk.CTkFrame):
         self.user = user_data
         self.team_id = self.get_team_id()
         
+        # Automatic Theme Constants (Tuples) - like member_overtime.py
+        self.COLOR_CARD_BG = ("#FFFFFF", "#1E1E1E")
+        self.COLOR_BORDER = ("#DBDBDB", "#2C2C2C")
+        self.COLOR_TEXT_MAIN = ("#1A1A2A", "#E8EDF2")
+        self.COLOR_TEXT_SEC = ("#555555", "#AAB7C4")
+        self.COLOR_TEXT_TER = ("#777777", "#718096")
+        self.COLOR_SCROLL_BG = ("#F5F5F5", "#1A1A1A")
+        self.COLOR_CONTAINER_BG = ("#F0F0F0", "#252525")
+        
         # Initialize member and project maps
         self.member_map = {}
         self.project_map = {}
@@ -220,7 +229,7 @@ class LeaderOvertime(ctk.CTkFrame):
         
         # Create pages container with original side margins
         self.pages = ctk.CTkFrame(self, fg_color="transparent")
-        self.pages.grid(row=0, column=0, sticky="nsew", padx=120, pady=20)
+        self.pages.grid(row=0, column=0, sticky="nsew", padx=0, pady=20)
         self.pages.grid_rowconfigure(0, weight=1)
         self.pages.grid_columnconfigure(0, weight=1)
         
@@ -300,10 +309,11 @@ class LeaderOvertime(ctk.CTkFrame):
     def create_main_page(self):
         self.main_page = ctk.CTkFrame(self.pages, fg_color="transparent")
         self.main_page.grid_rowconfigure(2, weight=1)  # List frame
+        self.main_page.grid_columnconfigure(0, weight=1)
         
         # Header with original spacing
         header = ctk.CTkFrame(self.main_page, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=0, pady=15)
+        header.grid(row=0, column=0, sticky="ew", padx=80, pady=20)
 
         ctk.CTkLabel(
             header,
@@ -314,49 +324,54 @@ class LeaderOvertime(ctk.CTkFrame):
         ctk.CTkButton(
             header,
             text="+ Add Overtime",
-            fg_color="#2980B9",
-            hover_color="#1F618D",
+            fg_color="#10B981",
+            hover_color="#0E9769",
             height=40,
+            corner_radius=10,
             command=lambda: self.show_page("add")
         ).pack(side="right")
 
         # Filter section with original design
         filter_frame = ctk.CTkFrame(
             self.main_page,
-            fg_color="#1E1E1E",
+            fg_color=self.COLOR_CONTAINER_BG,
             corner_radius=12,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=self.COLOR_BORDER
         )
-        filter_frame.grid(row=1, column=0, sticky="ew", padx=0, pady=10)
+        filter_frame.grid(row=1, column=0, sticky="ew", padx=80, pady=(4, 10))
 
         # Load member and project data
         self.load_member_project_data()
         
         # Filter widgets with original layout
-        self.member_search = AutocompleteComboBox(
+        # --- Member Search Dropdown ---
+        self.member_search = ctk.CTkComboBox(
             filter_frame,
             values=self.member_names,
-            width=120,
-            placeholder_text="Member..."
+            width=120,              
+            corner_radius=10,
+            command=lambda v: self.load_data() 
         )
+        self.member_search.set("Member...") # Acts as placeholder
         self.member_search.pack(side="left", padx=(10, 5), pady=15)
 
-        self.project_search = AutocompleteComboBox(
+        self.project_search = ctk.CTkComboBox(
             filter_frame,
             values=self.project_names,
-            width=120,
-            placeholder_text="Project..."
+            width=120,             
+            corner_radius=10,
+            command=lambda v: self.load_data() 
         )
-        self.project_search.pack(side="left", padx=5)
+        self.project_search.set("Project...") # Acts as placeholder
+        self.project_search.pack(side="left", padx=(10, 5), pady=15)
 
-        self.status_filter = ctk.CTkOptionMenu(
+        self.status_filter = ctk.CTkComboBox(
             filter_frame,
-            values=["All", "Pending", "Accepted", "Approved", "Rejected", "Cancelled"],
+            values=["All", "Pending", "Accepted", "Rejected", "Cancelled"],
             width=100,
-            height=35,
-            fg_color="#2980B9",
-            button_color="#1F618D"
+            corner_radius=10,
+            command=lambda v: self.load_data()
         )
         self.status_filter.set("All")
         self.status_filter.pack(side="left", padx=5)
@@ -371,34 +386,38 @@ class LeaderOvertime(ctk.CTkFrame):
 
         ctk.CTkButton(
             btn_frame,
-            text="Search",
-            fg_color="#2980B9",
-            hover_color="#1F618D",
-            height=35,
-            width=70,
+            text="🔍 Filter",
+            width=80,
+            height=32,            # Matched height for alignment
+            corner_radius=14,      # Matched corner radius
+            font=("Arial", 12, "bold"),
+            fg_color="#2471A3",
+            hover_color="#1A5276",
             command=self.refresh_ui
         ).pack(side="right", padx=5)
 
         ctk.CTkButton(
             btn_frame,
-            text="Clear",
-            fg_color="#7F8C8D",
-            hover_color="#616A6B",
-            height=35,
-            width=70,
+            text="✖ Clear",
+            width=80,
+            height=32,
+            corner_radius=14,
+            font=("Arial", 12, "bold"),
+            fg_color="#566573",
+            hover_color="#424949",
             command=self.clear_filters
         ).pack(side="right", padx=5)
 
         # List frame with original design but improved height
         self.list_frame = ctk.CTkScrollableFrame(
             self.main_page,
-            fg_color="#121212",
+            fg_color=self.COLOR_SCROLL_BG,
             corner_radius=12,
             border_width=1,
-            border_color="#2A2A2A",
+            border_color=self.COLOR_BORDER,
             height=400  # Fixed height
         )
-        self.list_frame.grid(row=2, column=0, sticky="nsew", padx=0, pady=10)
+        self.list_frame.grid(row=2, column=0, sticky="nsew", padx=80, pady=(0, 10))
 
     def create_add_page(self):
         self.add_page = ctk.CTkFrame(self.pages, fg_color="transparent")
@@ -409,29 +428,31 @@ class LeaderOvertime(ctk.CTkFrame):
         back_btn = ctk.CTkButton(
             self.add_page,
             text="← Back to List",
-            fg_color="transparent",
-            hover_color="#2A2A2A",
+            text_color=("black", "white"),
+            width=100,
+            fg_color=("#DBDBDB", "#333333"), 
+            # hover_color="#2A2A2A",
             font=("Arial", 12),
             height=35,
             command=lambda: self.show_page("main")
         )
-        back_btn.grid(row=0, column=0, sticky="nw", padx=20, pady=(10, 0))
-
+        back_btn.grid(row=0, column=0, sticky="nw", padx=80, pady=(10, 0))
+        
         # Create scrollable container for the form
         self.add_scrollable = ctk.CTkScrollableFrame(
             self.add_page,
             fg_color="transparent"
         )
-        self.add_scrollable.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.add_scrollable.grid(row=1, column=0, sticky="nsew", padx=80, pady=10)
         self.add_scrollable.grid_columnconfigure(0, weight=1)
 
         # Form frame inside scrollable container
         form_frame = ctk.CTkFrame(
             self.add_scrollable,
-            fg_color="#1E1E1E",
+            fg_color=self.COLOR_CONTAINER_BG,
             corner_radius=15,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=self.COLOR_BORDER
         )
         form_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         form_frame.grid_columnconfigure(0, weight=1)
@@ -464,7 +485,16 @@ class LeaderOvertime(ctk.CTkFrame):
             anchor="w"
         ).grid(row=0, column=0, sticky="w", pady=(10, 5))
         
-        self.member_cb = AutocompleteComboBox(content_frame, self.member_names, width=350, placeholder_text="Select or search member...")
+        self.member_cb = ctk.CTkComboBox(
+            content_frame,
+            values=self.member_names,
+            width=350,
+            corner_radius=10,
+            fg_color=self.COLOR_CARD_BG,
+            # button_color="#1E2A3A",
+            # button_hover_color="#2C3E50"
+        )
+        self.member_cb.set("Select member...")
         self.member_cb.grid(row=1, column=0, sticky="ew", pady=(0, 15))
 
         # Project field
@@ -475,7 +505,16 @@ class LeaderOvertime(ctk.CTkFrame):
             anchor="w"
         ).grid(row=2, column=0, sticky="w", pady=(5, 5))
         
-        self.project_cb = AutocompleteComboBox(content_frame, self.project_names, width=350, placeholder_text="Select or search project...")
+        self.project_cb = ctk.CTkComboBox(
+            content_frame,
+            values=self.project_names,
+            width=350,
+            corner_radius=10,
+            fg_color=self.COLOR_CARD_BG,
+            # button_color="#1E2A3A",
+            # button_hover_color="#2C3E50"
+        )
+        self.project_cb.set("Select project...")
         self.project_cb.grid(row=3, column=0, sticky="ew", pady=(0, 15))
 
         # Date field - DO NOT allow past dates (allow_past=False)
@@ -486,8 +525,16 @@ class LeaderOvertime(ctk.CTkFrame):
             anchor="w"
         ).grid(row=4, column=0, sticky="w", pady=(5, 5))
         
-        self.date_ent = DatePickerButton(content_frame, initial_date=date.today(), allow_past=False)
-        self.date_ent.grid(row=5, column=0, sticky="ew", pady=(0, 15))
+        # self.date_ent = DatePickerButton(content_frame, initial_date=date.today(), allow_past=False)
+        # self.date_ent.grid(row=3, column=0, sticky="ew", pady=(0, 15))
+        self.date_ent = DatePickerButton(
+            content_frame,              # Using filter_frame for horizontal alignment
+            initial_date=date.today(), 
+            allow_past=False
+        )
+
+        # Align to the left with padding to separate it from the previous widget
+        self.date_ent.grid(row=5, column=0, sticky="w", padx=10, pady=(0, 15))
 
         # Hours field
         ctk.CTkLabel(
@@ -508,7 +555,7 @@ class LeaderOvertime(ctk.CTkFrame):
             anchor="w"
         ).grid(row=8, column=0, sticky="w", pady=(5, 5))
         
-        self.reason_ent = ctk.CTkTextbox(content_frame, height=120, fg_color="#2A2A2A", border_width=1, border_color="#3D5166")
+        self.reason_ent = ctk.CTkTextbox(content_frame, height=120, fg_color=self.COLOR_CARD_BG, border_width=1, border_color=self.COLOR_BORDER)
         self.reason_ent.grid(row=9, column=0, sticky="ew", pady=(0, 20))
 
         # Button frame
@@ -542,8 +589,16 @@ class LeaderOvertime(ctk.CTkFrame):
 
     def reset_add_form(self):
         """Reset the add form to default values"""
-        self.member_cb.entry.delete(0, "end")
-        self.project_cb.entry.delete(0, "end")
+        if hasattr(self.member_cb, 'entry'):
+            self.member_cb.entry.delete(0, "end")
+        else:
+            self.member_cb.set("Select member...")
+
+        if hasattr(self.project_cb, 'entry'):
+            self.project_cb.entry.delete(0, "end")
+        else:
+            self.project_cb.set("Select project...")
+
         self.date_ent.clear()
         self.date_ent._date = date.today()
         self.date_ent.btn.configure(text=f" 📅 {date.today().strftime('%Y-%m-%d')}")
@@ -625,29 +680,31 @@ class LeaderOvertime(ctk.CTkFrame):
         back_btn = ctk.CTkButton(
             self.edit_page,
             text="← Back to List",
-            fg_color="transparent",
-            hover_color="#2A2A2A",
+            text_color=("black", "white"),
+            width=100,
+            fg_color=("#DBDBDB", "#333333"), 
+            # hover_color="#2A2A2A",
             font=("Arial", 12),
             height=35,
             command=lambda: self.show_page("main")
         )
-        back_btn.grid(row=0, column=0, sticky="nw", padx=20, pady=(10, 0))
+        back_btn.grid(row=0, column=0, sticky="nw", padx=80, pady=(10, 0))
 
         # Create scrollable container for the form
         self.edit_scrollable = ctk.CTkScrollableFrame(
             self.edit_page,
             fg_color="transparent"
         )
-        self.edit_scrollable.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
+        self.edit_scrollable.grid(row=1, column=0, sticky="nsew", padx=80, pady=10)
         self.edit_scrollable.grid_columnconfigure(0, weight=1)
 
         # Form frame inside scrollable container
         self.edit_form = ctk.CTkFrame(
             self.edit_scrollable,
-            fg_color="#1E1E1E",
+            fg_color=self.COLOR_CONTAINER_BG,
             corner_radius=15,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=self.COLOR_BORDER
         )
         self.edit_form.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
 
@@ -738,13 +795,13 @@ class LeaderOvertime(ctk.CTkFrame):
         reason_display = ctk.CTkTextbox(
             content_frame,
             height=100,
-            fg_color="#2A2A2A",
-            state="disabled",
+            fg_color=self.COLOR_CARD_BG,
             border_width=1,
-            border_color="#3D5166"
+            border_color=self.COLOR_BORDER
         )
         reason_display.grid(row=5, column=0, sticky="ew", pady=(0, 15))
         reason_display.insert("1.0", row['reason'] or "-")
+        reason_display.configure(state="disabled")
 
         # Show rejection reason if exists
         if row.get('rejected_reason') and row['rejected_reason'].strip():
@@ -758,13 +815,13 @@ class LeaderOvertime(ctk.CTkFrame):
             reject_display = ctk.CTkTextbox(
                 content_frame,
                 height=80,
-                fg_color="#2A1A1A",
-                state="disabled",
+                fg_color=self.COLOR_TEXT_SEC,
                 border_width=1,
-                border_color="#5C3A3A"
+                border_color=self.COLOR_BORDER
             )
             reject_display.grid(row=7, column=0, sticky="ew", pady=(0, 15))
             reject_display.insert("1.0", row['rejected_reason'])
+            reject_display.configure(state="disabled")
 
         # Only show edit fields if status is Pending and date is not past
         if row['status'] == 'Pending':
@@ -848,16 +905,18 @@ class LeaderOvertime(ctk.CTkFrame):
             btn_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
             btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(20, 25))
             
-            ctk.CTkButton(
-                btn_frame,
-                text="Back to List",
-                fg_color="#2980B9",
-                hover_color="#1F618D",
-                height=40,
-                width=120,
-                font=("Arial", 13),
-                command=lambda: self.show_page("main")
-            ).pack(pady=10)
+            
+        # ctk.CTkButton(
+        #     btn_frame,
+        #     text="← Back to List",
+        #     width=80,
+        #     fg_color=("#DBDBDB", "#333333"),   # light/dark adaptive colors
+        #     text_color=("black", "white"),     # adaptive text colors
+        #     hover_color="#616A6B",             # subtle hover effect
+        #     font=("Arial", 13),
+        #     command=lambda: self.show_page("main")
+        # ).pack(side="left", padx=10, pady=10)
+
 
     def update_overtime(self, ot_id):
         """Update the overtime record"""
@@ -882,9 +941,12 @@ class LeaderOvertime(ctk.CTkFrame):
 
     def clear_filters(self):
         """Clear all filter fields"""
-        self.member_search.entry.delete(0, "end")
-        self.project_search.entry.delete(0, "end")
-        self.date_filter.clear()
+        self.member_search.set("Member...") 
+        self.project_search.set("Project...")
+        if hasattr(self.date_filter, 'clear'):
+            self.date_filter.clear()
+        else:
+            self.date_filter.delete(0, "end")
         self.status_filter.set("All")
         self.refresh_ui()
 
@@ -905,17 +967,17 @@ class LeaderOvertime(ctk.CTkFrame):
 
         # Apply filters
         member = self.member_search.get().strip()
-        if member:
+        if member and member != "Member...":
             query += " AND u.full_name LIKE %s"
             params.append(f"%{member}%")
 
         project = self.project_search.get().strip()
-        if project:
+        if project and project != "Project...":
             query += " AND p.project_name LIKE %s"
             params.append(f"%{project}%")
 
         status = self.status_filter.get()
-        if status != "All":
+        if status and status not in ["All", "Status..."]:
             query += " AND o.status = %s"
             params.append(status)
 
@@ -944,9 +1006,9 @@ class LeaderOvertime(ctk.CTkFrame):
             card = ctk.CTkFrame(
                 self.list_frame,
                 corner_radius=12,
-                fg_color="#1E1E1E",
+                fg_color=self.COLOR_CONTAINER_BG,
                 border_width=1,
-                border_color="#2A2A2A"
+                border_color=self.COLOR_BORDER
             )
             card.pack(fill="x", padx=15, pady=10)
 
@@ -994,7 +1056,7 @@ class LeaderOvertime(ctk.CTkFrame):
 
             # Show warning if pending and overdue
             if row['status'] == 'Pending' and row['ot_date'] < date.today():
-                warning_frame = ctk.CTkFrame(left, fg_color="#5C3A3A", corner_radius=6)
+                warning_frame = ctk.CTkFrame(left, fg_color=self.COLOR_TEXT_SEC, corner_radius=6)
                 warning_frame.pack(fill="x", pady=(5, 0))
                 
                 ctk.CTkLabel(
@@ -1019,7 +1081,7 @@ class LeaderOvertime(ctk.CTkFrame):
             # Show rejection reason if status is Rejected
             if row['status'] == 'Rejected' and row.get('rejected_reason') and row['rejected_reason'].strip():
                 reject_text = row['rejected_reason'][:100] + "..." if len(row['rejected_reason']) > 100 else row['rejected_reason']
-                reject_frame = ctk.CTkFrame(left, fg_color="#3D1E1E", corner_radius=6)
+                reject_frame = ctk.CTkFrame(left, fg_color=self.COLOR_TEXT_TER, corner_radius=6)
                 reject_frame.pack(fill="x", pady=(5, 0))
                 
                 ctk.CTkLabel(
@@ -1037,7 +1099,7 @@ class LeaderOvertime(ctk.CTkFrame):
             # Modern Status Badge
             status_config = {
                 "Pending": {"color": "#F39C12", "bg": "#3D2E1A", "icon": "⏳", "text": "Pending"},
-                "Accepted": {"color": "#27AE60", "bg": "#1A3D2A", "icon": "✅", "text": "Accepted"},
+                "Accepted": {"color": "#27AE60", "bg": "#1A3D2A", "icon": "✓", "text": "Accepted"},
                 "Approved": {"color": "#2ECC71", "bg": "#1A4D2A", "icon": "✓", "text": "Approved"},
                 "Rejected": {"color": "#E74C3C", "bg": "#4A1A1A", "icon": "✗", "text": "Rejected"},
                 "Cancelled": {"color": "#95A5A6", "bg": "#2A3A3A", "icon": "⊗", "text": "Cancelled"}
@@ -1075,10 +1137,11 @@ class LeaderOvertime(ctk.CTkFrame):
                 delete_btn = ctk.CTkButton(
                     action_frame,
                     text="Delete",
-                    width=80,
-                    height=32,
-                    fg_color="#C0392B",
-                    hover_color="#A93226",
+                    width=60,
+                    height=30,
+                    corner_radius=14,
+                    fg_color="#E74C3C",
+                    hover_color="#C0392B",
                     font=("Arial", 11),
                     command=lambda id=row['id']: self.delete_request(id)
                 )
@@ -1090,10 +1153,11 @@ class LeaderOvertime(ctk.CTkFrame):
                     edit_btn = ctk.CTkButton(
                         action_frame,
                         text="Edit",
-                        width=80,
-                        height=32,
-                        fg_color="#2980B9",
-                        hover_color="#1F618D",
+                        width=60,
+                        height=30,
+                        corner_radius=14,
+                        fg_color="#F39C12",
+                        hover_color="#D68910",
                         font=("Arial", 11),
                         command=lambda r=row: self.edit_request(r)
                     )
@@ -1102,7 +1166,7 @@ class LeaderOvertime(ctk.CTkFrame):
                     # Show warning for overdue pending
                     overdue_badge = ctk.CTkFrame(
                         action_frame,
-                        fg_color="#4A1A1A",
+                        fg_color=self.COLOR_TEXT_SEC,
                         corner_radius=12,
                         height=25,
                         width=80

@@ -8,6 +8,15 @@ class MemberOvertime(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.db = Database()
         self.user = user  # Login ဝင်ထားသော Member data
+        
+        # Automatic Theme Constants (Tuples) - matching member_report.py
+        self.COLOR_CARD_BG = ("#FFFFFF", "#1E1E1E")
+        self.COLOR_BORDER = ("#DBDBDB", "#2C2C2C")
+        self.COLOR_TEXT_MAIN = ("#1A1A2A", "#E8EDF2")
+        self.COLOR_TEXT_SEC = ("#555555", "#AAB7C4")
+        self.COLOR_TEXT_TER = ("#777777", "#718096")
+        self.COLOR_SCROLL_BG = ("#F5F5F5", "#1A1A1A")
+        self.COLOR_CONTAINER_BG = ("#F0F0F0", "#252525")
 
         # Configure grid
         self.grid_rowconfigure(0, weight=0)  # Header
@@ -17,12 +26,13 @@ class MemberOvertime(ctk.CTkFrame):
 
         # --- Header ---
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=120, pady=20)
+        header.grid(row=0, column=0, sticky="ew", padx=80, pady=20)
         
         ctk.CTkLabel(
             header, 
             text="Overtime Management", 
-            font=("Arial", 22, "bold")
+            font=("Arial", 20, "bold"),
+            text_color=self.COLOR_TEXT_MAIN
         ).pack(side="left")
 
         # --- Segmented Button for Tab Selection ---
@@ -31,37 +41,37 @@ class MemberOvertime(ctk.CTkFrame):
             values=["📋 Pending Requests", "📜 History"],
             command=self.on_tab_change,
             font=("Arial", 13, "bold"),
-            fg_color="#1E1E1E",
-            selected_color="#2B5B84",
-            unselected_color="#333333",
-            text_color="white",
+            fg_color=self.COLOR_CONTAINER_BG,
+            selected_color=("#3498DB", "#1F538D"),
+            unselected_color=self.COLOR_CARD_BG,
+            text_color=self.COLOR_TEXT_MAIN,
             corner_radius=12,
             height=40
         )
-        self.segmented_btn.grid(row=1, column=0, sticky="ew", padx=120, pady=10)
+        self.segmented_btn.grid(row=1, column=0, sticky="ew", padx=80, pady=10)
         self.segmented_btn.set("📋 Pending Requests")  # Set default tab
 
         # --- Content Frame (changes based on selected tab) ---
         self.content_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.content_frame.grid(row=2, column=0, sticky="nsew", padx=120, pady=10)
+        self.content_frame.grid(row=2, column=0, sticky="nsew", padx=80, pady=10)
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(0, weight=1)
 
         # Create scrollable frames for both tabs
         self.pending_frame = ctk.CTkScrollableFrame(
             self.content_frame,
-            fg_color="#121212",
+            fg_color=self.COLOR_SCROLL_BG,
             corner_radius=12,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=self.COLOR_BORDER
         )
         
         self.history_frame = ctk.CTkScrollableFrame(
             self.content_frame,
-            fg_color="#121212",
+            fg_color=self.COLOR_SCROLL_BG,
             corner_radius=12,
             border_width=1,
-            border_color="#2A2A2A"
+            border_color=self.COLOR_BORDER
         )
 
         # Initial data load
@@ -116,7 +126,7 @@ class MemberOvertime(ctk.CTkFrame):
                 ctk.CTkLabel(
                     self.pending_frame, 
                     text="✨ No pending requests from leader.",
-                    text_color="gray",
+                    text_color=self.COLOR_TEXT_SEC,
                     font=("Arial", 14)
                 ).pack(expand=True, fill="both", pady=50)
                 return
@@ -129,16 +139,16 @@ class MemberOvertime(ctk.CTkFrame):
                 count_frame,
                 text=f"📬 You have {len(rows)} pending request(s)",
                 font=("Arial", 12, "bold"),
-                text_color="#3498DB"
+                text_color=self.COLOR_TEXT_MAIN
             ).pack(anchor="w")
 
             for r in rows:
                 card = ctk.CTkFrame(
                     self.pending_frame,
-                    fg_color=("#2B2B2B", "#1E1E1E"),
+                    fg_color=self.COLOR_CARD_BG,
                     corner_radius=10,
                     border_width=1,
-                    border_color="#3D5166"
+                    border_color=self.COLOR_BORDER
                 )
                 card.pack(fill="x", pady=8, padx=10)
 
@@ -154,14 +164,14 @@ class MemberOvertime(ctk.CTkFrame):
                     top_row,
                     text=f"📁 {r['project_name']}",
                     font=("Arial", 13, "bold"),
-                    text_color="#4A90E2"
+                    text_color=self.COLOR_TEXT_MAIN
                 ).pack(side="left")
                 
                 ctk.CTkLabel(
                     top_row,
                     text=f"📅 {r['ot_date']}",
                     font=("Arial", 11),
-                    text_color="gray"
+                    text_color=self.COLOR_TEXT_SEC
                 ).pack(side="right")
 
                 # Hours and Details
@@ -171,25 +181,27 @@ class MemberOvertime(ctk.CTkFrame):
                 ctk.CTkLabel(
                     details_frame,
                     text=f"⏳ Duration: {r['hours']} hours",
-                    font=("Arial", 12)
+                    font=("Arial", 12),
+                    text_color=self.COLOR_TEXT_MAIN
                 ).pack(anchor="w")
 
                 # Leader's reason
                 if r['reason'] and r['reason'].strip():
-                    reason_frame = ctk.CTkFrame(content_frame, fg_color=("#252525", "#2A2A2A"), corner_radius=6)
+                    reason_frame = ctk.CTkFrame(content_frame, fg_color=self.COLOR_CONTAINER_BG, corner_radius=6)
                     reason_frame.pack(fill="x", pady=(8, 0))
                     
                     ctk.CTkLabel(
                         reason_frame,
                         text="💬 Leader's Request:",
                         font=("Arial", 11, "bold"),
-                        text_color="#F39C12"
+                        text_color=("#F39C12", "#F39C12")
                     ).pack(anchor="w", padx=10, pady=(5, 0))
                     
                     ctk.CTkLabel(
                         reason_frame,
                         text=r['reason'],
                         font=("Arial", 11),
+                        text_color=self.COLOR_TEXT_SEC,
                         wraplength=550,
                         justify="left"
                     ).pack(anchor="w", padx=10, pady=(0, 5))
@@ -197,28 +209,29 @@ class MemberOvertime(ctk.CTkFrame):
                 # Buttons
                 btn_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
                 btn_frame.pack(fill="x", pady=(12, 0))
-                
-                ctk.CTkButton(
-                    btn_frame, 
-                    text="✓ Accept", 
-                    width=100,
-                    height=35,
-                    fg_color="#27AE60", 
-                    hover_color="#1E8449",
-                    font=("Arial", 12, "bold"),
-                    command=lambda id=r['id']: self.update_status(id, 'Accepted')
+
+                def _btn(text, color, hover, cmd, width=60, height=30, corner_radius=14):
+                    return ctk.CTkButton(
+                        btn_frame,
+                        text=text,
+                        width=width,
+                        height=height,
+                        corner_radius=corner_radius,
+                        fg_color=color,
+                        hover_color=hover,
+                        font=("Arial", 12, "bold"),
+                        text_color="white",
+                        command=cmd
+                    )
+
+                _btn("✓ Accept", "#27AE60", "#1E8449", 
+                    lambda id=r['id']: self.update_status(id, 'Accepted')
                 ).pack(side="left", padx=(0, 10))
-                
-                ctk.CTkButton(
-                    btn_frame, 
-                    text="✗ Reject", 
-                    width=100,
-                    height=35,
-                    fg_color="#E74C3C", 
-                    hover_color="#C0392B",
-                    font=("Arial", 12, "bold"),
-                    command=lambda id=r['id']: self.handle_reject(id)
+
+                _btn("✗ Reject", "#E74C3C", "#C0392B", 
+                    lambda id=r['id']: self.handle_reject(id)
                 ).pack(side="left")
+
 
         except Exception as e:
             print(f"Error loading pending requests: {e}")
@@ -244,7 +257,7 @@ class MemberOvertime(ctk.CTkFrame):
                 ctk.CTkLabel(
                     self.history_frame, 
                     text="📭 No overtime history yet.",
-                    text_color="gray",
+                    text_color=self.COLOR_TEXT_SEC,
                     font=("Arial", 14)
                 ).pack(expand=True, fill="both", pady=50)
                 return
@@ -257,25 +270,25 @@ class MemberOvertime(ctk.CTkFrame):
                 count_frame,
                 text=f"📊 Total records: {len(rows)}",
                 font=("Arial", 12, "bold"),
-                text_color="#3498DB"
+                text_color=self.COLOR_TEXT_MAIN
             ).pack(anchor="w")
 
             for r in rows:
                 card = ctk.CTkFrame(
                     self.history_frame, 
-                    fg_color=("#252525", "#1E1E1E"), 
+                    fg_color=self.COLOR_CARD_BG, 
                     corner_radius=10,
                     border_width=1,
-                    border_color="#3D5166"
+                    border_color=self.COLOR_BORDER
                 )
                 card.pack(fill="x", pady=8, padx=10)
 
                 status_colors = {
-                    "Accepted": "#27AE60", 
-                    "Rejected": "#E74C3C", 
-                    "Approved": "#2980B9"
+                    "Accepted": self.COLOR_TEXT_MAIN, 
+                    "Rejected": ("#E74C3C", "#E74C3C"), 
+                    "Approved": ("#2980B9", "#2980B9")
                 }
-                s_color = status_colors.get(r['status'], "gray")
+                s_color = status_colors.get(r['status'], self.COLOR_TEXT_SEC)
 
                 # Content
                 content_frame = ctk.CTkFrame(card, fg_color="transparent")
@@ -289,7 +302,8 @@ class MemberOvertime(ctk.CTkFrame):
                 ctk.CTkLabel(
                     top_row, 
                     text=left_info, 
-                    font=("Arial", 12)
+                    font=("Arial", 12),
+                    text_color=self.COLOR_TEXT_MAIN
                 ).pack(side="left")
                 
                 ctk.CTkLabel(
@@ -301,40 +315,42 @@ class MemberOvertime(ctk.CTkFrame):
 
                 # Show Leader's Original Reason
                 if r['reason'] and r['reason'].strip():
-                    reason_frame = ctk.CTkFrame(content_frame, fg_color=("#2B2B2B", "#2A2A2A"), corner_radius=6)
+                    reason_frame = ctk.CTkFrame(content_frame, fg_color=self.COLOR_CONTAINER_BG, corner_radius=6)
                     reason_frame.pack(fill="x", pady=(8, 0))
                     
                     ctk.CTkLabel(
                         reason_frame,
                         text="📋 Leader's Reason:",
                         font=("Arial", 11, "bold"),
-                        text_color="#3498DB"
+                        text_color=self.COLOR_TEXT_MAIN
                     ).pack(anchor="w", padx=10, pady=(5, 0))
                     
                     ctk.CTkLabel(
                         reason_frame,
                         text=r['reason'],
                         font=("Arial", 11),
+                        text_color=self.COLOR_TEXT_SEC,
                         wraplength=550,
                         justify="left"
                     ).pack(anchor="w", padx=10, pady=(0, 5))
 
                 # Show Member's Rejection Reason (if rejected)
                 if r['status'] == 'Rejected' and r.get('rejected_reason') and r['rejected_reason'].strip():
-                    reject_frame = ctk.CTkFrame(content_frame, fg_color=("#3D1E1E", "#2B1010"), corner_radius=6)
+                    reject_frame = ctk.CTkFrame(content_frame, fg_color=("#F8E6E6", "#3D1E1E"), corner_radius=6)
                     reject_frame.pack(fill="x", pady=(5, 0))
                     
                     ctk.CTkLabel(
                         reject_frame,
                         text="❌ Your Rejection Reason:",
                         font=("Arial", 11, "bold"),
-                        text_color="#E74C3C"
+                        text_color=("#E74C3C", "#E74C3C")
                     ).pack(anchor="w", padx=10, pady=(5, 0))
                     
                     ctk.CTkLabel(
                         reject_frame,
                         text=r['rejected_reason'],
                         font=("Arial", 11),
+                        text_color=self.COLOR_TEXT_SEC,
                         wraplength=550,
                         justify="left"
                     ).pack(anchor="w", padx=10, pady=(0, 5))
@@ -344,17 +360,59 @@ class MemberOvertime(ctk.CTkFrame):
             messagebox.showerror("Error", f"Could not load history: {e}")
 
     def handle_reject(self, ot_id):
-        """Handle reject action with reason input"""
-        reason = simpledialog.askstring(
-            "Reject Overtime", 
-            "Please provide reason for rejection:", 
-            parent=self
-        )
-        
-        if reason and reason.strip():
-            self.update_status(ot_id, 'Rejected', reason.strip())
-        elif reason == "":
-            messagebox.showwarning("Warning", "Reason is required to reject.")
+        """Handle reject action with reason input (styled popup)"""
+        popup = ctk.CTkToplevel(self)
+        popup.title("Reject Overtime")
+        popup.geometry("400x250")
+        popup.grab_set()
+
+        ctk.CTkLabel(
+            popup, 
+            text="Please provide reason for rejection:", 
+            font=("Arial", 14, "bold")
+        ).pack(pady=(15, 10))
+
+        reason_box = ctk.CTkTextbox(popup, height=100)
+        reason_box.pack(fill="x", padx=20)
+
+        def confirm():
+            reason = reason_box.get("0.0", "end").strip()
+            if reason:
+                self.update_status(ot_id, 'Rejected', reason)
+                popup.destroy()
+            else:
+                messagebox.showwarning("Warning", "Reason is required to reject.")
+
+        def cancel():
+            popup.destroy()
+
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame.pack(pady=15)
+
+        ctk.CTkButton(
+            btn_frame, 
+            text="✓ Confirm", 
+            width=60, 
+            height=30,
+            corner_radius=14,
+            fg_color="#E74C3C", 
+            hover_color="#C0392B", 
+            text_color="white", 
+            command=confirm
+        ).pack(side="left", padx=10)
+
+        ctk.CTkButton(
+            btn_frame, 
+            text="✗ Cancel", 
+            width=60, 
+            height=30,
+            corner_radius=14,
+            fg_color="#95A5A6", 
+            hover_color="#7F8C8D", 
+            text_color="white", 
+            command=cancel
+        ).pack(side="left", padx=10)
+
 
     def update_status(self, ot_id, new_status, member_note=None):
         """Update request status in database"""

@@ -173,7 +173,7 @@ class MemberReportFrame(ctk.CTkFrame):
             ctk.CTkLabel(info, text=date, font=("Arial", 13, "bold"), text_color=self.COLOR_TEXT_MAIN).pack(anchor="w")
             ctk.CTkLabel(info, text=f"Total: {total_hours}h", font=("Arial", 11), text_color=self.COLOR_TEXT_SEC).pack(anchor="w")
             
-            summary = f"{len(rows)} tasks" if len(rows) > 1 else rows[0]['tasks']
+            summary = f"{len(rows)} task" if len(rows) == 1 else f"{len(rows)} tasks"
             ctk.CTkLabel(info, text=summary, font=("Arial", 11), text_color=self.COLOR_TEXT_TER).pack(anchor="w")
 
             btn_frame = ctk.CTkFrame(card, fg_color="transparent")
@@ -183,8 +183,8 @@ class MemberReportFrame(ctk.CTkFrame):
                 return ctk.CTkButton(btn_frame, text=text, width=60, height=30, corner_radius=8,
                                     fg_color=color, hover_color=hover, command=cmd)
 
-            _btn("View", "#1f538d", "#174a7a", lambda d=date: self.show_detail_view(d)).pack(side="left", padx=4)
-            _btn("Edit", "#F39C12", "#D68910", lambda d=date: self.edit_report(d)).pack(side="left", padx=4)
+            _btn("View", "#1f538d", "#174a7a", lambda d=date: (self.save_filter_state(), self.show_detail_view(d))).pack(side="left", padx=4)
+            _btn("Edit", "#F39C12", "#D68910",lambda d=date: (self.save_filter_state(), self.edit_report(d))).pack(side="left", padx=4)
             _btn("Delete", "#E74C3C", "#C0392B", lambda d=date: self.delete_report(d)).pack(side="left", padx=4)
 
     def show_history_view(self):  
@@ -233,30 +233,70 @@ class MemberReportFrame(ctk.CTkFrame):
         self.clear_view()
         self.report_rows = []
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=80, pady=20)
+        header.pack(fill="x", padx=80, pady=(10, 10))
 
+        # --- Row 1: Back button ---
         top_bar = ctk.CTkFrame(header, fg_color="transparent")
-        top_bar.pack(fill="x")
-        ctk.CTkButton(top_bar, text="← Back", width=80, fg_color=("#DBDBDB", "#333333"), text_color=("black", "white"), command=self.show_history_view).pack(side="left")
-        self.stats_lbl = ctk.CTkLabel(top_bar, text="Total: 0.0 / 8.0 Hours", font=("Arial", 16, "bold"), text_color="#F1C40F")
-        self.stats_lbl.pack(side="right")
+        top_bar.pack(fill="x", padx=10)
 
+        ctk.CTkButton(
+            top_bar,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            command=self.show_history_view
+        ).pack(side="left")
+
+
+        # --- Row 2: Date button (below back) ---
+        date_row = ctk.CTkFrame(header, fg_color="transparent")
+        date_row.pack(fill="x", padx=10, pady=(6, 4))
+
+        self.date_picker = DatePickerButton(
+            date_row,
+            initial_date=datetime.today().date()
+        )
+        self.date_picker.pack(side="left")
+
+
+        # --- Row 3: Progress bar + Total ---
         progress_frame = ctk.CTkFrame(header, fg_color="transparent")
-        progress_frame.pack(fill="x", pady=(8, 0))
-        self.progress = ctk.CTkProgressBar(progress_frame, height=10, progress_color="#10B981")
+        progress_frame.pack(fill="x", padx=10, pady=(4, 6))
+
+        self.progress = ctk.CTkProgressBar(
+            progress_frame,
+            height=10,
+            progress_color="#10B981"
+        )
         self.progress.set(0)
         self.progress.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self.date_picker = DatePickerButton(progress_frame, initial_date=datetime.today().date())
-        self.date_picker.pack(side="right")
+
+        self.stats_lbl = ctk.CTkLabel(
+            progress_frame,
+            text="Total: 0.0 / 8.0 Hours",
+            font=("Arial", 16, "bold"),
+            text_color="#F1C40F"
+        )
+        self.stats_lbl.pack(side="right")
 
         self.form_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", height=380)
         self.form_scroll.pack(fill="both", expand=True, padx=80, pady=10)
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(fill="x", padx=80, pady=(0, 20))
-        self.save_btn = ctk.CTkButton(footer, text="Save & Submit", width=180, height=40, corner_radius=10, 
-                                     fg_color="#1f538d", hover_color="#174a7a", command=self.save_all_reports)
-        self.save_btn.pack(side="right")
+        self.save_btn = ctk.CTkButton(
+            footer,
+            text="Save",
+            width=110,
+            height=32,
+            corner_radius=8,
+            font=("Arial", 12, "bold"),
+            fg_color="#1f538d",
+            hover_color="#174a7a",
+            command=self.save_all_reports
+        )
+        self.save_btn.pack(side="right", padx=10)
        
         self.add_btn = ctk.CTkButton(self.form_scroll, text="＋ Add More Tasks", fg_color="transparent", 
                                      border_width=1, border_color="#10B981", text_color="#10B981", command=self.add_item_row)
@@ -335,7 +375,16 @@ class MemberReportFrame(ctk.CTkFrame):
         self.clear_view()
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=80, pady=20)
-        ctk.CTkButton(top, text="← Back", command=self.show_history_view).pack(side="left")
+        ctk.CTkButton(
+            top,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            command=self.show_history_view
+        ).pack(side="left")
         ctk.CTkLabel(top, text=f"Details - {date}", font=("Arial", 20, "bold"), text_color=("black", "white")).pack(side="left", padx=20)
         scroll = ctk.CTkScrollableFrame(self, fg_color=self.COLOR_SCROLL_BG)
         scroll.pack(fill="both", expand=True, padx=80, pady=10)
@@ -353,7 +402,16 @@ class MemberReportFrame(ctk.CTkFrame):
         self.report_rows = []
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=80, pady=20)
-        ctk.CTkButton(top, text="← Back", command=self.show_history_view).pack(side="left")
+        ctk.CTkButton(
+            top,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            command=self.show_history_view
+        ).pack(side="left")
         ctk.CTkLabel(top, text=f"Edit Report - {date}", font=("Arial", 20, "bold"), text_color=("black", "white")).pack(side="left", padx=20)
  
         progress_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -377,8 +435,17 @@ class MemberReportFrame(ctk.CTkFrame):
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(fill="x", padx=80, pady=(0, 20))
-        ctk.CTkButton(footer, text="Update Report", width=180, height=40, corner_radius=10, fg_color="#F39C12", command=lambda: self.update_report(date)).pack(side="right")
-
+        ctk.CTkButton(
+            footer,
+            text="Update",
+            width=110,
+            height=32,
+            corner_radius=8,
+            font=("Arial", 12, "bold"),
+            fg_color="#F39C12",
+            hover_color="#D68910",
+            command=lambda: self.update_report(date)
+        ).pack(side="right", padx=10)
     def add_item_row_with_data(self, data):
         container = ctk.CTkFrame(self.form_scroll, fg_color=self.COLOR_CONTAINER_BG, corner_radius=10)
         container.pack(fill="x", pady=8, padx=5)
@@ -472,3 +539,8 @@ class MemberReportFrame(ctk.CTkFrame):
                 pdf.output(file_path)
                 messagebox.showinfo("Success", "PDF exported!")
         except Exception as e: messagebox.showerror("Export Error", str(e))
+        
+    def save_filter_state(self):
+        if hasattr(self, "start_cal") and hasattr(self, "end_cal"):
+            self.start_date = self.start_cal.get_date()
+            self.end_date = self.end_cal.get_date()
