@@ -337,7 +337,16 @@ class LeaderReportView(ctk.CTkFrame):
         top = ctk.CTkFrame(self.container, fg_color="transparent")
         top.pack(fill="x", padx=content_padx, pady=14)
 
-        ctk.CTkButton(top, text="← Back", command=self.back_to_list).pack(side="left")
+        ctk.CTkButton(
+            top,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            command=self.back_to_list
+        ).pack(side="left")
         ctk.CTkLabel(top, text=f"{member_name} - {date_val}", font=("Arial", 20, "bold"), text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20)
 
         scroll = ctk.CTkScrollableFrame(self.container, fg_color=("#EEEEEE", "#1A1A1A"), corner_radius=14, border_width=1, border_color=("#DDDDDD", "#2C2C2C"))

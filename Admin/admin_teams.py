@@ -22,12 +22,17 @@ class AdminTeams(ctk.CTkFrame):
         self.edit_mode = False
         self.edit_team_id = None
 
+        # ================= SAME BG COLOR =================
+
+        self.section_bg = ("#E5E7EB", "#1E1E1E")
+
         # ================= HEADER =================
 
         self.header_frame = ctk.CTkFrame(
             self,
             fg_color="transparent"
         )
+
         self.header_frame.pack(
             fill="x",
             padx=80,
@@ -48,62 +53,16 @@ class AdminTeams(ctk.CTkFrame):
             hover_color="#0E9A6B",
             command=self.toggle_form
         )
+
         self.add_btn.pack(side="right")
 
-        # ================= TABLE CONTAINER =================
-
-        self.table_container = ctk.CTkFrame(
-            self,
-            fg_color="transparent"
-        )
-
-        self.table_container.pack(
-            fill="both",
-            expand=True,
-            padx=80,
-            pady=20
-        )
-
-        # ================= SCROLLABLE TEAM LIST =================
-
-        self.table_frame = ctk.CTkScrollableFrame(
-            self.table_container,
-
-            label_text="Active Teams",
-
-            # MAIN BG
-            fg_color=("#E5E7EB", "#1E1E1E"),
-
-            # HEADER BG
-            label_fg_color=("#D1D5DB", "#2B2B2B"),
-
-            # HEADER TEXT
-            label_text_color=("black", "white"),
-
-            corner_radius=12
-        )
-
-        self.table_frame.pack(
-            fill="both",
-            expand=True
-        )
-
-        self.load_teams()
-
-    # =========================================================
-    # TOGGLE FORM
-    # =========================================================
-
-    def toggle_form(self):
-
-        if self.form_visible:
-            self.reset_form()
-            return
+        # ================= FORM FRAME =================
 
         self.form_frame = ctk.CTkFrame(
             self,
 
-            fg_color=("#F9FAFB", "#1E1E1E"),
+            # SAME COLOR
+            fg_color=self.section_bg,
 
             corner_radius=12,
 
@@ -134,7 +93,7 @@ class AdminTeams(ctk.CTkFrame):
 
             height=40,
 
-            fg_color=("#FFFFFF", "#2B2B2B"),
+            fg_color=("white", "#2B2B2B"),
 
             text_color=("black", "white"),
 
@@ -184,7 +143,53 @@ class AdminTeams(ctk.CTkFrame):
 
         self.save_team_btn.pack(side="right")
 
-        # SHOW FORM
+        # ================= TABLE CONTAINER =================
+
+        self.table_container = ctk.CTkFrame(
+            self,
+            fg_color="transparent"
+        )
+
+        self.table_container.pack(
+            fill="both",
+            expand=True,
+            padx=80,
+            pady=20
+        )
+
+        # ================= SCROLLABLE TEAM LIST =================
+
+        self.table_frame = ctk.CTkScrollableFrame(
+            self.table_container,
+
+            label_text="Active Teams",
+
+            # SAME COLOR
+            fg_color=self.section_bg,
+
+            label_fg_color=("#D1D5DB", "#2B2B2B"),
+
+            label_text_color=("black", "white"),
+
+            corner_radius=12
+        )
+
+        self.table_frame.pack(
+            fill="both",
+            expand=True
+        )
+
+        self.load_teams()
+
+    # =========================================================
+    # TOGGLE FORM
+    # =========================================================
+
+    def toggle_form(self):
+
+        if self.form_visible:
+            self.reset_form()
+            return
 
         self.form_frame.pack(
             after=self.header_frame,
@@ -201,8 +206,9 @@ class AdminTeams(ctk.CTkFrame):
 
     def reset_form(self):
 
-        if hasattr(self, "form_frame"):
-            self.form_frame.destroy()
+        self.form_frame.pack_forget()
+
+        self.team_name_entry.delete(0, "end")
 
         self.edit_mode = False
         self.edit_team_id = None
@@ -218,16 +224,12 @@ class AdminTeams(ctk.CTkFrame):
 
         pattern = r"^[A-Z](?=.*\d).{3,}$"
 
-        # EMPTY
-
         if not team_name:
             messagebox.showwarning(
                 "Input Error",
                 "Team name cannot be empty."
             )
             return
-
-        # VALIDATION
 
         if not re.match(pattern, team_name):
 
@@ -240,7 +242,7 @@ class AdminTeams(ctk.CTkFrame):
 
         try:
 
-            # ================= UPDATE =================
+            # UPDATE
 
             if self.edit_mode:
 
@@ -254,7 +256,7 @@ class AdminTeams(ctk.CTkFrame):
                         "Team updated!"
                     )
 
-            # ================= CREATE =================
+            # CREATE
 
             else:
 
@@ -288,14 +290,10 @@ class AdminTeams(ctk.CTkFrame):
 
     def load_teams(self):
 
-        # CLEAR OLD ROWS
-
         for widget in self.table_frame.winfo_children():
             widget.destroy()
 
         teams = self.db.get_all_teams()
-
-        # ================= EMPTY STATE =================
 
         if not teams:
 
