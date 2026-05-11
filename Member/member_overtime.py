@@ -415,26 +415,38 @@ class MemberOvertime(ctk.CTkFrame):
 
 
     def update_status(self, ot_id, new_status, member_note=None):
-        """Update request status in database"""
+        """Permanent Fix: Updates status and triggers Leader notification badge"""
         try:
+            # 1. Update the Overtime Request itself
             if member_note:
-                sql = """
-                UPDATE overtime_requests 
-                SET status = %s, 
-                    rejected_reason = %s
-                WHERE id = %s
-                """
+                sql = "UPDATE overtime_requests SET status = %s, rejected_reason = %s WHERE id = %s"
                 self.db.cursor.execute(sql, (new_status, member_note, ot_id))
+                # MUST use lowercase 'overtime' to trigger leader_menu.py badge logic
+                msg = f"overtime request rejected by {self.user['full_name']}"
             else:
-                self.db.cursor.execute(
-                    "UPDATE overtime_requests SET status = %s WHERE id = %s", 
-                    (new_status, ot_id)
-                )
+                sql = "UPDATE overtime_requests SET status = %s WHERE id = %s"
+                self.db.cursor.execute(sql, (new_status, ot_id))
+                msg = f"overtime request accepted by {self.user['full_name']}"
             
+            # 2. Add to notification table (Matching your Leave Request logic)
+            # This SQL finds the 'created_by' (Leader ID) from the projects table 
+            # linked to this overtime request.
+            req_id = self.db.cursor.lastrowid  # Get the ID of the OT request you just created
+            msg = f"{self.user['full_name']} submitted a new overtime request."
+
+            notif_sql = """
+                INSERT INTO notifications (user_id, message, is_read, created_at)
+                SELECT id, %s, 0, NOW() FROM users 
+                WHERE role = 'leader' AND team_id = %s
+            """
+            self.db.cursor.execute(notif_sql, (msg, self.user.get('team_id')))
+            
+            # 3. Commit changes to Database
             self.db.conn.commit()
+            
             messagebox.showinfo("Success", f"OT Request {new_status}!")
             
-            # Refresh current tab
+            # 4. Refresh UI Tabs
             current_tab = self.segmented_btn.get()
             if current_tab == "📋 Pending Requests":
                 self.refresh_pending_requests()
@@ -442,4 +454,6 @@ class MemberOvertime(ctk.CTkFrame):
                 self.refresh_history()
                 
         except Exception as e:
-            messagebox.showerror("Error", f"Could not update status: {e}")
+            if hasattr(self.db, 'conn'):
+                self.db.conn.rollback()
+            messagebox.showerror("Error", f"System Error: {e}")

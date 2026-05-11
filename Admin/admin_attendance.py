@@ -21,6 +21,9 @@ class AdminAttendance(ctk.CTkFrame):
             "ot": "#8B5CF6",
         }
         self.month_total_workdays = "-"
+        self._detail_mode = False
+        self._saved_filters = {}
+        self._detail_export_context = None
 
         self._build_ui()
         self._load_team_options()
@@ -33,8 +36,7 @@ class AdminAttendance(ctk.CTkFrame):
 
     def _build_ui(self):
         header_f = ctk.CTkFrame(self, fg_color="transparent")
-        header_f.pack(fill="x", padx=100, pady=(10, 10))
-
+        header_f.pack(fill="x", padx=80, pady=(10, 10))
         ctk.CTkLabel(
             header_f,
             text="Employee Attendance Dashboard",
@@ -49,13 +51,15 @@ class AdminAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#3A4656"),
         )
-        control_card.pack(fill="x", padx=100, pady=(0, 5))
+        control_card.pack(fill="x", padx=80, pady=(0, 5))
+        control_card.grid_columnconfigure(8, weight=1)
 
         ctk.CTkLabel(control_card, text="Search").grid(row=0, column=0, padx=(20, 6), pady=10, sticky="w")
         self.search_entry = ctk.CTkEntry(
             control_card,
             placeholder_text="Name or ID",
-            width=220,
+            width=205,
+            height=36,
             corner_radius=10,
         )
         self.search_entry.grid(row=0, column=1, padx=6, pady=4)
@@ -66,6 +70,7 @@ class AdminAttendance(ctk.CTkFrame):
             control_card,
             values=["All Teams"],
             width=180,
+            height=36,
             corner_radius=10,
             command=lambda _v: self.load_data(),
         )
@@ -78,6 +83,7 @@ class AdminAttendance(ctk.CTkFrame):
         control_card,
         values=[],
         width=180,
+        height=36,
         corner_radius=10,
         command=lambda v: self.load_data(),
         )
@@ -86,29 +92,30 @@ class AdminAttendance(ctk.CTkFrame):
 
         ctk.CTkButton(
             control_card,
-            text="Reset",
+            text="✖ Clear",
             width=78,
+            height=36,
             corner_radius=10,
             fg_color="#6B7280",
             hover_color="#4B5563",
             command=self.reset_filters,
-        ).grid(row=0, column=7, padx=6, pady=8)
+        ).grid(row=0, column=6, padx=6, pady=8)
 
         ctk.CTkButton(
-        control_card,
-        text="Export PDF",
-        width=98,
-        corner_radius=10,
-        fg_color="#DC2626",
-        hover_color="#B91C1C",
-        command=self.export_pdf,
-    ).grid(row=0, column=8, padx=(100, 20), pady=8) # Changed 6 to 100 for more margin-left
+            control_card,
+            text="Export PDF",
+            width=98,
+            height=36,
+            corner_radius=10,
+            fg_color="#DC2626",
+            hover_color="#B91C1C",
+            command=self.export_pdf,
+        ).grid(row=0, column=9, padx=(6, 20), pady=8, sticky="e")
 
         self.result_label = ctk.CTkLabel(self, text="0 records | Month Work: -", text_color=("#334155", "#CBD5E1"))
-        self.result_label.pack(anchor="w", padx=100, pady=(0, 6))
+        self.result_label.pack(anchor="w", padx=80, pady=(0, 6))
 
         self._create_table()
-
     def _create_table(self):
     # main container
         self.table_card = ctk.CTkFrame(
@@ -118,7 +125,7 @@ class AdminAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#2A3442"),
         )
-        self.table_card.pack(fill="both", expand=True, padx=100, pady=(0, 20))
+        self.table_card.pack(fill="both", expand=True, padx=80, pady=(0, 20))
         header = ctk.CTkFrame(
             self.table_card,
             fg_color=("#9CA3AF", "#334155"),
@@ -142,7 +149,7 @@ class AdminAttendance(ctk.CTkFrame):
         h("Leave", 80).pack(side="left", padx=10)
         h("Late", 80).pack(side="left", padx=10)
         h("OT", 100).pack(side="left", padx=10)
-        # 🔥 SCROLL FRAME (like AdminUsers)
+        # 﨟樊ｫｨ SCROLL FRAME (like AdminUsers)
         self.scroll = ctk.CTkScrollableFrame(
             self.table_card,
             fg_color="transparent"
@@ -326,7 +333,7 @@ class AdminAttendance(ctk.CTkFrame):
         self.db.cursor.execute(sql, tuple(params))
         return self.db.cursor.fetchall()
 
-    def _open_employee_attendance_detail(self, user_id, full_name):
+    def _open_employee_attendance_detail(self, user_id, full_name, team_name=None):
         month_label = self.month_filter.get()
         month_key = self.month_map.get(month_label, "")
 
@@ -336,32 +343,67 @@ class AdminAttendance(ctk.CTkFrame):
             messagebox.showerror("Fetch Error", f"Cannot load attendance detail: {e}")
             return
 
-        detail_win = ctk.CTkToplevel(self)
-        detail_win.title(f"Attendance Detail - {full_name}")
-        detail_win.geometry("860x560")
-        detail_win.transient(self.winfo_toplevel())
-        detail_win.grab_set()
+        self._saved_filters = {
+            "search": self.search_entry.get(),
+            "team": self.team_filter.get(),
+            "month": month_label,
+        }
+        self._detail_mode = True
+        for child in self.winfo_children():
+            child.destroy()
+
+        top_bar = ctk.CTkFrame(self, fg_color="transparent")
+        top_bar.pack(fill="x", padx=80, pady=(12, 8))
+        ctk.CTkButton(
+            top_bar,
+            text="← Back",
+            width=140,
+            height=36,
+            corner_radius=8,
+            fg_color="#2B6EA5",
+            text_color="#FFFFFF",
+            hover_color="#255F8F",
+            command=self._return_from_detail_page,
+        ).pack(side="left")
+        ctk.CTkButton(
+            top_bar,
+            text="Export PDF",
+            width=110,
+            height=36,
+            corner_radius=10,
+            fg_color="#DC2626",
+            hover_color="#B91C1C",
+            command=self._export_employee_detail_pdf,
+        ).pack(side="right")
+
+        self._detail_export_context = {
+            "user_id": user_id,
+            "full_name": full_name,
+            "team_name": team_name,
+            "month_label": month_label,
+            "rows": rows,
+        }
 
         ctk.CTkLabel(
-            detail_win,
-            text=f"{full_name} (ID: {user_id})",
+            self,
+            text=f"{full_name} (Employee ID: {user_id})",
             font=("Arial", 18, "bold"),
-        ).pack(anchor="w", padx=20, pady=(18, 4))
+        ).pack(anchor="w", padx=80, pady=(4, 4))
 
         ctk.CTkLabel(
-            detail_win,
+            self,
             text=f"Month: {month_label}",
             text_color=("#334155", "#CBD5E1"),
-        ).pack(anchor="w", padx=20, pady=(0, 10))
+        ).pack(anchor="w", padx=80, pady=(0, 10))
 
         table_card = ctk.CTkFrame(
-            detail_win,
+            self,
             fg_color=("#FFFFFF", "#1B1F24"),
             corner_radius=12,
             border_width=1,
             border_color=("#D6DEEB", "#2A3442"),
         )
-        table_card.pack(fill="both", expand=True, padx=20, pady=(0, 14))
+        table_card.pack(fill="both", expand=True, padx=80, pady=(0, 20))
 
         header = ctk.CTkFrame(table_card, fg_color=("#9CA3AF", "#334155"), corner_radius=8)
         header.pack(fill="x", padx=10, pady=(10, 0))
@@ -408,6 +450,140 @@ class AdminAttendance(ctk.CTkFrame):
             ctk.CTkLabel(card, text=check_out_value, width=140).pack(side="left", padx=10)
             ctk.CTkLabel(card, text=ot_value, width=120, text_color=self.metric_colors["ot"]).pack(side="left", padx=10)
             ctk.CTkLabel(card, text=remark, width=120, text_color=remark_color).pack(side="left", padx=10)
+
+    def _return_from_detail_page(self):
+        self._detail_mode = False
+        for child in self.winfo_children():
+            child.destroy()
+
+        self._build_ui()
+        self._load_team_options()
+        self._load_month_options()
+
+        if self._saved_filters:
+            self.search_entry.delete(0, "end")
+            self.search_entry.insert(0, self._saved_filters.get("search", ""))
+
+            team_value = self._saved_filters.get("team", "All Teams")
+            if team_value in self.team_map:
+                self.team_filter.set(team_value)
+            else:
+                self.team_filter.set("All Teams")
+
+            month_value = self._saved_filters.get("month", "")
+            if month_value in self.month_map:
+                self.month_filter.set(month_value)
+
+        self.load_data()
+
+    def _export_employee_detail_pdf(self):
+        context = self._detail_export_context or {}
+        rows = context.get("rows", [])
+        if not rows:
+            messagebox.showwarning("No Data", "No detail records to export.")
+            return
+
+        user_id = context.get("user_id")
+        full_name = context.get("full_name", "Employee")
+        month_label = context.get("month_label", "Month")
+        safe_name = str(full_name).replace(" ", "_")
+        safe_month = str(month_label).replace(" ", "_")
+        file_name = f"AttendanceDetail_{safe_name}_{safe_month}.pdf"
+
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".pdf",
+            initialfile=file_name,
+            filetypes=[("PDF files", "*.pdf")],
+        )
+        if not file_path:
+            return
+
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        except Exception as e:
+            messagebox.showerror("Missing Dependency", f"Cannot export PDF: {e}")
+            return
+
+        try:
+            doc = SimpleDocTemplate(file_path, pagesize=letter, leftMargin=28, rightMargin=28, topMargin=28, bottomMargin=28)
+            styles = getSampleStyleSheet()
+            elements = []
+
+            title_style = ParagraphStyle("DetailTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=colors.HexColor("#0B1220"), alignment=1, spaceAfter=6)
+            meta_style = ParagraphStyle("DetailMeta", parent=styles["Normal"], fontName="Helvetica", fontSize=10, leading=13, textColor=colors.HexColor("#334155"))
+
+            month_key = self.month_map.get(month_label, "")
+            month_workdays = self._calculate_month_total_workdays(month_key)
+            team_label = context.get("team_name") or self._saved_filters.get("team", "All Teams")
+            safe_team_label = escape(str(team_label))
+            safe_month_label = escape(str(month_label))
+            safe_month_work = escape(str(month_workdays))
+
+            elements.append(Paragraph("Employee Attendance Detail Report", title_style))
+            elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", meta_style))
+            elements.append(Spacer(1, 10))
+
+            info_table = Table(
+                [[
+                    Paragraph(
+                        f"<b><font color='#1D4ED8'>Team:</font></b> {safe_team_label}<br/>"
+                        f"<b><font color='#1D4ED8'>Employee:</font></b> {escape(str(full_name))}",
+                        meta_style
+                    ),
+                    Paragraph(
+                        f"<b><font color='#1D4ED8'>Month:</font></b> {safe_month_label}<br/>"
+                        f"<b><font color='#1D4ED8'>Month Workdays:</font></b> {safe_month_work}",
+                        meta_style
+                    ),
+                ]],
+                colWidths=[3.8 * inch, 3.2 * inch],
+            )
+            info_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.HexColor("#E2E8F0")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            elements.append(info_table)
+            elements.append(Spacer(1, 10))
+
+            table_data = [["Date", "Check-In", "Check-Out", "OT Hours", "Remark"]]
+            for row in rows:
+                is_late = bool(row["is_late"])
+                table_data.append([
+                    self._dash(row["attendance_date"]),
+                    self._dash(row["check_in"]),
+                    self._dash(row["check_out"]),
+                    f"{float(row['ot_hours'] or 0):g}",
+                    "LATE" if is_late else "ON TIME",
+                ])
+
+            table = Table(table_data, repeatRows=1, colWidths=[1.55 * inch, 1.25 * inch, 1.25 * inch, 1.1 * inch, 1.35 * inch])
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.HexColor("#FFFFFF"), colors.HexColor("#F8FAFC")]),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                ("TEXTCOLOR", (3, 1), (3, -1), colors.HexColor("#7C3AED")),
+            ]))
+            elements.append(table)
+
+            doc.build(elements)
+            messagebox.showinfo("Export Successful", "Detail attendance PDF exported successfully.")
+        except Exception as e:
+            messagebox.showerror("Export Error", f"PDF export failed: {e}")
 
     def reset_filters(self):
         # 1. Clear search box
@@ -571,7 +747,6 @@ class AdminAttendance(ctk.CTkFrame):
                         self.scroll,
                         fg_color=("#EEF2F7", "#1F2933"),
                         corner_radius=10
-                        
                     )
                     card.pack(fill="x", pady=4, padx=5)
 
@@ -585,10 +760,9 @@ class AdminAttendance(ctk.CTkFrame):
                         fg_color="transparent",
                         hover_color=("#DBEAFE", "#1E3A5F"),
                         text_color=("#1D4ED8", "#60A5FA"),
-                        # font=("Arial", 12, "underline"),
                         font=("Arial", 12),
                         cursor="hand2",
-                        command=lambda user_id=row["id"], full_name=row["full_name"]: self._open_employee_attendance_detail(user_id, full_name),
+                        command=lambda user_id=row["id"], full_name=row["full_name"], team_name=row.get("team_name"): self._open_employee_attendance_detail(user_id, full_name, team_name),
                     ).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._dash(row["team_name"]), width=120).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._dash(row["workdays"]), width=80, text_color=self.metric_colors["work"]).pack(side="left", padx=10)
@@ -596,7 +770,7 @@ class AdminAttendance(ctk.CTkFrame):
                     ctk.CTkLabel(card, text=self._dash(row["latecount"]), width=80, text_color=self.metric_colors["late"]).pack(side="left", padx=10)
                     ctk.CTkLabel(card, text=self._num_or_dash(row["overtimehour"]), width=100, text_color=self.metric_colors["ot"]).pack(side="left", padx=10)
 
-                    # 🔥 bottom border line (like AdminUsers style)
+                    # 﨟樊ｫｨ bottom border line (like AdminUsers style)
                     border = ctk.CTkFrame(card, height=1, fg_color=("#D6DEEB", "#334155"))
                     border.pack(fill="x", side="bottom", pady=(6, 0))
 
@@ -743,3 +917,10 @@ class AdminAttendance(ctk.CTkFrame):
             messagebox.showinfo("Export Successful", "Attendance PDF exported successfully.")
         except Exception as e:
             messagebox.showerror("Export Error", f"PDF export failed: {e}")
+
+
+
+
+
+
+

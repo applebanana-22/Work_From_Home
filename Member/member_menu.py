@@ -70,31 +70,62 @@ class MemberMenu:
             self.sidebar.after(5000, self.auto_refresh_loop)
 
     def refresh_sidebar_badge(self):
-        """Fetches unread count from DB and updates the red badge on Leave button"""
+        """Sorts unread notifications to the correct sidebar buttons."""
         try:
+            # Fetch all unread notifications for the current user
             self.db.cursor.execute(
-                "SELECT COUNT(*) as count FROM notifications WHERE user_id = %s AND is_read = 0", 
+                "SELECT message FROM notifications WHERE user_id = %s AND is_read = 0", 
                 (self.user['id'],)
             )
-            result = self.db.cursor.fetchone()
-            count = result['count'] if result else 0
+            notifications = self.db.cursor.fetchall()
             
-            if self.badge_label: 
-                self.badge_label.destroy()
-                self.badge_label = None
+            # Initialize counters
+            leave_count = 0
+            ot_count = 0
+
+            # Categorize based on message content
+            for note in notifications:
+                msg = note['message'].lower()
+                if "leave" in msg:
+                    leave_count += 1
+                elif "overtime" in msg:
+                    ot_count += 1
+
+            # Update the respective navigation buttons
+            self._apply_badge_to_button("leave", leave_count)
+            self._apply_badge_to_button("overtime", ot_count)
+
+        except Exception as e:
+            print(f"Error refreshing badges: {e}")
+    
+    def _apply_badge_to_button(self, nav_key, count):
+        """Helper to draw or remove red notification badges on sidebar buttons"""
+        btn = self.nav_buttons.get(nav_key)
+        if not btn: 
+            return
+
+        # 1. Look for and destroy any existing badge on this button
+        for child in btn.winfo_children():
+            if isinstance(child, ctk.CTkLabel) and getattr(child, "_is_badge", False):
+                child.destroy()
+
+        # 2. If count is > 0, create a new badge
+        if count > 0:
+            badge = ctk.CTkLabel(
+                btn, 
+                text=str(count),
+                font=("Arial", 10, "bold"),
+                fg_color="#E74C3C", # Notification Red
+                text_color="white",
+                width=20, 
+                height=20, 
+                corner_radius=10
+            )
+            # Custom flag so we can identify this label to destroy it later
+            badge._is_badge = True 
             
-            if count > 0:
-                leave_btn = self.nav_buttons.get("leave")
-                if leave_btn:
-                    self.badge_label = ctk.CTkLabel(
-                        leave_btn, text=str(count), 
-                        font=("Arial", 10, "bold"), 
-                        fg_color="#E74C3C", text_color="white", 
-                        width=18, height=18, corner_radius=9
-                    )
-                    self.badge_label.place(relx=0.9, rely=0.5, anchor="center")
-        except: 
-            pass
+            # Position the badge on the right side of the button
+            badge.place(relx=0.9, rely=0.5, anchor="center")
 
     def mark_notifications_as_read(self):
         """Updates DB to set notifications as read and clears the UI badge"""
@@ -149,11 +180,18 @@ class MemberMenu:
         except Exception as e: self.show_error(f"Dashboard Error: {e}")
 
     def show_leave_request(self):
-        """Specialized view: Clears notifications upon clicking"""
+        """Clears ONLY leave-related notifications upon clicking"""
         self.clear()
         try:
+            # Targeted SQL update for Leave only
+            self.db.cursor.execute(
+                "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND message LIKE '%%leave%%'", 
+                (self.user['id'],)
+            )
+            self.db.conn.commit()
+            self.refresh_sidebar_badge() # Update the UI immediately
+
             from Member.member_leave import MemberLeave
-            self.mark_notifications_as_read()
             # Passing self as sidebar_ref allows child views to trigger menu updates
             view = MemberLeave(self.content, self.user, sidebar_ref=self) 
             view.pack(fill="both", expand=True)
@@ -183,6 +221,14 @@ class MemberMenu:
     def show_overtime(self):
         self.clear()
         try:
+            # This correctly targets ONLY Overtime messages
+            self.db.cursor.execute(
+                "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND message LIKE '%%Overtime%%'", 
+                (self.user['id'],)
+            )
+            self.db.conn.commit()
+            self.refresh_sidebar_badge()
+
             from Member.member_overtime import MemberOvertime
             view = MemberOvertime(self.content, self.user)
             view.pack(fill="both", expand=True)

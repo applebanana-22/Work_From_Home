@@ -31,7 +31,7 @@ class UserRegisterFrame(ctk.CTkFrame):
             border_color=("#DBDBDB", "#333333"), # <--- Added borders so it stands out in Light Mode
             corner_radius=10
         )
-        self.main_container.pack(fill="both", expand=True, padx=100, pady=(10, 40))
+        self.main_container.pack(fill="both", expand=True, padx=80, pady=(10, 40))
 
         # --- The Grid Form ---
         self.f = ctk.CTkFrame(self.main_container, fg_color="transparent")
@@ -231,7 +231,7 @@ class UserUpdateFrame(ctk.CTkFrame):
             border_color=("#DBDBDB", "#333333"), # <--- Added borders so it stands out in Light Mode
             corner_radius=10
         )
-        self.main_container.pack(fill="both", expand=True, padx=100, pady=(10, 40))
+        self.main_container.pack(fill="both", expand=True, padx=80, pady=(10, 40))
 
         self.f = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.f.pack(expand=True, padx=50, pady=30)
@@ -390,13 +390,13 @@ class AdminUsers(ctk.CTkFrame):
     def show_list_view(self):
         self.clear_container()
         header = ctk.CTkFrame(self.container, fg_color="transparent")
-        header.pack(fill="x", padx=100, pady=20)
+        header.pack(fill="x", padx=80, pady=20)
         
         ctk.CTkLabel(header, text="User Management", font=("Arial", 24, "bold")).pack(side="left")
         
         # --- FILTER BAR ---
         filter_frame = ctk.CTkFrame(self.container, fg_color="transparent")
-        filter_frame.pack(fill="x", padx=100, pady=(0, 10))
+        filter_frame.pack(fill="x", padx=80, pady=(0, 10))
 
         self.search_id = ctk.CTkEntry(filter_frame, placeholder_text="Employee ID", width=120)
         self.search_id.pack(side="left", padx=5)
@@ -420,8 +420,8 @@ class AdminUsers(ctk.CTkFrame):
         self.search_batch = ctk.CTkEntry(filter_frame, placeholder_text="Batch", width=100)
         self.search_batch.pack(side="left", padx=5)
 
-        ctk.CTkButton(filter_frame, text="Filter", width=90, command=self.filter_users).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="Reset", fg_color="#6B7280", width=90, command=self.reset_filters).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="🔍 Filter",fg_color="#2471A3", hover_color="#1A5276", width=90, command=self.filter_users).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="✖ Clear", fg_color="#566573", hover_color="#424949", width=90, command=self.reset_filters).pack(side="left", padx=5)
         
         ctk.CTkButton(
             header, text="+ Create Account", 
@@ -430,7 +430,7 @@ class AdminUsers(ctk.CTkFrame):
         ).pack(side="right")
         
         self.list_frame = ctk.CTkScrollableFrame(self.container, label_text="Our Members",label_font=("Arial", 16, "bold"), label_text_color=("#0E0E0E", "#AAAAAA"), fg_color=("#FFFFFF", "#181818"), border_width=1, border_color=("#E0E0E0", "#2B2B2B"))
-        self.list_frame.pack(fill="both", expand=True, padx=100, pady=10)
+        self.list_frame.pack(fill="both", expand=True, padx=80, pady=10)
         self.refresh_list()
 
     def show_register_view(self):
@@ -485,13 +485,13 @@ class AdminUsers(ctk.CTkFrame):
 
             ctk.CTkButton(
                 btn_frame, text="Update", width=70, height=28,
-                fg_color="#166DBF",
+                fg_color="#F39C12", hover_color="#D68910",
                 command=lambda uid=row['id']: self.handle_update(uid)
             ).pack(side="left", padx=5)
 
             ctk.CTkButton(
                 btn_frame, text="Delete", width=70, height=28,
-                fg_color="#C0392B",
+                fg_color="#E74C3C", hover_color="#C0392B",
                 command=lambda uid=row['id']: self.handle_delete(uid)
             ).pack(side="left", padx=5)
     def filter_users(self):

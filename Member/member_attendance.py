@@ -21,18 +21,19 @@ class DatePickerButton(ctk.CTkFrame):
         self._field = ctk.CTkFrame(
             self,
             width=140,
-            height=32,
-            corner_radius=10,
+            height=36,
+            corner_radius=8,
             fg_color=("#F9F9FA", "#343638"),
-            border_width=0,
+            border_width=1,
+            border_color=("#C5CCD3", "#565B5E"),
         )
         self.configure(
             width=140,
-            height=32,
-            corner_radius=10,
+            height=36,
+            corner_radius=8,
             fg_color="transparent",
             border_width=1,
-            border_color=("#979DA2", "#565B5E"),
+            border_color=("#C5CCD3", "#565B5E"),
         )
         self._field.pack_propagate(False)
         self._field.pack(fill="both", expand=True)
@@ -41,15 +42,15 @@ class DatePickerButton(ctk.CTkFrame):
             self._field,
             text=self._fmt(),
             font=("Arial", 12),
-            text_color=("#1A1A1A", "#DCE4EE"),
+            text_color=("black", "white"),
         )
-        self._date_lbl.pack(side="left", padx=(10, 0))
+        self._date_lbl.pack(side="left", padx=(6, 0))
 
         self._arrow_lbl = ctk.CTkLabel(
             self._field,
-            text="▼",
+            text="",
             font=("Arial", 11),
-            text_color="#A7B4C2",
+            text_color=("#7A7A7A", "#A7B4C2"),
         )
         self._arrow_lbl.pack(side="right", padx=(0, 10))
 
@@ -57,7 +58,7 @@ class DatePickerButton(ctk.CTkFrame):
             w.bind("<Button-1>", self._open_picker)
 
     def _fmt(self):
-        return self._date.strftime('%Y-%m-%d')
+        return f"📅 {self._date.strftime('%Y-%m-%d')}"
 
     def _open_picker(self, _event=None):
         top = tk.Toplevel(self)
@@ -153,7 +154,7 @@ class MemberAttendance(ctk.CTkFrame):
     # ---------------- UI ----------------
     def setup_ui(self):
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=100, pady=20)
+        header.pack(fill="x", padx=80, pady=20)
 
         ctk.CTkLabel(
             header,
@@ -169,13 +170,15 @@ class MemberAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#3A4656"),
         )
-        filter_frame.pack(fill="x", padx=100, pady=(0, 18))
+        filter_frame.pack(fill="x", padx=80, pady=(0, 18))
+        filter_frame.grid_columnconfigure(8, weight=1)
 
         ctk.CTkLabel(filter_frame, text="Search").grid(row=0, column=0, padx=(20, 6), pady=10, sticky="w")
 
         self.search_entry = ctk.CTkEntry(
             filter_frame,
-            width=220,
+            width=205,
+            height=36,
             corner_radius=10,
         )
         self.search_entry.grid(row=0, column=1, padx=6, pady=8)
@@ -193,6 +196,7 @@ class MemberAttendance(ctk.CTkFrame):
             filter_frame,
             values=[],
             width=180,
+            height=36,
             corner_radius=10,
             command=lambda _v: self.load_data()
         )
@@ -200,8 +204,9 @@ class MemberAttendance(ctk.CTkFrame):
 
         ctk.CTkButton(
             filter_frame,
-            text="Reset",
+            text="✖ Clear",
             width=78,
+            height=36,
             fg_color="#6B7280",
             hover_color="#4B5563",
             corner_radius=10,
@@ -212,15 +217,16 @@ class MemberAttendance(ctk.CTkFrame):
             filter_frame,
             text="Export PDF",
             width=98,
+            height=36,
             fg_color="#DC2626",
             hover_color="#B91C1C",
             corner_radius=10,
             command=self.export_pdf
-        ).grid(row=0, column=7, padx=(153, 20), pady=8)
+        ).grid(row=0, column=9, padx=(6, 20), pady=8, sticky="e")
 
         # ---------------- STATS ----------------
         self.stats_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.stats_container.pack(fill="x", padx=100, pady=5)
+        self.stats_container.pack(fill="x", padx=80, pady=5)
 
         self.month_work_lbl = self.create_stat_card("Month Work", "0", self.metric_colors["work"])
         self.working_lbl = self.create_stat_card("Working Days", "0", self.metric_colors["work"])
@@ -236,7 +242,7 @@ class MemberAttendance(ctk.CTkFrame):
             border_width=1,
             border_color=("#D6DEEB", "#2A3442"),
         )
-        self.table_card.pack(fill="both", expand=True, padx=100, pady=10)
+        self.table_card.pack(fill="both", expand=True, padx=80, pady=10)
 
         header_row = ctk.CTkFrame(self.table_card, fg_color=("#9CA3AF", "#334155"))
         header_row.pack(fill="x", padx=10, pady=(10, 0))
@@ -378,7 +384,7 @@ class MemberAttendance(ctk.CTkFrame):
                 selected_label = label
                 break
 
-        # fallback → latest
+        # fallback 竊・latest
         if not selected_label and values:
             selected_label = values[0]
 
@@ -673,3 +679,4 @@ class MemberAttendance(ctk.CTkFrame):
         elements.append(table)
         doc.build(elements)
         messagebox.showinfo("Export Successful", "Attendance PDF exported successfully.")
+

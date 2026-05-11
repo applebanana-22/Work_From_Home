@@ -667,6 +667,12 @@ class LeaderOvertime(ctk.CTkFrame):
             VALUES (%s, %s, %s, %s, %s, 'Pending')
         """, (member_id, project_id, ot_date, hours, reason))
 
+        # THIS PART TRIGGERS THE BADGE
+        msg = f"New Overtime Request for {ot_date}."
+        self.db.cursor.execute("""
+            INSERT INTO notifications (user_id, message, is_read, created_at) 
+            VALUES (%s, %s, 0, NOW())""", (member_id, msg))
+
         self.db.conn.commit()
         messagebox.showinfo("Success", f"✅ Overtime request for {member_name} has been submitted successfully!")
         self.show_page("main")
