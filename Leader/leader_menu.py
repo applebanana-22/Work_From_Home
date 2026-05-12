@@ -94,30 +94,29 @@ class LeaderMenu:
             self.sidebar.after(5000, self.auto_refresh_loop)
 
     def refresh_sidebar_badge(self):
-        """Sorts unread notifications to the correct sidebar buttons."""
         try:
-            # Fetch all unread notifications for the current user
             self.db.cursor.execute(
                 "SELECT message FROM notifications WHERE user_id = %s AND is_read = 0", 
                 (self.user['id'],)
             )
             notifications = self.db.cursor.fetchall()
             
-            # Initialize counters
             leave_count = 0
             ot_count = 0
+            activity_count = 0 # Add this counter
 
-            # Categorize based on message content
             for note in notifications:
                 msg = note['message'].lower()
                 if "leave" in msg:
                     leave_count += 1
                 elif "overtime" in msg:
                     ot_count += 1
+                elif "announcement" in msg: # Add this check
+                    activity_count += 1
 
-            # Update the respective navigation buttons
             self._apply_badge_to_button("leave", leave_count)
             self._apply_badge_to_button("overtime", ot_count)
+            self._apply_badge_to_button("activity", activity_count) # Apply to Activity button
 
         except Exception as e:
             print(f"Error refreshing badges: {e}")
@@ -213,10 +212,21 @@ class LeaderMenu:
             self.show_error("Leave Requests", e)
 
     def show_activity(self):
-        self.clear_content()
-        try: 
+        self.clear_content() # or self.clear() for member
+        try:
+            # Mark announcement notifications as read
+            self.db.cursor.execute(
+                "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND message LIKE '%%announcement%%'", 
+                (self.user['id'],)
+            )
+            self.db.conn.commit()
+            self.refresh_sidebar_badge()
+
+            # ... existing View loading code ...
+            from Leader.leader_activity import LeaderActivity # or Member version
             LeaderActivity(self.content, self.user).pack(fill="both", expand=True)
-        except Exception as e: self.show_error("Activity", e)
+        except Exception as e: 
+            self.show_error("Activity", e)
 
     def show_project(self):
         self.clear_content()

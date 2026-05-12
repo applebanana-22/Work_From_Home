@@ -472,9 +472,21 @@ class CreateAnnouncementPage(ctk.CTkFrame):
                     (t, m, self.edit_data['id'])
                 )
             else:
+                # 1. Insert the announcement (Existing code)
                 self.db.cursor.execute(
                     "INSERT INTO announcements (title, message, sender_role, created_by) VALUES (%s, %s, 'admin', %s)",
-                    (t, m, self.user['full_name'])
+                    (t, m, self.user['id'])
+                )
+                
+                # 2. ADD THIS: Notify all users about the new announcement
+                # We use the keyword 'announcement' for the sidebar filter
+                notif_msg = f"New Announcement: {t}"
+                self.db.cursor.execute(
+                    """
+                    INSERT INTO notifications (user_id, message, is_read, created_at)
+                    SELECT id, %s, 0, NOW() FROM users WHERE id != %s
+                    """, 
+                    (notif_msg, self.user['id'])
                 )
 
             self.db.conn.commit()

@@ -584,9 +584,21 @@ class CreateTeamPostPage(ctk.CTkFrame):
                     (title, message, self.edit_data['id'], self.user['full_name'])
                 )
             else:
+                # 1. Insert the announcement (Existing code)
                 self.db.cursor.execute(
                     "INSERT INTO announcements (title, message, sender_role, created_by, created_at) VALUES (%s, %s, %s, %s, NOW())",
                     (title, message, "leader", self.user['full_name'])
+                )
+
+                # 2. ADD THIS: Create notifications for all Members
+                # We use the keyword 'announcement' so the badge logic can find it
+                notif_msg = f"New Team Announcement: {title}"
+                self.db.cursor.execute(
+                    """
+                    INSERT INTO notifications (user_id, message, is_read, created_at)
+                    SELECT id, %s, 0, NOW() FROM users WHERE role = 'member'
+                    """, 
+                    (notif_msg,)
                 )
 
             self.db.conn.commit()
