@@ -187,7 +187,7 @@ class MemberActivity(ctk.CTkFrame):
 
         replies = self.db.cursor.fetchall()
 
-        MAX_VISIBLE_REPLIES = 3
+        MAX_VISIBLE_REPLIES = 2
 
         if replies:
             replies_container = ctk.CTkFrame(right, fg_color="transparent")
@@ -261,7 +261,7 @@ class MemberActivity(ctk.CTkFrame):
         reply_entry = ctk.CTkTextbox(
                 reply_frame,
                 height=35,
-               fg_color=("#EEEEEE", "#2A2A2A"),
+                fg_color=("#EEEEEE", "#2A2A2A"),
                 corner_radius=8,
                 wrap="word"
             )
@@ -270,7 +270,7 @@ class MemberActivity(ctk.CTkFrame):
             # Placeholder text
         placeholder_text = "Write a reply..."
         reply_entry.insert("1.0", placeholder_text)
-        reply_entry.configure(text_color=("black", "white"))
+        reply_entry.configure(text_color="#888888")
 
         def clear_placeholder(event, box=reply_entry):
                 if box.get("1.0", "end-1c") == placeholder_text:
@@ -280,7 +280,7 @@ class MemberActivity(ctk.CTkFrame):
         def restore_placeholder(event, box=reply_entry):
                 if not box.get("1.0", "end-1c").strip():
                     box.insert("1.0", placeholder_text)
-                    box.configure(text_color=("black", "white"))
+                    box.configure(text_color=("gray"))
 
         reply_entry.bind("<FocusIn>", clear_placeholder)
         reply_entry.bind("<FocusOut>", restore_placeholder)
@@ -294,7 +294,9 @@ class MemberActivity(ctk.CTkFrame):
                 width=35,
                 height=35,
                 fg_color="#0A93F5",
-                hover_color="#0873C4",
+                hover_color="#898A8B",
+                border_width=0,
+                font=("Arial", 18),
                 command=lambda a_id=announcement_id, e=reply_entry:
                     self.add_reply(a_id, e)
             ).pack(side="right")

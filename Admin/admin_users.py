@@ -1,7 +1,19 @@
 import re
 import customtkinter as ctk
 from database import Database
+from tkinter import filedialog
 from tkinter import messagebox
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer
+)
+
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
 
 class UserRegisterFrame(ctk.CTkFrame):
     """The Registration Form UI - Handles dynamic visibility and auto-increment ID"""
@@ -89,7 +101,8 @@ class UserRegisterFrame(ctk.CTkFrame):
         self.batch = ctk.CTkEntry(self.f, height=45, width=400)
 
         # 8. Save Button
-        self.save_btn = ctk.CTkButton(self.f, text="Register", width=150, height=40, fg_color="#10B981", command=self.save_user)
+        self.save_btn = ctk.CTkButton(self.f, text="Register", width=150, height=40, fg_color="#10B981",
+        hover_color="#0E9A6B", command=self.save_user)
         self.save_btn.grid(row=10, column=0, columnspan=2, pady=30)
 
     def get_next_emp_id(self):
@@ -273,7 +286,7 @@ class UserUpdateFrame(ctk.CTkFrame):
         # --- Button ---
         self.update_btn = ctk.CTkButton(
             self.f, text="Save Changes",
-            fg_color="#166DBF",
+            fg_color="#10B981", hover_color="#059669",
             command=self.perform_update
         )
         self.update_btn.grid(row=6, column=0, columnspan=2, pady=30)
@@ -406,15 +419,15 @@ class AdminUsers(ctk.CTkFrame):
 
         self.search_role = ctk.CTkOptionMenu(
             filter_frame,
-            values=["All", "admin", "leader", "member"],
+            values=["Roles", "admin", "leader", "member"],
             width=120
         )
-        self.search_role.set("All")
+        self.search_role.set("Roles")
         self.search_role.pack(side="left", padx=5)
 
-        teams = ["All"] + self.get_team_names()
+        teams = ["Teams"] + self.get_team_names()
         self.search_team = ctk.CTkOptionMenu(filter_frame, values=teams, width=120)
-        self.search_team.set("All")
+        self.search_team.set("Teams")
         self.search_team.pack(side="left", padx=5)
 
         self.search_batch = ctk.CTkEntry(filter_frame, placeholder_text="Batch", width=100)
@@ -422,10 +435,12 @@ class AdminUsers(ctk.CTkFrame):
 
         ctk.CTkButton(filter_frame, text="🔍 Filter",fg_color="#2471A3", hover_color="#1A5276", width=90, command=self.filter_users).pack(side="left", padx=5)
         ctk.CTkButton(filter_frame, text="✖ Clear", fg_color="#566573", hover_color="#424949", width=90, command=self.reset_filters).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="Export", fg_color="#AA4242", hover_color="#B62525", width=90, command=self.export_users).pack(side="left", padx=5)
         
         ctk.CTkButton(
             header, text="+ Create Account", 
-            fg_color="#10B981", height=38, 
+            fg_color="#10B981",
+            hover_color="#0E9A6B", height=38, 
             command=self.show_register_view
         ).pack(side="right")
         
@@ -485,7 +500,8 @@ class AdminUsers(ctk.CTkFrame):
 
             ctk.CTkButton(
                 btn_frame, text="Update", width=70, height=28,
-                fg_color="#F39C12", hover_color="#D68910",
+                fg_color="#F39C12", 
+                hover_color="#D68910",
                 command=lambda uid=row['id']: self.handle_update(uid)
             ).pack(side="left", padx=5)
 
@@ -520,11 +536,11 @@ class AdminUsers(ctk.CTkFrame):
                 conditions.append("u.full_name LIKE %s")
                 params.append(f"%{self.search_name.get()}%")
 
-        if self.search_role.get() != "All":
+        if self.search_role.get() != "Roles":
             conditions.append("u.role = %s")
             params.append(self.search_role.get())
 
-        if self.search_team.get() != "All":
+        if self.search_team.get() != "Teams":
             conditions.append("t.team_name = %s")
             params.append(self.search_team.get())
 
@@ -570,9 +586,9 @@ class AdminUsers(ctk.CTkFrame):
         self.search_batch.delete(0, "end")
 
         # Reset dropdowns
-        self.search_role.set("All")
-        self.search_team.set("All")
-        
+        self.search_role.set("Roles")
+        self.search_team.set("Teams")
+
         self.search_id.focus()
         self.search_name.focus()
         self.search_batch.focus()
@@ -580,6 +596,147 @@ class AdminUsers(ctk.CTkFrame):
 
     # Reload full list
         self.refresh_list()
+        
+    def export_users(self):
+        try:
+            conditions = []
+            params = []
+
+            # Employee ID Filter
+            if self.search_id.get():
+                conditions.append("u.employee_id LIKE %s")
+                params.append(f"%{self.search_id.get()}%")
+
+            # Full Name Filter
+            if self.search_name.get():
+                conditions.append("u.full_name LIKE %s")
+                params.append(f"%{self.search_name.get()}%")
+
+            # Role Filter
+            if self.search_role.get() != "Roles":
+                conditions.append("u.role = %s")
+                params.append(self.search_role.get())
+
+            # Team Filter
+            if self.search_team.get() != "Teams":
+                conditions.append("t.team_name = %s")
+                params.append(self.search_team.get())
+
+            # Batch Filter
+            if self.search_batch.get():
+                conditions.append("u.batch LIKE %s")
+                params.append(f"%{self.search_batch.get()}%")
+
+            where_clause = ""
+            if conditions:
+                where_clause = "WHERE " + " AND ".join(conditions)
+
+            sql = f"""
+            SELECT
+                u.employee_id,
+                u.full_name,
+                u.username,
+                u.role,
+                IFNULL(t.team_name, 'No Team') AS team_name,
+                u.batch
+            FROM users u
+            LEFT JOIN teams t ON u.team_id = t.team_id
+            {where_clause}
+            ORDER BY u.id DESC
+            """
+
+            self.db.cursor.execute(sql, tuple(params))
+            rows = self.db.cursor.fetchall()
+
+            if not rows:
+                messagebox.showwarning(
+                    "No Data",
+                    "No matching users found to export."
+                )
+                return
+
+            # Save PDF
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF Files", "*.pdf")],
+                title="Save User Report"
+            )
+
+            if not file_path:
+                return
+
+            # Create PDF
+            doc = SimpleDocTemplate(
+                file_path,
+                pagesize=letter
+            )
+
+            elements = []
+
+            styles = getSampleStyleSheet()
+
+            title = Paragraph(
+                "User Management Report",
+                styles['Heading1']
+            )
+
+            elements.append(title)
+            elements.append(Spacer(1, 12))
+
+            # Table Data
+            data = [[
+                "Employee ID",
+                "Full Name",
+                "Username",
+                "Role",
+                "Team",
+                "Batch"
+            ]]
+
+            for row in rows:
+                data.append([
+                    row['employee_id'],
+                    row['full_name'],
+                    row['username'],
+                    row['role'],
+                    row['team_name'],
+                    row['batch']
+                ])
+
+            # Create Table
+            table = Table(data)
+
+            # Table Style
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER')
+            ]))
+
+            elements.append(table)
+
+            doc.build(elements)
+
+            messagebox.showinfo(
+                "Export Successful",
+                f"PDF exported successfully!\n\nSaved to:\n{file_path}"
+            )
+
+        except Exception as e:
+            messagebox.showerror(
+                "Export Error",
+                str(e)
+            )
         
     def render_table(self, rows):
     # --- TABLE HEADER ---
@@ -611,13 +768,13 @@ class AdminUsers(ctk.CTkFrame):
 
             ctk.CTkButton(
                 btn_frame, text="Update", width=70, height=28,
-                fg_color="#166DBF",
+                fg_color="#F39C12", hover= "#D68910",
                 command=lambda uid=row['id']: self.handle_update(uid)
             ).pack(side="left", padx=5)
 
             ctk.CTkButton(
                 btn_frame, text="Delete", width=70, height=28,
-                fg_color="#C0392B",
+                fg_color="#E74C3C", hover_color="#C0392B",
                 command=lambda uid=row['id']: self.handle_delete(uid)
             ).pack(side="left", padx=5)
         

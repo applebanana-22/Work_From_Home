@@ -41,7 +41,7 @@ class AdminTeams(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self.header_frame,
-            text="🛡️ Team Management",
+            text="Team Management",
             font=("Arial", 24, "bold"),
             text_color=("black", "white")
         ).pack(side="left")
@@ -60,14 +60,9 @@ class AdminTeams(ctk.CTkFrame):
 
         self.form_frame = ctk.CTkFrame(
             self,
-
-            # SAME COLOR
             fg_color=self.section_bg,
-
             corner_radius=12,
-
             border_width=1,
-
             border_color=("#D1D5DB", "#3A3A3A")
         )
 
@@ -88,15 +83,10 @@ class AdminTeams(ctk.CTkFrame):
 
         self.team_name_entry = ctk.CTkEntry(
             self.form_frame,
-
             placeholder_text="Enter team name...",
-
             height=40,
-
             fg_color=("white", "#2B2B2B"),
-
             text_color=("black", "white"),
-
             border_color=("#D1D5DB", "#444")
         )
 
@@ -119,7 +109,7 @@ class AdminTeams(ctk.CTkFrame):
             pady=(5, 15)
         )
 
-        # CANCEL
+        # CANCEL BUTTON
 
         self.cancel_btn = ctk.CTkButton(
             self.form_btn_row,
@@ -131,7 +121,7 @@ class AdminTeams(ctk.CTkFrame):
 
         self.cancel_btn.pack(side="left")
 
-        # SAVE
+        # SAVE BUTTON
 
         self.save_team_btn = ctk.CTkButton(
             self.form_btn_row,
@@ -157,20 +147,14 @@ class AdminTeams(ctk.CTkFrame):
             pady=20
         )
 
-        # ================= SCROLLABLE TEAM LIST =================
+        # ================= TEAM LIST =================
 
         self.table_frame = ctk.CTkScrollableFrame(
             self.table_container,
-
             label_text="Active Teams",
-
-            # SAME COLOR
             fg_color=self.section_bg,
-
             label_fg_color=("#D1D5DB", "#2B2B2B"),
-
             label_text_color=("black", "white"),
-
             corner_radius=12
         )
 
@@ -191,6 +175,10 @@ class AdminTeams(ctk.CTkFrame):
             self.reset_form()
             return
 
+        # clear entry before showing
+        self.team_name_entry.delete(0, "end")
+        self.team_name_entry._activate_placeholder()
+
         self.form_frame.pack(
             after=self.header_frame,
             fill="x",
@@ -208,11 +196,31 @@ class AdminTeams(ctk.CTkFrame):
 
         self.form_frame.pack_forget()
 
+        # clear entry
         self.team_name_entry.delete(0, "end")
 
+        # restore placeholder
+        self.team_name_entry._activate_placeholder()
+
+        # remove focus
+        self.focus()
+
+        # reset states
         self.edit_mode = False
         self.edit_team_id = None
         self.form_visible = False
+
+        # reset title
+        self.form_title.configure(
+            text="Create New Team"
+        )
+
+        # reset button
+        self.save_team_btn.configure(
+            text="Create Team",
+            fg_color="#10B981",
+            hover_color="#0E9A6B"
+        )
 
     # =========================================================
     # SAVE TEAM
@@ -242,7 +250,7 @@ class AdminTeams(ctk.CTkFrame):
 
         try:
 
-            # UPDATE
+            # UPDATE TEAM
 
             if self.edit_mode:
 
@@ -256,7 +264,7 @@ class AdminTeams(ctk.CTkFrame):
                         "Team updated!"
                     )
 
-            # CREATE
+            # CREATE TEAM
 
             else:
 
@@ -299,13 +307,9 @@ class AdminTeams(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 self.table_frame,
-
                 text="🚫 No teams yet\nClick 'Create Team' to start",
-
                 font=("Arial", 13),
-
                 text_color=("gray40", "gray70"),
-
                 justify="center"
             ).pack(pady=30)
 
@@ -322,13 +326,9 @@ class AdminTeams(ctk.CTkFrame):
 
             row = ctk.CTkFrame(
                 self.table_frame,
-
                 fg_color=("#F3F4F6", "#2B2B2B"),
-
                 corner_radius=10,
-
                 border_width=1,
-
                 border_color=("#D1D5DB", "#444")
             )
 
@@ -355,17 +355,13 @@ class AdminTeams(ctk.CTkFrame):
 
             ctk.CTkLabel(
                 info_frame,
-
                 text=f"👥 {tname}",
-
                 font=("Arial", 14, "bold"),
-
                 text_color=("black", "white"),
-
                 anchor="w"
             ).pack(anchor="w")
 
-            # BUTTON AREA
+            # BUTTON FRAME
 
             btn_frame = ctk.CTkFrame(
                 row,
@@ -381,16 +377,11 @@ class AdminTeams(ctk.CTkFrame):
 
             ctk.CTkButton(
                 btn_frame,
-
                 text="Delete",
-
                 width=70,
                 height=30,
-
                 fg_color="#E74C3C",
-
                 hover_color="#C0392B",
-
                 command=lambda t_id=tid:
                 self.delete_team(t_id)
 
@@ -403,16 +394,11 @@ class AdminTeams(ctk.CTkFrame):
 
             ctk.CTkButton(
                 btn_frame,
-
                 text="Edit",
-
                 width=70,
                 height=30,
-
                 fg_color="#F39C12",
-
                 hover_color="#D68910",
-
                 command=lambda t_id=tid, t_name=tname:
                 self.load_edit_form(t_id, t_name)
 

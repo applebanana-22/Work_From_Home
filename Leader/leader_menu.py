@@ -191,15 +191,26 @@ class LeaderMenu:
         except Exception as e: self.show_error("Dashboard", e)
 
     def show_leave_request(self):
-        """Displays Leave Manager and clears notification badges"""
+        """Displays Leave Manager and clears ONLY leave notifications"""
         self.clear_content()
         try:
             from Leader.leader_leave_manage import LeaderLeaveManage
-            self.mark_notifications_as_read()
+            
+            # --- CHANGE THIS PART ---
+            # Instead of self.mark_notifications_as_read(), use this:
+            self.db.cursor.execute(
+                "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND message LIKE '%%leave%%'", 
+                (self.user['id'],)
+            )
+            self.db.conn.commit()
+            self.refresh_sidebar_badge() # Refresh UI immediately
+            # ------------------------
+
             # Pass sidebar_ref so child views can trigger sidebar updates
             view = LeaderLeaveManage(self.content, self.user, sidebar_ref=self)
             view.pack(fill="both", expand=True)
-        except Exception as e: self.show_error("Leave Requests", e)
+        except Exception as e: 
+            self.show_error("Leave Requests", e)
 
     def show_activity(self):
         self.clear_content()

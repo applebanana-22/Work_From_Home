@@ -250,7 +250,7 @@ class LeaderActivity(ctk.CTkFrame):
                         btn_frame,
                         text="Delete",
                          width=70, 
-                         fg_color="#E74C3C",
+                         fg_color= "#E74C3C",
                          hover_color="#C0392B" ,
                         command=lambda i=row['id']: self.handle_delete(i)
                     ).pack(side="left", padx=5)
@@ -259,7 +259,8 @@ class LeaderActivity(ctk.CTkFrame):
                         btn_frame,
                         text="Edit",
                         width=60,
-                        fg_color="#2980B9",
+                        fg_color="#F39C12",
+                        hover_color="#D68910",
                         command=lambda r=row: self.go_to_create_page(r)
                     ).pack(side="left", padx=5)
 
@@ -282,7 +283,7 @@ class LeaderActivity(ctk.CTkFrame):
 
                 replies = self.db.cursor.fetchall()
 
-                MAX_VISIBLE_REPLIES = 3
+                MAX_VISIBLE_REPLIES = 2
 
                 if replies:
                     replies_container = ctk.CTkFrame(right, fg_color="transparent")
@@ -298,7 +299,7 @@ class LeaderActivity(ctk.CTkFrame):
                         for reply in visible:
                             reply_box = ctk.CTkFrame(
                                 container,
-                                fg_color=("#EEEEEE", "#2A2A2A"),
+                                fg_color=("#F5F5F5", "#2A2A2A"),
                                 corner_radius=8
                             )
                             reply_box.pack(fill="x", padx=10, pady=3)
@@ -311,14 +312,14 @@ class LeaderActivity(ctk.CTkFrame):
                                 reply_box,
                                 text=f"{r_name} ({r_time})",
                                 font=("Arial", 11, "bold"),
-                                text_color=("black", "white")
+                                text_color=("gray40", "#AAAAAA")
                             ).pack(anchor="w", padx=8, pady=(3, 0))
 
                             ctk.CTkLabel(
                                 reply_box,
                                 text=r_msg,
                                 font=("Arial", 12),
-                                text_color=("black", "white"),
+                                text_color=("black", "#DDDDDD"),
                                 wraplength=600,
                                 justify="left"
                             ).pack(anchor="w", padx=8, pady=(0, 5))
@@ -347,7 +348,7 @@ class LeaderActivity(ctk.CTkFrame):
                     ctk.CTkLabel(
                         right,
                         text="No replies yet.",
-                        text_color="#777777",
+                        text_color=("gray40", "#777777"),
                         font=("Arial", 11)
                     ).pack(anchor="w", padx=10, pady=(5, 0))
 
@@ -358,9 +359,9 @@ class LeaderActivity(ctk.CTkFrame):
 
                 reply_entry = ctk.CTkTextbox(
                     reply_frame,
-                    height=35,           # Fixed height
+                    height=35,
+                    fg_color=("#EEEEEE", "#2A2A2A"),
                     corner_radius=8,
-                    fg_color="#AAA7A7", 
                     wrap="word"
                 )
                 reply_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -368,7 +369,7 @@ class LeaderActivity(ctk.CTkFrame):
                # Placeholder text
                 placeholder_text = "Write a reply..."
                 reply_entry.insert("1.0", placeholder_text)
-                reply_entry.configure(text_color="gray")
+                reply_entry.configure(text_color="#888888")
 
                 def clear_placeholder(event, box=reply_entry):
                     if box.get("1.0", "end-1c") == placeholder_text:
@@ -378,7 +379,7 @@ class LeaderActivity(ctk.CTkFrame):
                 def restore_placeholder(event, box=reply_entry):
                     if not box.get("1.0", "end-1c").strip():
                         box.insert("1.0", placeholder_text)
-                        box.configure(text_color="gray")
+                        box.configure(text_color=("gray"))
 
                 reply_entry.bind("<FocusIn>", clear_placeholder)
                 reply_entry.bind("<FocusOut>", restore_placeholder)
@@ -390,7 +391,9 @@ class LeaderActivity(ctk.CTkFrame):
                     width=35,
                     height=35,
                     fg_color="#0A93F5",
-                    hover_color="#0873C4",
+                    hover_color="#898A8B",
+                    border_width=0,
+                    font=("Arial", 18),
                     command=lambda a_id=row['id'], e=reply_entry: self.add_reply(a_id, e)
                 ).pack(side="right")
 
@@ -516,10 +519,11 @@ class CreateTeamPostPage(ctk.CTkFrame):
         back_btn = ctk.CTkButton(
             form_frame,
             text="← Back",
-            width=60,
-            height=35,
-            fg_color="#2E86C1",
-            hover_color="#1F618D",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
             command=self.back_callback
         )
         back_btn.pack(anchor="w", padx=30, pady=(20, 10))

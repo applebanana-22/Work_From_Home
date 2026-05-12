@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
-    def __init__(self, host="192.168.100.85"):
+    def __init__(self, host="192.168.100.83"):
         self.host = host
         self.connect()
 
@@ -154,6 +154,33 @@ class Database:
         except Exception as e:
             self.conn.rollback()
             raise e
+    
+    def create_team(self, name):
+        try:
+            self.cursor.execute("INSERT INTO teams (team_name) VALUES (%s)", (name,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error creating team: {e}")
+            return False
+
+    def update_team(self, team_id, new_name):
+        try:
+            self.cursor.execute("UPDATE teams SET team_name = %s WHERE team_id = %s", (new_name, team_id))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating team: {e}")
+            return False
+
+    def delete_team(self, team_id):
+        try:
+            self.cursor.execute("DELETE FROM teams WHERE team_id = %s", (team_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error deleting team: {e}")
+            return False
             
     def close(self):
         try:

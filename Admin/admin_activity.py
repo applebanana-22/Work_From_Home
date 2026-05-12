@@ -18,7 +18,7 @@ class AdminAnnouncements(ctk.CTkFrame):
  
         self.toggle_btn = ctk.CTkButton(self.header_frame, text="+ Create New", width=60, height=35,
                                         corner_radius=20, font=("Arial", 13, "bold"),
-                                        fg_color="#27AE60",hover_color="#1E8449", command=self.go_to_form_page)
+                                        fg_color="#10B981",hover_color="#1E8449", command=self.go_to_form_page)
         self.toggle_btn.pack(side="left")
         
         # --- 2. DROP-DOWN FORM ---
@@ -124,8 +124,8 @@ class AdminAnnouncements(ctk.CTkFrame):
                 ctk.CTkLabel(header_f, text=post_time, font=("Arial", 10), text_color=("black", "white")).pack(side="left", padx=15)
                 btn_frame = ctk.CTkFrame(header_f, fg_color="transparent")
                 btn_frame.pack(side="right")
-                ctk.CTkButton(btn_frame, text="Delete", width=70, fg_color="#E74C3C",hover_color="#C0392B" ,command=lambda i=row['id']: self.handle_delete(i)).pack(side="left", padx=5)
-                ctk.CTkButton(btn_frame, text="Edit", width=60, fg_color="#2980B9", command=lambda r=row: self.go_to_form_page(r)).pack(side="left", padx=5)
+                ctk.CTkButton(btn_frame, text="Delete", width=70, fg_color= "#E74C3C",hover_color="#C0392B"  ,command=lambda i=row['id']: self.handle_delete(i)).pack(side="left", padx=5)
+                ctk.CTkButton(btn_frame, text="Edit", width=60,  fg_color="#F39C12",hover_color="#D68910", command=lambda r=row: self.go_to_form_page(r)).pack(side="left", padx=5)
                
                 # ctk.CTkLabel(text_container, text=row['message'], font=("Arial", 12), wraplength=450, justify="left", anchor="w", text_color="#121212").pack(fill="x", pady=(2, 0))
                 self.create_expandable_message(text_container, row['message'])
@@ -137,7 +137,7 @@ class AdminAnnouncements(ctk.CTkFrame):
                 )
                 replies = self.db.cursor.fetchall()
 
-                MAX_VISIBLE_REPLIES = 3
+                MAX_VISIBLE_REPLIES = 2
 
                 # Only create replies container if replies exist
                 if replies:
@@ -224,7 +224,7 @@ class AdminAnnouncements(ctk.CTkFrame):
                     height=35,
                     corner_radius=8,
                     fg_color=("#EEEEEE", "#2A2A2A"),
-                    text_color=("black", "white"),
+                    text_color=("gray"),
                     wrap="word"
                 )
                 reply_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -234,21 +234,21 @@ class AdminAnnouncements(ctk.CTkFrame):
 
                 # Insert placeholder initially
                 reply_entry.insert("1.0", placeholder_text)
-                reply_entry.configure(text_color="gray")
+                reply_entry.configure(text_color="#888888")
 
 
                 def clear_placeholder(event, box=reply_entry, text=placeholder_text):
                     """Remove placeholder when textbox gains focus."""
                     if box.get("1.0", "end-1c") == text:
                         box.delete("1.0", "end")
-                        box.configure(text_color="white")
+                        box.configure(text_color=("black", "white"))
 
 
                 def restore_placeholder(event, box=reply_entry, text=placeholder_text):
                     """Restore placeholder when textbox loses focus and is empty."""
                     if not box.get("1.0", "end-1c").strip():
                         box.insert("1.0", text)
-                        box.configure(text_color="gray")
+                        box.configure(text_color=("gray"))
 
 
                 # Bind events
@@ -262,7 +262,9 @@ class AdminAnnouncements(ctk.CTkFrame):
                     width=35,
                     height=35,
                     fg_color="#0A93F5",
-                    hover_color="#0873C4",
+                    hover_color="#898A8B",
+                    border_width=0,
+                    font=("Arial", 18),
                     command=lambda a_id=announcement_id, e=reply_entry: self.add_reply(a_id, e)
                 ).pack(side="right")
 
@@ -404,10 +406,11 @@ class CreateAnnouncementPage(ctk.CTkFrame):
         back_btn = ctk.CTkButton(
             container,
             text="← Back",
-            width=60,
-            height=35,
-            fg_color="#2E86C1",
-            hover_color="#1F618D",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
             command=self.back_callback
         )
         back_btn.pack(anchor="w", padx=30, pady=(20, 10))
