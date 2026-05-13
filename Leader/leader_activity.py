@@ -26,7 +26,7 @@ class LeaderActivity(ctk.CTkFrame):
 
                 # ================= HEADER TABS =================
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=100, pady=(10, 5))
+        header.pack(fill="x", padx=80, pady=(10, 5))
 
         self.current_view = "company"
 
@@ -74,10 +74,10 @@ class LeaderActivity(ctk.CTkFrame):
         # ================= SCROLL AREA =================
         self.container = ctk.CTkScrollableFrame(
             self,
-            fg_color=("#F5F5F5", "#121212"),
+            fg_color=("#D1D1D1", "#444444"),
             corner_radius=12
         )
-        self.container.pack(fill="both", expand=True, padx=100, pady=10)
+        self.container.pack(fill="both", expand=True, padx=80, pady=10)
 
         self.refresh_ui()
         self.after(2000, self.check_new_posts)

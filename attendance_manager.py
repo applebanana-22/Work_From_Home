@@ -42,8 +42,8 @@ class AttendanceManager:
         if not self.is_checked_in:
             # Check if already completed for the CURRENT date
             if self.check_if_already_completed():
-                messagebox.showwarning("ယနေ့အတွက် ကန့်သတ်ချက်", 
-                    "ယနေ့အတွက် တစ်ကြိမ် Check-in/out လုပ်ပြီးဖြစ်၍ နောက်တစ်ကြိမ် ထပ်မံလုပ်ဆောင်၍ မရနိုင်ပါ။")
+                messagebox.showwarning("Limit for Today", 
+                    "You have already checked in/out for today and cannot do it again.")
                 return
 
             if messagebox.askyesno("Check-in", f"Confirm Check-in at {location}?"):

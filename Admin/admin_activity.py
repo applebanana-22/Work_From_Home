@@ -14,7 +14,7 @@ class AdminAnnouncements(ctk.CTkFrame):
 
         # --- 1. HEADER ---
         self.header_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.header_frame.pack(fill="x", padx=100, pady=(10, 0))
+        self.header_frame.pack(fill="x", padx=80, pady=(10, 0))
  
         self.toggle_btn = ctk.CTkButton(self.header_frame, text="+ Create New", width=60, height=35,
                                         corner_radius=20, font=("Arial", 13, "bold"),
@@ -47,14 +47,14 @@ class AdminAnnouncements(ctk.CTkFrame):
             text="Admin Post History",
             font=("Arial", 18, "bold"),
             text_color=("black", "white")
-        ).pack(anchor="w", padx=100, pady=(10, 0))
+        ).pack(anchor="w", padx=80, pady=(10, 0))
  
         # --- LIST ---
         self.list_frame = ctk.CTkScrollableFrame(self)
-        self.list_frame.pack(fill="both", expand=True, padx=100, pady=10)
+        self.list_frame.pack(fill="both", expand=True, padx=80, pady=10)
  
         self.list_frame.configure(
-            fg_color=("white", "black"),
+            fg_color=("#D1D1D1", "#444444"),
             corner_radius=12,
             border_width=1,
             border_color="#2A2A2A"
@@ -400,7 +400,7 @@ class CreateAnnouncementPage(ctk.CTkFrame):
             fg_color=("#FFFFFF", "#1A1A1A"),
             corner_radius=15
         )
-        container.pack(fill="both", expand=True, padx=100, pady=30)
+        container.pack(fill="both", expand=True, padx=80, pady=30)
 
         # ================= BACK BUTTON =================
         back_btn = ctk.CTkButton(
@@ -475,7 +475,7 @@ class CreateAnnouncementPage(ctk.CTkFrame):
                 # 1. Insert the announcement (Existing code)
                 self.db.cursor.execute(
                     "INSERT INTO announcements (title, message, sender_role, created_by) VALUES (%s, %s, 'admin', %s)",
-                    (t, m, self.user['id'])
+                    (t, m, self.user['full_name'])
                 )
                 
                 # 2. ADD THIS: Notify all users about the new announcement

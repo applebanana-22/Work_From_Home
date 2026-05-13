@@ -6,7 +6,12 @@ class LoginApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("WFH Tracker - Login")
-        self.geometry("400x350") # Increased height slightly for error message
+        
+        # Replace self.geometry("400x350") with:
+        width = 400
+        height = 350
+        self.center_window(width, height)
+        
         self.db = Database()
  
         self.label = ctk.CTkLabel(self, text="WFH System Login", font=("Arial", 20, "bold"))
@@ -29,7 +34,14 @@ class LoginApp(ctk.CTk):
  
         # ✅ NEW LINE ADDED
         self.bind("<Return>", lambda event: self.login_event())
- 
+    
+    def center_window(self, width, height):
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        
     def login_event(self):
         # 1. Reset visual states
         self.error_label.configure(text="")

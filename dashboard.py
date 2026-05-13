@@ -12,12 +12,15 @@ class Dashboard(ctk.CTk):
     def __init__(self, user_data):
         super().__init__()
         
-        # --- Window Configuration ---
         ctk.set_appearance_mode("dark") 
         ctk.set_default_color_theme("blue")
         self.title("GIC Myanmar Work From Home Tracker")
         
-        self.geometry("1100x700")
+        # Replace self.geometry("1100x700") with:
+        width = 1100
+        height = 700
+        self.center_window(width, height)
+        
         self.minsize(1000, 650)
         
         self.db = Database()
@@ -80,6 +83,13 @@ class Dashboard(ctk.CTk):
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+    def center_window(self, width, height):
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width // 2) - (width // 2)
+        y = (screen_height // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+        
     def setup_header(self):
         for widget in self.header_frame.winfo_children():
             widget.destroy()

@@ -44,7 +44,7 @@ class DatePickerButton(ctk.CTkFrame):
         # Initialize calendar with the style name string
         self.cal = Calendar(
             self.panel,
-            style="Custom.Calendar", 
+            style="Custom.Calendar",
             selectmode="day",
             date_pattern="yyyy-mm-dd",
             year=self._date.year,
@@ -110,7 +110,7 @@ class DatePickerButton(ctk.CTkFrame):
 
 class MemberSchedule(ctk.CTkFrame):
     def __init__(self, master, user):
-        super().__init__(master, fg_color=("white", "#1A1A1A"))
+        super().__init__(master, fg_color=("#FFFFFF", "#1A1A1A"))
         self.db = Database()
         self.user = user
         self.setup_ui()
@@ -139,15 +139,13 @@ class MemberSchedule(ctk.CTkFrame):
         _lbl(inner, "From")
         self.start_cal = DatePickerButton(inner, initial_date=datetime.today().date())
         self.start_cal.pack(side="left", padx=(0, 16))
-        self.start_cal.on_change(lambda _: self.refresh_view())
 
         _lbl(inner, "To")
         self.end_cal = DatePickerButton(inner, initial_date=datetime.today().date())
         self.end_cal.pack(side="left", padx=(0, 24))
-        self.end_cal.on_change(lambda _: self.refresh_view())
 
         ctk.CTkButton(inner, text="🔍 Check My Dates", fg_color="#2471A3", hover_color="#1A5276",
-                      width=140, corner_radius=9, font=("Arial", 12, "bold"),
+                      width=140, height=36, corner_radius=9, font=("Arial", 12, "bold"),
                       command=self.refresh_view).pack(side="left", padx=(0, 4))
 
         self.scroll = ctk.CTkScrollableFrame(self.wrapper, fg_color=("#FFFFFF", "#0D1117"),
@@ -167,30 +165,74 @@ class MemberSchedule(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             if not rows:
-                ctk.CTkLabel(self.scroll, text="No schedule assigned for this period.", text_color="gray").pack(pady=20)
+                ctk.CTkLabel(
+                    self.scroll,
+                    text="No schedule assigned for this period.",
+                    text_color=("#7B7D7D", "#AABBCD")
+                ).pack(pady=20)
                 return
 
-            header_row = ctk.CTkFrame(self.scroll, fg_color=("#EAECEE", "#1E2731"), corner_radius=12)
+            header_row = ctk.CTkFrame(
+                self.scroll,
+                fg_color=("#EAECEE", "#1E2731"),
+                corner_radius=12
+            )
             header_row.pack(fill="x", padx=15, pady=(8, 8))
-            ctk.CTkLabel(header_row, text="Date", font=("Arial", 12, "bold"), text_color=("#2C3E50", "#AABBCD")).pack(side="left", padx=20, pady=12)
-            ctk.CTkLabel(header_row, text="Status", font=("Arial", 12, "bold"), text_color=("#2C3E50", "#AABBCD")).pack(side="right", padx=20, pady=12)
+            ctk.CTkLabel(
+                header_row,
+                text="Date",
+                font=("Arial", 12, "bold"),
+                text_color=("#2C3E50", "#AABBCD")
+            ).pack(side="left", padx=20, pady=12)
+            ctk.CTkLabel(
+                header_row,
+                text="Status",
+                font=("Arial", 12, "bold"),
+                text_color=("#2C3E50", "#AABBCD")
+            ).pack(side="right", padx=20, pady=12)
 
             for r in rows:
-                status_color = "#27AE60" if r['status'] == 'Office' else "#3498DB"
-                row_frame = ctk.CTkFrame(self.scroll, fg_color=("#F8F9F9", "#1B2430"), corner_radius=14, 
-                                         border_width=1, border_color=("#EBEDEF", "#26313F"))
+                is_office = r['status'] == 'Office'
+                status_color = ("#D5F5E3", "#27AE60") if is_office else ("#D6EAF8", "#3498DB")
+                status_text = ("#145A32", "#FFFFFF") if is_office else ("#1B4F72", "#FFFFFF")
+                status_icon = "🏢" if is_office else "🏠"
+                row_frame = ctk.CTkFrame(
+                    self.scroll,
+                    fg_color=("#F8F9F9", "#1B2430"),
+                    corner_radius=14,
+                    border_width=1,
+                    border_color=("#EBEDEF", "#26313F")
+                )
                 row_frame.pack(fill="x", pady=6, padx=15)
 
                 left = ctk.CTkFrame(row_frame, fg_color="transparent")
                 left.pack(side="left", fill="x", expand=True, padx=18, pady=14)
                 
-                ctk.CTkLabel(left, text=r['schedule_date'].strftime('%Y-%m-%d'), font=("Arial", 13, "bold"), 
-                             text_color=("#1A1A1A", "white"), anchor="w").pack(fill="x")
-                ctk.CTkLabel(left, text=r['schedule_date'].strftime('%A'), font=("Arial", 11), 
-                             text_color=("#566573", "#AABBCD"), anchor="w").pack(fill="x", pady=(4, 0))
+                ctk.CTkLabel(
+                    left,
+                    text=r['schedule_date'].strftime('%Y-%m-%d'),
+                    font=("Arial", 13, "bold"),
+                    text_color=("#1A1A1A", "#FFFFFF"),
+                    anchor="w"
+                ).pack(fill="x")
+                ctk.CTkLabel(
+                    left,
+                    text=r['schedule_date'].strftime('%A'),
+                    font=("Arial", 11),
+                    text_color=("#566573", "#AABBCD"),
+                    anchor="w"
+                ).pack(fill="x", pady=(4, 0))
 
-                ctk.CTkLabel(row_frame, text=r['status'].upper(), fg_color=status_color, text_color="white", 
-                             corner_radius=10, font=("Arial", 11, "bold"), height=26, width=80).pack(side="right", padx=18, pady=16)
+                ctk.CTkLabel(
+                    row_frame,
+                    text=f"{status_icon} {r['status'].upper()}",
+                    fg_color=status_color,
+                    text_color=status_text,
+                    corner_radius=10,
+                    font=("Arial", 11, "bold"),
+                    height=26,
+                    width=96
+                ).pack(side="right", padx=18, pady=16)
         except Exception as e: print(f"Sync error: {e}")
 
     def auto_refresh(self):

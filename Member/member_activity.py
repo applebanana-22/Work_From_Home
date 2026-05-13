@@ -41,28 +41,28 @@ class MemberActivity(ctk.CTkFrame):
         # ================= CONTAINERS =================
         # (Same position → switch with show/hide)
         self.team_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.team_container.pack(fill="both", expand=True, padx=100, pady=5)
+        self.team_container.pack(fill="both", expand=True, padx=80, pady=5)
 
         self.admin_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.admin_container.pack(fill="both", expand=True, padx=100, pady=5)
+        self.admin_container.pack(fill="both", expand=True, padx=80, pady=5)
 
         # ================= TEAM VIEW =================
         self.team_view = ctk.CTkScrollableFrame(
             self.team_container,
-            fg_color=("#F5F5F5", "#121212"),
+            fg_color=("#D1D1D1", "#444444"),
             corner_radius=12,
             border_width=1,
-            border_color="#2E86C1"
+            # border_color="#2E86C1"
         )
         self.team_view.pack(fill="both", expand=True, padx=20, pady=5)
 
         # ================= ADMIN VIEW =================
         self.admin_view = ctk.CTkScrollableFrame(
             self.admin_container,
-            fg_color=("#F5F5F5", "#121212"),
+            fg_color=("#D1D1D1", "#444444"),
             corner_radius=12,
             border_width=1,
-            border_color="#2E86C1"
+            # border_color="#2E86C1"
         )
         self.admin_view.pack(fill="both", expand=True, padx=20, pady=5)
 
@@ -91,7 +91,7 @@ class MemberActivity(ctk.CTkFrame):
             w.destroy()
 
         if self.current_view == "team":
-            self.team_container.pack(fill="both", expand=True, padx=100, pady=5)
+            self.team_container.pack(fill="both", expand=True, padx=80, pady=5)
             self.admin_container.pack_forget()
 
             self.db.cursor.execute("""
@@ -105,7 +105,7 @@ class MemberActivity(ctk.CTkFrame):
                 self.create_card(self.team_view, row, "#2E86C1")
 
         else:
-            self.admin_container.pack(fill="both", expand=True, padx=100, pady=5)
+            self.admin_container.pack(fill="both", expand=True, padx=80, pady=5)
             self.team_container.pack_forget()
 
             self.db.cursor.execute("""
