@@ -3,6 +3,7 @@ from Admin.admin_users import AdminUsers
 from Admin.admin_activity import AdminAnnouncements 
 from Admin.admin_teams import AdminTeams
 from Admin.admin_attendance import AdminAttendance
+from Admin.daily_report import DailyReportFrame
 
 class AdminMenu:
     def __init__(self, sidebar, content, user):
@@ -24,7 +25,7 @@ class AdminMenu:
         self.add_nav_btn("👥   User Management", self.show_users)
         self.add_nav_btn("🤝   Team Management", self.show_teams) 
         self.add_nav_btn("📅   Attendance", self.show_attendance)
-
+        self.add_nav_btn("📊   Daily Report", self.show_daily_report)
         # Default စဖွင့်မည့် Page
         self.show_activity()
 
@@ -93,6 +94,14 @@ class AdminMenu:
             attendance_view.pack(fill="both", expand=True)
         except Exception as e:
             self.show_error("Attendance", e)
+            
+    def show_daily_report(self):
+        self.clear_content()
+        try:
+            report_view = DailyReportFrame(self.content, self.user)
+            report_view.pack(fill="both", expand=True)
+        except Exception as e:
+            self.show_error("Daily Report", e)
 
     def show_error(self, view_name, error):
         """Error ဖြစ်ခဲ့လျှင် ပြသရန်"""

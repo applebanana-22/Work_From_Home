@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
-    def __init__(self, host="192.168.100.83"):
+    def __init__(self, host="192.168.100.85"):
         self.host = host
         self.connect()
 

@@ -142,7 +142,7 @@ class LeaderDashboard(ctk.CTkFrame):
     def connect_tracking_server(self):
         try:
             if not self.sio.connected:
-                self.sio.connect('http://192.168.100.83:5000', transports=['websocket']) 
+                self.sio.connect('http://192.168.100.85:5000', transports=['websocket']) 
             @self.sio.on("status_update")
             def on_update(data):
                 if self.winfo_exists():

@@ -4,7 +4,7 @@ from database import Database
 
 sio = socketio.Server(cors_allowed_origins='*')
 app = socketio.WSGIApp(sio)
-db = Database() # Server မှာ တစ်ခါပဲ ချိတ်ထားမည်
+db = Database() # Server
 
 connected_users = {}
 
