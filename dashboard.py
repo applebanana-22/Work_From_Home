@@ -139,6 +139,16 @@ class Dashboard(ctk.CTk):
         )
         self.attendance_btn.pack(fill="x", pady=(8, 15))
 
+        # # Work Mode Section
+        # ctk.CTkLabel(bottom_frame, text="CURRENT WORK MODE", font=("Arial", 10, "bold"), text_color="gray").pack(anchor="w", padx=5)
+        
+        # self.status_switch = ctk.CTkSegmentedButton(
+        #     bottom_frame, values=["🏢 Office", "🏠 WFH"],
+        #     font=("Arial", 12, "bold"),
+        #     command=self.manual_status_change
+        # )
+        # self.status_switch.pack(fill="x", pady=(8, 15))
+        
         # Work Mode Section
         ctk.CTkLabel(bottom_frame, text="CURRENT WORK MODE", font=("Arial", 10, "bold"), text_color="gray").pack(anchor="w", padx=5)
         
@@ -148,6 +158,9 @@ class Dashboard(ctk.CTk):
             command=self.manual_status_change
         )
         self.status_switch.pack(fill="x", pady=(8, 15))
+        
+        # Add this line to set the initial color based on the starting value
+        self.update_segment_color(self.status_switch.get())
 
         # Theme Switch
         self.theme_switch = ctk.CTkSwitch(bottom_frame, text="Dark Mode", font=("Arial", 12), command=self.change_appearance_mode)
@@ -178,6 +191,7 @@ class Dashboard(ctk.CTk):
         self.setup_header()
 
     def manual_status_change(self, selected_value):
+        self.update_segment_color(selected_value) # Add this line
         if self.user['role'].lower() == 'member': return
         new_status = "Office" if "Office" in selected_value else "WFH"
         try:
@@ -207,6 +221,7 @@ class Dashboard(ctk.CTk):
                 status = res['current_status'] if res and res['current_status'] else "Office"
                 self.status_switch.set("🏢 Office" if status == "Office" else "🏠 WFH")
         except: pass
+        self.update_segment_color(self.status_switch.get())
 
     def change_appearance_mode(self):
         mode = "dark" if self.theme_switch.get() == 1 else "light"
@@ -219,7 +234,7 @@ class Dashboard(ctk.CTk):
         elif role == 'leader': 
             self.menu_logic = LeaderMenu(self.sidebar_scroll, self.main_view, user)
         else: 
-            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.85:5000")
+            self.tracker = MemberTracking(user_id=user['id'], server_url="http://192.168.100.83:5000")
             self.tracker.set_tracking_state(False) 
             self.menu_logic = MemberMenu(self.sidebar_scroll, self.main_view, user)
 
@@ -232,3 +247,17 @@ class Dashboard(ctk.CTk):
             self.on_closing()
             from main import LoginApp
             LoginApp().mainloop()
+            
+    def update_segment_color(self, value):
+        if "Office" in value:
+            # Green theme for Office
+            self.status_switch.configure(
+                selected_color=("#2ECC71", "#27AE60"), 
+                selected_hover_color=("#27AE60", "#1E8449")
+            )
+        else:
+            # Blue theme for WFH
+            self.status_switch.configure(
+                selected_color=("#3498DB", "#2980B9"), 
+                selected_hover_color=("#2980B9", "#2471A3")
+            )

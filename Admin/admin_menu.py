@@ -3,7 +3,7 @@ from Admin.admin_users import AdminUsers
 from Admin.admin_activity import AdminAnnouncements 
 from Admin.admin_teams import AdminTeams
 from Admin.admin_attendance import AdminAttendance
-from Admin.daily_report import DailyReportFrame
+from Admin.admin_report_view import DailyReportFrame
 
 class AdminMenu:
     def __init__(self, sidebar, content, user):

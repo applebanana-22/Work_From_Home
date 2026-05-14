@@ -39,10 +39,11 @@ class DatePickerButton(ctk.CTkFrame):
             width=120,
             height=28,
             corner_radius=10,
-            fg_color="#1E2A3A",
-            hover_color="#2C3E50",
-            border_width=1,
-            border_color="#3D5166",
+            fg_color=("#F9F9FA", "#343638"),       
+            border_color=("#979DA2", "#565B5E"),   
+            border_width=2.5,                        
+            text_color=("gray10", "#DCE4EE"),      
+            hover_color=("#E5E5E7", "#2B2D2F"),   
             anchor="w",
             command=self.toggle
         )
@@ -1039,8 +1040,8 @@ class LeaderOvertime(ctk.CTkFrame):
             ctk.CTkLabel(
                 top_row,
                 text=f"📅 {row['ot_date']}",
-                font=("Arial", 11),
-                text_color="#888888"
+                font=("Arial", 11, "bold"),
+                text_color=("#000000", "#888888")
             ).pack(side="left", padx=10)
 
             # Project and hours
@@ -1056,8 +1057,8 @@ class LeaderOvertime(ctk.CTkFrame):
             ctk.CTkLabel(
                 middle_row,
                 text=f"⏱️ {row['hours']} hours",
-                font=("Arial", 12),
-                text_color="#AAAAAA"
+                font=("Arial", 12, "bold"),
+                text_color=("#000000", "#AAAAAA")
             ).pack(side="left", padx=(15, 0))
 
             # Show warning if pending and overdue
