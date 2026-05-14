@@ -432,7 +432,16 @@ class LeaderReportView(ctk.CTkFrame):
         header = ctk.CTkFrame(self.container, fg_color="transparent")
         header.pack(fill="x", padx=content_padx, pady=14)
 
-        ctk.CTkButton(header, text="← Back", width=100, command=self.show_reports_list).pack(side="left")
+        ctk.CTkButton(
+            header,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            command=self.show_reports_list
+        ).pack(side="left")
         ctk.CTkLabel(header, text="Manage Categories", font=("Arial", 22, "bold"), text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20)
 
         input_f = ctk.CTkFrame(self.container, fg_color=("#F9F9F9", "#1E1E1E"), corner_radius=14, border_width=1, border_color=("#E0E0E0", "#2C2C2C"))
@@ -441,8 +450,18 @@ class LeaderReportView(ctk.CTkFrame):
         self.cat_entry = ctk.CTkEntry(input_f, placeholder_text="New category name...", width=300, height=36, corner_radius=8,
                                      border_color=("#CCCCCC", "#2C2C2C"), fg_color=("#FFFFFF", "#1E1E1E"), text_color=("#000000", "#FFFFFF"))
         self.cat_entry.pack(side="left", padx=20, pady=14)
-        ctk.CTkButton(input_f, text="Add", width=100, fg_color="#2471A3", command=self.add_category).pack(side="left", padx=10)
-
+        ctk.CTkButton(
+            input_f,
+            text="Add",
+            width=100,
+            height=30,
+            corner_radius=9,
+            font=("Arial", 12, "bold"),
+            fg_color="#10B981",
+            hover_color="#0E9F6E",
+            command=self.add_category
+        ).pack(side="left", padx=10)
+        
         self.cat_scroll = ctk.CTkScrollableFrame(self.container, fg_color=("#EEEEEE", "#1A1A1A"), corner_radius=14, border_width=1, border_color=("#DDDDDD", "#2C2C2C"))
         self.cat_scroll.pack(fill="both", expand=True, padx=content_padx, pady=(0, 10))
         self.refresh_categories()
@@ -465,8 +484,18 @@ class LeaderReportView(ctk.CTkFrame):
             row = ctk.CTkFrame(self.cat_scroll, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=10, border_width=1, border_color=("#E0E0E0", "#2C2C2C"))
             row.pack(fill="x", pady=2)
             ctk.CTkLabel(row, text=cat['name'], text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20, pady=10)
-            ctk.CTkButton(row, text="Delete", width=70, fg_color="#E74C3C", command=lambda cid=cat['id']: self.delete_category(cid)).pack(side="right", padx=10)
-
+            ctk.CTkButton(
+                row,
+                text="Delete",
+                width=70,
+                height=30,
+                corner_radius=9,
+                font=("Arial", 12),
+                fg_color="#E74C3C",
+                hover_color="#C0392B",
+                command=lambda cid=cat['id']: self.delete_category(cid)
+            ).pack(side="right", padx=10)
+            
     def delete_category(self, cat_id):
         if messagebox.askyesno("Confirm", "Delete this category?"):
             self.db.cursor.execute("DELETE FROM report_categories WHERE id = %s", (cat_id,))

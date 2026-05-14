@@ -345,28 +345,54 @@ class MemberReportFrame(ctk.CTkFrame):
     def save_all_reports(self):
         try:
             total = sum(float(row["hour_var"].get() or 0) for row in self.report_rows)
+
             if total > 8:
                 messagebox.showerror("Error", "Total hours cannot exceed 8 hours!")
                 return
-            
+
             selected_date = str(self.date_picker.get_date())
-            self.db.cursor.execute("SELECT COUNT(*) as count FROM daily_reports WHERE user_id=%s AND report_date=%s", (self.user['id'], selected_date))
+
+            self.db.cursor.execute(
+                "SELECT COUNT(*) as count FROM daily_reports WHERE user_id=%s AND report_date=%s",
+                (self.user['id'], selected_date)
+            )
+
             if self.db.cursor.fetchone()['count'] > 0:
                 messagebox.showerror("Error", f"Report for {selected_date} already exists!")
                 return
- 
+
             saved_count = 0
+
             for row in self.report_rows:
-                tasks, hours, cat = row["desc_txt"].get("1.0", "end-1c").strip(), row["hour_var"].get(), row["cat_var"].get()
-                if tasks and float(hours or 0) > 0:
-                    self.db.cursor.execute("INSERT INTO daily_reports (user_id, report_date, tasks, category, hours) VALUES (%s, %s, %s, %s, %s)",
-                                          (self.user['id'], selected_date, tasks, cat, hours))
-                    saved_count += 1
-           
-            if saved_count > 0:
-                self.db.conn.commit()
-                messagebox.showinfo("Success", f"Saved {saved_count} sections!")
-                self.show_history_view()
+                tasks = row["desc_txt"].get("1.0", "end-1c").strip()
+                hours = row["hour_var"].get()
+                cat = row["cat_var"].get()
+
+                # validation
+                if not tasks:
+                    messagebox.showwarning("Warning", "Please write task description.")
+                    return
+
+                if float(hours or 0) <= 0:
+                    messagebox.showwarning("Warning", "Hours must be greater than 0.")
+                    return
+
+                self.db.cursor.execute(
+                    """
+                    INSERT INTO daily_reports
+                    (user_id, report_date, tasks, category, hours)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (self.user['id'], selected_date, tasks, cat, hours)
+                )
+
+                saved_count += 1
+
+            self.db.conn.commit()
+
+            messagebox.showinfo("Success", f"Saved {saved_count} sections!")
+            self.show_history_view()
+
         except Exception as e:
             self.db.conn.rollback()
             messagebox.showerror("Database Error", f"Error: {e}")
@@ -519,26 +545,119 @@ class MemberReportFrame(ctk.CTkFrame):
         try:
             from fpdf import FPDF
             from tkinter import filedialog
-            start, end = self.start_cal.get_date(), self.end_cal.get_date()
-            self.db.cursor.execute("SELECT report_date, category, tasks, hours FROM daily_reports WHERE user_id = %s AND report_date BETWEEN %s AND %s ORDER BY report_date ASC", (self.user['id'], str(start), str(end)))
+            from collections import defaultdict
+
+            start = self.start_cal.get_date()
+            end = self.end_cal.get_date()
+
+            self.db.cursor.execute(
+                """
+                SELECT report_date, category, tasks, hours
+                FROM daily_reports
+                WHERE user_id = %s
+                AND report_date BETWEEN %s AND %s
+                ORDER BY report_date ASC, created_at ASC
+                """,
+                (self.user['id'], str(start), str(end))
+            )
+
             rows = self.db.cursor.fetchall()
-            if not rows: return messagebox.showinfo("No Data", "No reports found.")
-            file_path = filedialog.asksaveasfilename(defaultextension=".pdf", filetypes=[("PDF files", "*.pdf")])
-            if file_path:
-                pdf = FPDF()
-                pdf.add_page()
-                pdf.set_font("Arial", 'B', 16)
-                pdf.cell(0, 10, f"Daily Reports: {self.user.get('full_name', 'User')}", ln=True, align='C')
-                pdf.ln(10)
-                for r in rows:
-                    pdf.set_font("Arial", 'B', 12)
-                    pdf.cell(0, 10, f"{r['report_date']} | {r['category']} | {r['hours']}h", ln=True)
-                    pdf.set_font("Arial", '', 11)
-                    pdf.multi_cell(0, 8, str(r['tasks']))
-                    pdf.ln(5)
-                pdf.output(file_path)
-                messagebox.showinfo("Success", "PDF exported!")
-        except Exception as e: messagebox.showerror("Export Error", str(e))
+
+            if not rows:
+                return messagebox.showinfo("No Data", "No reports found.")
+
+            grouped = defaultdict(list)
+
+            for r in rows:
+                grouped[r['report_date']].append(r)
+
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf")],
+                initialfile=f"{self.user.get('full_name', 'User')}_Reports.pdf"
+            )
+
+            if not file_path:
+                return
+
+            pdf = FPDF()
+            pdf.add_page()
+
+            # ===== TITLE =====
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(
+                0,
+                10,
+                f"Daily Reports: {self.user.get('full_name', 'User')}",
+                ln=True,
+                align='C'
+            )
+
+            pdf.ln(10)
+
+            # ===== TABLE HEADER =====
+            pdf.set_font("Arial", 'B', 10)
+
+            headers = ["Date", "Category", "Hrs", "Task"]
+            widths = [35, 40, 20, 95]
+
+            for i, h in enumerate(headers):
+                pdf.cell(widths[i], 10, h, border=1, align='C')
+
+            pdf.ln()
+
+            # ===== TABLE BODY =====
+            pdf.set_font("Arial", '', 9)
+
+            for date, tasks in grouped.items():
+
+                for i, r in enumerate(tasks):
+
+                    # date merged effect
+                    date_border = 'LR'
+
+                    if i == len(tasks) - 1:
+                        date_border = 'LRB'
+
+                    pdf.cell(
+                        widths[0],
+                        10,
+                        str(date) if i == 0 else "",
+                        border=date_border,
+                        align='C'
+                    )
+
+                    pdf.cell(
+                        widths[1],
+                        10,
+                        r['category'],
+                        border=1,
+                        align='C'
+                    )
+
+                    pdf.cell(
+                        widths[2],
+                        10,
+                        f"{float(r['hours']):.2f}",
+                        border=1,
+                        align='C'
+                    )
+
+                    pdf.cell(
+                        widths[3],
+                        10,
+                        str(r['tasks'])[:55],
+                        border=1
+                    )
+
+                    pdf.ln()
+
+            pdf.output(file_path)
+
+            messagebox.showinfo("Success", "PDF exported!")
+
+        except Exception as e:
+            messagebox.showerror("Export Error", str(e))
         
     def save_filter_state(self):
         if hasattr(self, "start_cal") and hasattr(self, "end_cal"):
