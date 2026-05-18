@@ -7,6 +7,7 @@ class MemberDashboard(ctk.CTkFrame):
         self.user = user
         self.db = db
         self._is_destroyed = False
+        self._after_id = None # Track the timer to prevent "invalid command" errors
 
         self.setup_ui()
         
@@ -48,26 +49,29 @@ class MemberDashboard(ctk.CTkFrame):
         )
         self.table_bg.pack(fill="both", expand=True, padx=40, pady=(0, 30))
 
-        # --- DUAL TREEVIEW SETUP (To isolate Activity color) ---
+        # Container for the tables and scrollbar
+        tree_container = ctk.CTkFrame(self.table_bg, fg_color="transparent")
+        tree_container.pack(fill="both", expand=True, padx=15, pady=15)
+
+        # --- DUAL TREEVIEW SETUP ---
         info_cols = ("id", "name", "location")
-        self.info_tree = ttk.Treeview(self.table_bg, columns=info_cols, show="headings", height=10)
-        self.status_tree = ttk.Treeview(self.table_bg, columns=("activity",), show="headings", height=10)
+        self.info_tree = ttk.Treeview(tree_container, columns=info_cols, show="headings", height=10)
+        self.status_tree = ttk.Treeview(tree_container, columns=("activity",), show="headings", height=10)
 
         for col in info_cols:
             self.info_tree.heading(col, text=col.replace("_", " ").upper())
             self.info_tree.column(col, anchor="center")
         
         self.info_tree.column("name", width=250, anchor="w")
-        
         self.status_tree.heading("activity", text="ACTIVITY")
         self.status_tree.column("activity", anchor="center", width=150)
 
-        # Pack them side by side like the Leader Dashboard
-        self.info_tree.pack(side="left", fill="both", expand=True, padx=(15, 0), pady=15)
-        self.status_tree.pack(side="right", fill="y", padx=(0, 15), pady=15)
+        # Pack tables and Scrollbar
+        self.info_tree.pack(side="left", fill="both", expand=True)
+        self.status_tree.pack(side="left", fill="y") # Changed to side="left" to sit next to info_tree
 
         self.apply_treeview_style()
-        self.sync_scroll()
+        self.sync_scroll(tree_container)
 
     def apply_treeview_style(self):
         style = ttk.Style()
@@ -86,12 +90,10 @@ class MemberDashboard(ctk.CTkFrame):
 
         style.map("Treeview", background=[('selected', '#3498DB')])
 
-        # Status specific colors for the status_tree ONLY
         self.status_tree.tag_configure("ACTIVE", foreground="#2ECC71", font=("Arial", 11, "bold")) 
         self.status_tree.tag_configure("AWAY", foreground="#F1C40F", font=("Arial", 11, "bold"))    
         self.status_tree.tag_configure("OFFLINE", foreground="#E74C3C", font=("Arial", 11, "bold"))
         
-        # Stripe colors for both
         for t in [self.info_tree, self.status_tree]:
             t.tag_configure('odd', background=odd_row_bg)
 
@@ -111,29 +113,46 @@ class MemberDashboard(ctk.CTkFrame):
                 name_val = f" 👤 {m['full_name']}"
                 loc = m['current_status'] or "Office"
                 loc_val = f"🏢 {loc}" if loc == "Office" else f"🏠 {loc}"
-                
                 raw_status = (m['status'] or "offline").upper()
                 act_val = f"● {raw_status}"
 
                 row_tag = ('odd',) if i % 2 != 0 else ()
-                
-                # Insert info into left tree (Normal colors)
                 self.info_tree.insert("", "end", values=(m['employee_id'], name_val, loc_val), tags=row_tag)
-                # Insert status into right tree (Colored text via Status Tag)
                 self.status_tree.insert("", "end", values=(act_val,), tags=(raw_status,) + row_tag)
 
         except Exception as e:
             print(f"Table Error: {e}")
 
-    def sync_scroll(self):
-        """Ensures both tables move together when scrolling"""
-        def on_tree_scroll(*args):
+    def sync_scroll(self, container):
+        """Creates a linked scrollbar and mousewheel sync"""
+        # 1. Create the Scrollbar
+        self.scrollbar = ttk.Scrollbar(container, orient="vertical")
+        self.scrollbar.pack(side="right", fill="y")
+
+        # 2. Command: When scrollbar moves -> Move both trees
+        def on_scrollbar_move(*args):
             self.info_tree.yview(*args)
             self.status_tree.yview(*args)
         
-        self.scrollbar = ttk.Scrollbar(self.table_bg, orient="vertical", command=on_tree_scroll)
-        self.info_tree.configure(yscrollcommand=self.scrollbar.set)
-        self.status_tree.configure(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.config(command=on_scrollbar_move)
+
+        # 3. Update Scrollbar: When either tree moves -> Update scrollbar position
+        def on_tree_scroll(*args):
+            self.scrollbar.set(*args)
+            on_scrollbar_move("moveto", args[0]) # Force other tree to match
+
+        self.info_tree.configure(yscrollcommand=on_tree_scroll)
+        self.status_tree.configure(yscrollcommand=on_tree_scroll)
+
+        # 4. Mousewheel binding (Optional but recommended for Windows/Linux)
+        def on_mousewheel(event):
+            # Move both based on delta
+            self.info_tree.yview_scroll(int(-1*(event.delta/120)), "units")
+            self.status_tree.yview_scroll(int(-1*(event.delta/120)), "units")
+            return "break" # Prevent double scroll
+
+        self.info_tree.bind("<MouseWheel>", on_mousewheel)
+        self.status_tree.bind("<MouseWheel>", on_mousewheel)
 
     def create_card(self, master, title, value, color):
         card = ctk.CTkFrame(master, height=120, corner_radius=15, 
@@ -148,8 +167,30 @@ class MemberDashboard(ctk.CTkFrame):
         if self._is_destroyed: return
         self.refresh_stats()
         self.load_team_data()
-        self.after(900000, self.auto_refresh)
+        # Save ID to cancel on destroy
+        self._after_id = self.after(15000, self.auto_refresh)
 
+    # def refresh_stats(self):
+    #     try:
+    #         self.db.cursor.execute(
+    #             "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active "
+    #             "FROM users WHERE team_id = %s AND role != 'leader'", (self.user['team_id'],)
+    #         )
+    #         stats_res = self.db.cursor.fetchone()
+    #         team_size, active_count = stats_res['total'] or 0, stats_res['active'] or 0
+
+    #         for w in self.stats_container.winfo_children(): w.destroy()
+            
+    #         card_data = [
+    #             {"title": "Team Size", "value": str(team_size), "color": "#3498DB"},
+    #             {"title": "Active Tasks", "value": "0", "color": "#10B981"},
+    #             {"title": "Urgent OT", "value": "0", "color": "#E74C3C"},
+    #             {"title": "On Duty", "value": f"{active_count}/{team_size}", "color": "#F39C12"}
+    #         ]
+    #         for item in card_data:
+    #             card = self.create_card(self.stats_container, item['title'], item['value'], item['color'])
+    #             card.pack(side="left", padx=(0, 20), expand=True, fill="both")
+    #     except Exception as e: print(f"Stats Refresh Error: {e}")
     def refresh_stats(self):
         try:
             self.db.cursor.execute(
@@ -158,20 +199,36 @@ class MemberDashboard(ctk.CTkFrame):
             )
             stats_res = self.db.cursor.fetchone()
             team_size, active_count = stats_res['total'] or 0, stats_res['active'] or 0
-
+ 
+            # Fetch Active Tasks count
+            self.db.cursor.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE assigned_to = %s AND status != 'Completed'",
+                    (self.user['full_name'],)
+                )
+            active_tasks_count = self.db.cursor.fetchone()['COUNT(*)'] or 0
+ 
+            # Fetch Urgent OT (Pending Overtime Requests) count
+            self.db.cursor.execute(
+                "SELECT COUNT(*) FROM overtime_requests WHERE member_id = %s AND status = 'Pending'",
+                (self.user['id'],)
+            )
+            urgent_ot_count = self.db.cursor.fetchone()['COUNT(*)'] or 0
+ 
             for w in self.stats_container.winfo_children(): w.destroy()
-            
+           
             card_data = [
                 {"title": "Team Size", "value": str(team_size), "color": "#3498DB"},
-                {"title": "Active Tasks", "value": "0", "color": "#10B981"},
-                {"title": "Urgent OT", "value": "0", "color": "#E74C3C"},
+                {"title": "Active Tasks", "value": str(active_tasks_count), "color": "#10B981"},
+                {"title": "Urgent OT", "value": str(urgent_ot_count), "color": "#E74C3C"},
                 {"title": "On Duty", "value": f"{active_count}/{team_size}", "color": "#F39C12"}
             ]
             for item in card_data:
                 card = self.create_card(self.stats_container, item['title'], item['value'], item['color'])
                 card.pack(side="left", padx=(0, 20), expand=True, fill="both")
         except Exception as e: print(f"Stats Refresh Error: {e}")
-
+        
     def destroy(self):
         self._is_destroyed = True
+        if self._after_id:
+            self.after_cancel(self._after_id)
         super().destroy()

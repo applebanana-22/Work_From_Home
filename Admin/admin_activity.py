@@ -340,68 +340,68 @@ class AdminAnnouncements(ctk.CTkFrame):
 
         return container
     
-    # def add_reply(self, announcement_id, textbox):
-    #     try:
-    #         reply_text = textbox.get("1.0", "end-1c").strip()
-
-    #         # Ignore empty or placeholder text
-    #         if not reply_text or reply_text == "Write a reply...":
-    #             return
-
-    #         # Save reply to database
-    #         self.db.insert_reply(announcement_id, self.user, reply_text)
-
-    #         # Reset textbox with placeholder
-    #         textbox.delete("1.0", "end")
-    #         textbox.insert("1.0", "Write a reply...")
-    #         textbox.configure(text_color="gray")
-
-    #         # Refresh UI
-    #         self.refresh_list()
-
-    #     except Exception as e:
-    #         messagebox.showerror("Error", str(e))
-    
     def add_reply(self, announcement_id, textbox):
-        message = textbox.get("0.0", "end-1c").strip()
-        if not message:
-            return
-
         try:
-            # 1. Save the actual reply (Your existing code structure)
-            # (Assuming your database schema uses an announcements_replies table or similar)
-            
-            # 2. Find who created the original announcement to notify them
-            self.db.cursor.execute(
-                "SELECT created_by, sender_role FROM announcements WHERE id = %s", 
-                (announcement_id,)
-            )
-            original_post = self.db.cursor.fetchone()
-            
-            if original_post:
-                # Construct a clear notification string containing the keyword 'reply'
-                notif_msg = f"New reply from {self.user['full_name']} on post: '{original_post['sender_role']}'"
-                
-                # 3. Insert notification for the target user
-                # Find the target user's ID using their full name
-                self.db.cursor.execute("SELECT id FROM users WHERE full_name = %s", (original_post['created_by'],))
-                target_user = self.db.cursor.fetchone()
-                
-                if target_user and target_user['id'] != self.user['id']:
-                    self.db.cursor.execute(
-                        """
-                        INSERT INTO notifications (user_id, message, is_read, created_at)
-                        VALUES (%s, %s, 0, NOW())
-                        """,
-                        (target_user['id'], notif_msg)
-                    )
-            
-            self.db.conn.commit()
-            # Clear textbox / refresh replies UI view here...
+            reply_text = textbox.get("1.0", "end-1c").strip()
+
+            # Ignore empty or placeholder text
+            if not reply_text or reply_text == "Write a reply...":
+                return
+
+            # Save reply to database
+            self.db.insert_reply(announcement_id, self.user, reply_text)
+
+            # Reset textbox with placeholder
+            textbox.delete("1.0", "end")
+            textbox.insert("1.0", "Write a reply...")
+            textbox.configure(text_color="gray")
+
+            # Refresh UI
+            self.refresh_list()
 
         except Exception as e:
-            self.db.conn.rollback()
-            print(f"Error saving reply notification: {e}")
+            messagebox.showerror("Error", str(e))
+    
+    # def add_reply(self, announcement_id, textbox):
+    #     message = textbox.get("0.0", "end-1c").strip()
+    #     if not message:
+    #         return
+
+    #     try:
+    #         # 1. Save the actual reply (Your existing code structure)
+    #         # (Assuming your database schema uses an announcements_replies table or similar)
+            
+    #         # 2. Find who created the original announcement to notify them
+    #         self.db.cursor.execute(
+    #             "SELECT created_by, sender_role FROM announcements WHERE id = %s", 
+    #             (announcement_id,)
+    #         )
+    #         original_post = self.db.cursor.fetchone()
+            
+    #         if original_post:
+    #             # Construct a clear notification string containing the keyword 'reply'
+    #             notif_msg = f"New reply from {self.user['full_name']} on post: '{original_post['sender_role']}'"
+                
+    #             # 3. Insert notification for the target user
+    #             # Find the target user's ID using their full name
+    #             self.db.cursor.execute("SELECT id FROM users WHERE full_name = %s", (original_post['created_by'],))
+    #             target_user = self.db.cursor.fetchone()
+                
+    #             if target_user and target_user['id'] != self.user['id']:
+    #                 self.db.cursor.execute(
+    #                     """
+    #                     INSERT INTO notifications (user_id, message, is_read, created_at)
+    #                     VALUES (%s, %s, 0, NOW())
+    #                     """,
+    #                     (target_user['id'], notif_msg)
+    #                 )
+            
+    #         self.db.conn.commit()
+    #         # Clear textbox / refresh replies UI view here...
+
+    #     except Exception as e:
+    #         self.db.conn.rollback()
+    #         print(f"Error saving reply notification: {e}")
         
     def send_with_ctrl_enter(self, event, announcement_id, textbox):
         self.add_reply(announcement_id, textbox)
