@@ -212,12 +212,12 @@ class MemberReportFrame(ctk.CTkFrame):
         ctk.CTkFrame(inner, width=1, height=32, fg_color=("#DBDBDB", "#2A3A4A")).pack(side="left", padx=(0, 20))
 
         def _btn(parent, text, color, hover, cmd):
-            ctk.CTkButton(parent, text=text, width=80, height=36, corner_radius=9, font=("Arial", 12, "bold"),
+            ctk.CTkButton(parent, text=text, width=60, height=36, corner_radius=9, font=("Arial", 12, "bold"),
                          fg_color=color, hover_color=hover, command=cmd).pack(side="left", padx=4)
 
         _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view)
         _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters)
-        _btn(inner, "📄 Export", "#C0392B", "#922B21", self.export_pdf_reports)
+        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_pdf_reports)
 
         list_header = ctk.CTkFrame(self, fg_color="transparent")
         list_header.pack(fill="x", padx=80, pady=(4, 2))

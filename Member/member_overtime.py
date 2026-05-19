@@ -80,6 +80,45 @@ class MemberOvertime(ctk.CTkFrame):
         # Show default tab
         self.show_pending_tab()
 
+    def _show_message(self, message, message_type="info", duration=3000):
+        """
+        Displays a transient message in the top-right corner of the master window.
+        message_type: "info", "warning", "error", "success"
+        """
+        # Determine colors based on message_type
+        if message_type == "error":
+            bg_color = "#E74C3C"  # Red
+            text_color = "white"
+        elif message_type == "warning":
+            bg_color = "#F39C12"  # Orange
+            text_color = "white"
+        elif message_type == "success":
+            bg_color = "#27AE60"  # Green
+            text_color = "white"
+        else:  # info
+            bg_color = "#3498DB"  # Blue
+            text_color = "white"
+
+        # Create a frame for the message
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        # Position in the top right corner, with some padding
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne") 
+
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color=text_color,
+            font=("Arial", 12, "bold"),
+            wraplength=250 # Wrap text if too long
+        ).pack(padx=15, pady=10)
+
+        # Destroy the message after 'duration' milliseconds
+        self.master.after(duration, message_frame.destroy)
+
     def on_tab_change(self, value):
         """Handle tab/segmented button change"""
         if value == "📋 Pending Requests":
@@ -235,7 +274,7 @@ class MemberOvertime(ctk.CTkFrame):
 
         except Exception as e:
             print(f"Error loading pending requests: {e}")
-            messagebox.showerror("Error", f"Could not load requests: {e}")
+            self._show_message(f"Could not load requests: {e}", "error")
 
     def refresh_history(self):
         """Show OT request history (non-pending)"""
@@ -357,7 +396,7 @@ class MemberOvertime(ctk.CTkFrame):
 
         except Exception as e:
             print(f"Error loading history: {e}")
-            messagebox.showerror("Error", f"Could not load history: {e}")
+            self._show_message(f"Could not load history: {e}", "error")
 
     def handle_reject(self, ot_id):
         """Handle reject action with reason input (styled popup)"""
@@ -381,7 +420,7 @@ class MemberOvertime(ctk.CTkFrame):
                 self.update_status(ot_id, 'Rejected', reason)
                 popup.destroy()
             else:
-                messagebox.showwarning("Warning", "Reason is required to reject.")
+                self._show_message("Reason is required to reject.", "warning")
 
         def cancel():
             popup.destroy()
@@ -444,7 +483,7 @@ class MemberOvertime(ctk.CTkFrame):
             # 3. Commit changes to Database
             self.db.conn.commit()
             
-            messagebox.showinfo("Success", f"OT Request {new_status}!")
+            self._show_message(f"OT Request {new_status}!", "success")
             
             # 4. Refresh UI Tabs
             current_tab = self.segmented_btn.get()
@@ -456,4 +495,4 @@ class MemberOvertime(ctk.CTkFrame):
         except Exception as e:
             if hasattr(self.db, 'conn'):
                 self.db.conn.rollback()
-            messagebox.showerror("Error", f"System Error: {e}")
+            self._show_message(f"System Error: {e}", "error")

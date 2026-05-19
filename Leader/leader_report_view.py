@@ -206,7 +206,7 @@ class LeaderReportView(ctk.CTkFrame):
         _lbl(inner, "Member")
         self.member_entry = ctk.CTkEntry(
             inner, placeholder_text="Search member…",
-            width=150, height=36, corner_radius=8,
+            width=100, height=36, corner_radius=8,
             border_color=("#CCCCCC", "#2C2C2C"), border_width=1,
             fg_color=("#FFFFFF", "#1E1E1E"),
             text_color=("#000000", "#FFFFFF"),

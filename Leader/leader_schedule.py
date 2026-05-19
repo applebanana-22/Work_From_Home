@@ -162,7 +162,7 @@ class LeaderSchedule(ctk.CTkFrame):
             fg_color=("#F2F4F4", "#141E2B"),
             border_width=1, border_color=("#D5D8DC", "#253545")
         )
-        filter_card.pack(fill="x", padx=10, pady=(4, 10))
+        filter_card.pack(fill="x", padx=2, pady=(4, 10))
 
         inner = ctk.CTkFrame(filter_card, fg_color="transparent")
         inner.pack(fill="x", padx=18, pady=14)
@@ -189,7 +189,7 @@ class LeaderSchedule(ctk.CTkFrame):
         _lbl(inner, "Member")
         self.name_filter = ctk.CTkEntry(
             inner, placeholder_text="Search name…",
-            width=150, height=36,
+            width=100, height=36,
             corner_radius=8,
             border_color=("#ABB2B9", "#3D5166"), border_width=1,
             fg_color=("#FFFFFF", "#1E2A3A"),
@@ -215,7 +215,7 @@ class LeaderSchedule(ctk.CTkFrame):
         self.status_filter.pack(side="left", padx=(0, 24))
 
         # ── Action buttons ────────────────────────────────────────────────────
-        def _btn(parent, text, color, hover, cmd, width=100):
+        def _btn(parent, text, color, hover, cmd, width=70):
             b = ctk.CTkButton(
                 parent, text=text, width=width, height=36,
                 corner_radius=9,
@@ -227,9 +227,9 @@ class LeaderSchedule(ctk.CTkFrame):
             b.pack(side="left", padx=4)
             return b
 
-        _btn(inner, "🔍  Filter",  "#2471A3", "#1A5276", self.refresh_view, width=72)
-        _btn(inner, "✖  Clear",   "#566573", "#424949", self.clear_filters, width=72)
-        _btn(inner, "📄  Export", "#C0392B", "#922B21", self.export_to_pdf, width=72)
+        _btn(inner, "🔍  Filter",  "#2471A3", "#1A5276", self.refresh_view)
+        _btn(inner, "✖  Clear",   "#566573", "#424949", self.clear_filters)
+        _btn(inner, "📄  Export", "#C0392B", "#922B21", self.export_to_pdf)
 
         # ── List header ───────────────────────────────────────────────────────
         list_header = ctk.CTkFrame(self.wrapper, fg_color="transparent")

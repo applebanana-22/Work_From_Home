@@ -191,6 +191,7 @@ class MemberDashboard(ctk.CTkFrame):
     #             card = self.create_card(self.stats_container, item['title'], item['value'], item['color'])
     #             card.pack(side="left", padx=(0, 20), expand=True, fill="both")
     #     except Exception as e: print(f"Stats Refresh Error: {e}")
+    
     def refresh_stats(self):
         try:
             self.db.cursor.execute(

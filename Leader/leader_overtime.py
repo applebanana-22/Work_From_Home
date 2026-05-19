@@ -129,7 +129,7 @@ class AutocompleteComboBox(ctk.CTkFrame):
         if hasattr(self, "popup") and self.popup.winfo_exists():
             return
 
-        self.popup = ctk.CTkToplevel(self)
+        self.popup = ctk.CTkToplevel(self.winfo_toplevel())
         self.popup.overrideredirect(True)
         self.popup.attributes("-topmost", True)
 
@@ -244,6 +244,45 @@ class LeaderOvertime(ctk.CTkFrame):
         
         # Start auto-cancellation check
         self.check_overdue_requests()
+
+    def _show_message(self, message, message_type="info", duration=3000):
+        """
+        Displays a transient message in the top-right corner of the master window.
+        message_type: "info", "warning", "error", "success"
+        """
+        # Determine colors based on message_type
+        if message_type == "error":
+            bg_color = "#E74C3C"  # Red
+            text_color = "white"
+        elif message_type == "warning":
+            bg_color = "#F39C12"  # Orange
+            text_color = "white"
+        elif message_type == "success":
+            bg_color = "#27AE60"  # Green
+            text_color = "white"
+        else:  # info
+            bg_color = "#3498DB"  # Blue
+            text_color = "white"
+
+        # Create a frame for the message
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        # Position in the top right corner, with some padding
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne") 
+
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color=text_color,
+            font=("Arial", 12, "bold"),
+            wraplength=250 # Wrap text if too long
+        ).pack(padx=15, pady=10)
+
+        # Destroy the message after 'duration' milliseconds
+        self.winfo_toplevel().after(duration, message_frame.destroy)
 
     def get_team_id(self):
         self.db.cursor.execute("SELECT team_id FROM users WHERE id = %s", (self.user['id'],))
@@ -613,38 +652,53 @@ class LeaderOvertime(ctk.CTkFrame):
         member_id = self.member_map.get(member_name)
         project_id = self.project_map.get(project_name)
 
+        # Reset all borders to default before validation
+        default_border_color = self.COLOR_BORDER
+        self.member_cb.configure(border_color=default_border_color)
+        self.project_cb.configure(border_color=default_border_color)
+        self.date_ent.btn.configure(border_color=default_border_color)
+        self.hours_ent.configure(border_color=default_border_color)
+        self.reason_ent.configure(border_color=default_border_color)
+
         if not member_id:
-            messagebox.showwarning("Validation Error", "Please select a valid member")
+            self._show_message("Please select a valid member", "error")
+            self.member_cb.configure(border_color="red")
             return
         
         if not project_id:
-            messagebox.showwarning("Validation Error", "Please select a valid project")
+            self._show_message("Please select a valid project", "error")
+            self.project_cb.configure(border_color="red")
             return
 
         try:
             hours = float(self.hours_ent.get())
             if hours <= 0 or hours > 24:
-                messagebox.showwarning("Validation Error", "Hours must be between 1 and 24")
+                self._show_message("Hours must be between 1 and 24", "error")
+                self.hours_ent.configure(border_color="red")
                 return
         except ValueError:
-            messagebox.showwarning("Validation Error", "Please enter valid hours (e.g., 2.5, 4, 8)")
+            self._show_message("Please enter valid hours (e.g., 2.5, 4, 8)", "error")
+            self.hours_ent.configure(border_color="red")
             return
 
         selected_date = self.date_ent.get_date()
         if not selected_date:
-            messagebox.showwarning("Validation Error", "Please select a date")
+            self._show_message("Please select a date", "error")
+            self.date_ent.btn.configure(border_color="red")
             return
         
         # Check if date is in the past
         if selected_date < date.today():
-            messagebox.showwarning("Validation Error", "Cannot select a past date for overtime request!")
+            self._show_message("Cannot select a past date for overtime request!", "error")
+            self.date_ent.btn.configure(border_color="red")
             return
 
         ot_date = selected_date.strftime('%Y-%m-%d')
         reason = self.reason_ent.get("1.0", "end").strip()
 
         if not reason:
-            messagebox.showwarning("Validation Error", "Please provide reason/tasks for overtime")
+            self._show_message("Please provide reason/tasks for overtime", "error")
+            self.reason_ent.configure(border_color="red")
             return
 
         # Check for duplicate - only check for Pending and Accepted status (not Rejected or Cancelled)
@@ -674,9 +728,13 @@ class LeaderOvertime(ctk.CTkFrame):
             INSERT INTO notifications (user_id, message, is_read, created_at) 
             VALUES (%s, %s, 0, NOW())""", (member_id, msg))
 
-        self.db.conn.commit()
-        messagebox.showinfo("Success", f"✅ Overtime request for {member_name} has been submitted successfully!")
-        self.show_page("main")
+        try:
+            self.db.conn.commit()
+            self._show_message(f"Overtime request for {member_name} has been submitted successfully!", "success")
+            self.show_page("main")
+        except Exception as e:
+            self.db.conn.rollback()
+            self._show_message(f"System Error: {e}", "error")
 
     def create_edit_page(self):
         self.edit_page = ctk.CTkFrame(self.pages, fg_color="transparent")
@@ -936,15 +994,19 @@ class LeaderOvertime(ctk.CTkFrame):
             messagebox.showerror("Validation Error", "Please enter valid hours (e.g., 2.5, 4, 8)")
             return
 
-        self.db.cursor.execute("""
-            UPDATE overtime_requests
-            SET hours = %s
-            WHERE id = %s AND status = 'Pending'
-        """, (hours, ot_id))
-        
-        self.db.conn.commit()
-        messagebox.showinfo("Success", f"✅ Overtime request has been updated successfully!")
-        self.show_page("main")
+        try:
+            self.db.cursor.execute("""
+                UPDATE overtime_requests
+                SET hours = %s
+                WHERE id = %s AND status = 'Pending'
+            """, (hours, ot_id))
+            
+            self.db.conn.commit()
+            self._show_message("Overtime request updated successfully!", "success")
+            self.show_page("main")
+        except Exception as e:
+            self.db.conn.rollback()
+            self._show_message(f"System Error: {e}", "error")
 
     def clear_filters(self):
         """Clear all filter fields"""
@@ -1200,7 +1262,7 @@ class LeaderOvertime(ctk.CTkFrame):
         result = self.db.cursor.fetchone()
         
         if not result:
-            messagebox.showerror("Error", "Request not found!")
+            self._show_message("Request not found!", "error")
             return
         
         status = result['status']
@@ -1214,7 +1276,11 @@ class LeaderOvertime(ctk.CTkFrame):
             msg = "⚠️ Are you sure you want to delete this overtime request?\n\nThis action cannot be undone!"
         
         if messagebox.askyesno("Confirm Delete", msg):
-            self.db.cursor.execute("DELETE FROM overtime_requests WHERE id = %s", (request_id,))
-            self.db.conn.commit()
-            messagebox.showinfo("Success", "✅ Overtime request has been deleted successfully!")
-            self.refresh_ui()
+            try:
+                self.db.cursor.execute("DELETE FROM overtime_requests WHERE id = %s", (request_id,))
+                self.db.conn.commit()
+                self._show_message("Overtime request deleted successfully!", "success")
+                self.refresh_ui()
+            except Exception as e:
+                self.db.conn.rollback()
+                self._show_message(f"System Error: {e}", "error")
