@@ -41,7 +41,7 @@ class DatePickerButton(ctk.CTkFrame):
             border_color=("#ABB2B9", "#2A3A4A")
         )
 
-        # Initialize calendar with the style name string
+        # Initialize calendar using the shared Custom.Calendar style
         self.cal = Calendar(
             self.panel,
             style="Custom.Calendar",
@@ -71,6 +71,7 @@ class DatePickerButton(ctk.CTkFrame):
         h_bg = "#16213E" if is_dark else "#EAECEE"
         h_fg = "#4FC3F7" if is_dark else "#2471A3"
 
+        # Configure a named ttk style that tkcalendar can reference
         style.configure("Custom.Calendar", 
                         background=bg, foreground=fg,
                         headersbackground=h_bg, headersforeground=h_fg,
@@ -81,7 +82,10 @@ class DatePickerButton(ctk.CTkFrame):
         
         # Safely configure the calendar if it exists
         if hasattr(self, 'cal'):
-            self.cal.configure(style="Custom.Calendar")
+            try:
+                self.cal.configure(style="Custom.Calendar")
+            except Exception:
+                pass
 
     def _fmt(self): return f"   📅   {self._date.strftime('%Y-%m-%d')}"
 
@@ -115,7 +119,7 @@ class MemberSchedule(ctk.CTkFrame):
         self.user = user
         self.setup_ui()
         self.auto_refresh()
-        
+
     def setup_ui(self):
         self.wrapper = ctk.CTkFrame(self, fg_color="transparent")
         self.wrapper.pack(fill="both", expand=True, padx=80, pady=5)
@@ -145,7 +149,7 @@ class MemberSchedule(ctk.CTkFrame):
         self.end_cal.pack(side="left", padx=(0, 24))
 
         ctk.CTkButton(inner, text="🔍 Check My Dates", fg_color="#2471A3", hover_color="#1A5276",
-                      width=140, height=36, corner_radius=9, font=("Arial", 12, "bold"),
+                      width=140, height=36, corner_radius=8, font=("Arial", 12, "bold"),
                       command=self.refresh_view).pack(side="left", padx=(0, 4))
 
         self.scroll = ctk.CTkScrollableFrame(self.wrapper, fg_color=("#FFFFFF", "#0D1117"),
@@ -153,10 +157,55 @@ class MemberSchedule(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.refresh_view()
 
+    def _show_message(self, message, message_type="info", duration=3000):
+        """
+        Displays a transient message in the top-right corner of the master window.
+        message_type: "info", "warning", "error", "success"
+        """
+        # Determine colors based on message_type
+        if message_type == "error":
+            bg_color = "#E74C3C"  # Red
+            text_color = "white"
+        elif message_type == "warning":
+            bg_color = "#F39C12"  # Orange
+            text_color = "white"
+        elif message_type == "success":
+            bg_color = "#27AE60"  # Green
+            text_color = "white"
+        else:  # info
+            bg_color = "#3498DB"  # Blue
+            text_color = "white"
+
+        # Create a frame for the message
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        # Position in the top right corner, with some padding
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne") 
+
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color=text_color,
+            font=("Arial", 12, "bold"),
+            wraplength=250 # Wrap text if too long
+        ).pack(padx=15, pady=10)
+
+        # Destroy the message after 'duration' milliseconds
+        self.winfo_toplevel().after(duration, message_frame.destroy)
+
     def refresh_view(self):
         for child in self.scroll.winfo_children(): child.destroy()
         user_id = self.user.get('id')
         start, end = self.start_cal.get_date(), self.end_cal.get_date()
+        today = datetime.today().date()
+
+        # Validation: allow past ranges; only ensure end is not before start
+        if end < start:
+            self._show_message("End date cannot be earlier than Start date", "error")
+            return
 
         try:
             query = """SELECT schedule_date, status FROM wfh_schedules 
@@ -170,6 +219,8 @@ class MemberSchedule(ctk.CTkFrame):
                     text="No schedule assigned for this period.",
                     text_color=("#7B7D7D", "#AABBCD")
                 ).pack(pady=20)
+                # show transient message as well
+                self._show_message("No record found for selected period", "info")
                 return
 
             header_row = ctk.CTkFrame(
@@ -228,10 +279,10 @@ class MemberSchedule(ctk.CTkFrame):
                     text=f"{status_icon} {r['status'].upper()}",
                     fg_color=status_color,
                     text_color=status_text,
-                    corner_radius=10,
+                    corner_radius=6,
                     font=("Arial", 11, "bold"),
-                    height=26,
-                    width=96
+                    height=30,
+                    width=75
                 ).pack(side="right", padx=18, pady=16)
         except Exception as e: print(f"Sync error: {e}")
 

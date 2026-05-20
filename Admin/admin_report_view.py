@@ -6,6 +6,7 @@ import tkinter as tk
 from fpdf import FPDF
 from tkcalendar import Calendar
 from collections import defaultdict
+import os
 
 # ── Reusable modern date-picker ──────────────────────────────────────────────
 class DatePickerButton(ctk.CTkFrame):
@@ -65,6 +66,7 @@ class DatePickerButton(ctk.CTkFrame):
             year=self._date.year,
             month=self._date.month,
             day=self._date.day,
+            maxdate=datetime.today().date(),
             showweeknumbers=False,
             firstweekday="monday",
             font=("Arial", 11),
@@ -120,6 +122,33 @@ class DailyReportFrame(ctk.CTkFrame):
         self.container.pack(fill="both", expand=True)
 
         self.show_reports_list()
+
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
+
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        self.after(duration, message_frame.destroy)
 
     def load_team_options(self):
         try:
@@ -334,7 +363,8 @@ class DailyReportFrame(ctk.CTkFrame):
 
         _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view, width=74)
         _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters, width=70)
-        _btn(inner, "📄 Export", "#C0392B", "#922B21", self.export_to_pdf, width=72)
+        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_to_pdf, width=70)
+        _btn(inner, "📥 CSV", "#16A085", "#117A65", self.export_to_csv, width=70)
 
         list_header = ctk.CTkFrame(self.container, fg_color="transparent")
         list_header.pack(fill="x", padx=content_padx, pady=(4, 2))
@@ -367,7 +397,7 @@ class DailyReportFrame(ctk.CTkFrame):
         start = self.start_cal.get_date()
         end = self.end_cal.get_date()
         if start > end:
-            messagebox.showerror("Invalid Date", "Start date cannot be later than End date.")
+            self._show_message("Start date cannot be later than End date.", "error")
             return
 
         member_search = self.member_entry.get().strip()
@@ -482,7 +512,7 @@ class DailyReportFrame(ctk.CTkFrame):
                     command=lambda tlist=tasks, m=member, d=date_val: self.open_detail_with_state(m, d, tlist)
                 ).pack()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            self._show_message(str(e, "error"))
 
     def refresh_counts(self):
         try:
@@ -632,7 +662,7 @@ class DailyReportFrame(ctk.CTkFrame):
 
             self.refresh_counts()
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            self._show_message(str(e, "error"))
 
     def open_detail_with_state(self, member, date_val, tasks):
         self.start_date = self.start_cal.get_date()
@@ -775,8 +805,49 @@ class DailyReportFrame(ctk.CTkFrame):
         try:
             self.db.cursor.execute(query, tuple(params))
             rows = self.db.cursor.fetchall()
+            grouped = defaultdict(list)
+
+            for r in rows:
+                key = (r['report_date'], r['full_name'])
+                grouped[key].append(r)
+
+            rows = []
+
+            for (report_date, member_name), reports in grouped.items():
+
+                first = reports[0]
+
+                rows.append({
+                    "report_date": report_date,
+                    "full_name": member_name,
+                    "team_name": first.get("team_name", "-"),
+
+                    "today_work": "\n".join(
+                        r.get("today_work", "")
+                        for r in reports
+                        if r.get("today_work")
+                    ),
+
+                    "tomorrow_work": "\n".join(
+                        r.get("tomorrow_work", "")
+                        for r in reports
+                        if r.get("tomorrow_work")
+                    ),
+
+                    "problems_issues": "\n".join(
+                        r.get("problems_issues", "")
+                        for r in reports
+                        if r.get("problems_issues")
+                    ),
+
+                    "shared_matters": "\n".join(
+                        r.get("shared_matters", "")
+                        for r in reports
+                        if r.get("shared_matters")
+                    )
+                })
             if not rows:
-                messagebox.showinfo("No Data", "No reports found.")
+                self._show_message("No reports found.", "info")
                 return
 
             file_path = filedialog.asksaveasfilename(
@@ -789,10 +860,14 @@ class DailyReportFrame(ctk.CTkFrame):
 
             class PDF(FPDF):
                 def header(self):
+                    self.set_draw_color(169, 169, 169)
+                    self.set_fill_color(0, 0, 139)
+                    self.set_text_color(0, 0, 0)
                     self.set_font("Arial", "B", 20)
                     self.cell(0, 12, "Admin Daily Reports", ln=True, align="C")
                     self.ln(4)
                     self.set_font("Arial", "B", 11)
+                    self.set_text_color(0, 0, 0)
                     self.cell(14, 8, "Date :", ln=0)
                     self.set_font("Arial", "", 11)
                     self.cell(0, 8, f"{self.start_date} ~ {self.end_date}", ln=True)
@@ -800,9 +875,14 @@ class DailyReportFrame(ctk.CTkFrame):
                     self.set_font("Arial", "B", 10)
                     headers = ["Date", "Name", "Team", "Today's Work Detail", "Tomorrow's Work Schedule", "Problems/Issues", "Shared Matters"]
                     widths = self.col_widths
+                    self.set_draw_color(169, 169, 169)
+                    self.set_fill_color(0, 0, 139)
+                    self.set_text_color(245, 245, 245)
                     for i, header in enumerate(headers):
-                        self.cell(widths[i], 12, header, border=1, align="C")
+                        self.cell(widths[i], 12, header, border=1, align="C", fill=True)
                     self.ln()
+                    self.set_text_color(0, 0, 0)
+                    self.set_fill_color(255, 255, 255)
 
             pdf = PDF("L", "mm", "A4")
             pdf.start_date = start
@@ -854,6 +934,7 @@ class DailyReportFrame(ctk.CTkFrame):
                 if pdf.get_y() + row_height > 190:
                     pdf.add_page()
                     pdf.set_font("Arial", "", body_font_size)
+                pdf.set_draw_color(169, 169, 169)
                 x = pdf.get_x(); y = pdf.get_y()
                 for width in pdf.col_widths:
                     pdf.rect(x, y, width, row_height)
@@ -869,6 +950,282 @@ class DailyReportFrame(ctk.CTkFrame):
                 pdf.set_y(y + row_height)
 
             pdf.output(file_path)
-            messagebox.showinfo("Success", "PDF exported successfully!")
+            self._show_message("PDF exported successfully!", "success")
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            self._show_message(str(e, "error"))
+
+    def export_to_csv(self):
+        try:
+            from openpyxl import Workbook
+            from openpyxl.utils import get_column_letter
+            from openpyxl.styles import Alignment
+        except ImportError:
+            self._show_message("openpyxl is required to export Excel files. Install it with:\n\npip install openpyxl", "error")
+            return
+
+        start = self.start_cal.get_date()
+        end = self.end_cal.get_date()
+        member_search = self.member_entry.get().strip()
+        team_id = self.team_map.get(self.selected_team)
+
+        query = '''
+        SELECT
+            dr.report_date,
+            u.full_name,
+            t.team_name,
+            dr.today_work,
+            dr.tomorrow_work,
+            dr.problems_issues,
+            dr.shared_matters
+            FROM users u
+            JOIN daily_reports dr ON u.id = dr.user_id
+            LEFT JOIN teams t ON u.team_id = t.team_id
+            WHERE u.role='member'
+            AND dr.report_date BETWEEN %s AND %s
+        '''
+        params = [start, end]
+
+        if team_id is not None:
+            query += " AND u.team_id = %s"
+            params.append(team_id)
+
+        if member_search:
+            query += " AND u.full_name LIKE %s"
+            params.append(f"%{member_search}%")
+
+        query += '''
+            ORDER BY
+            dr.report_date DESC,
+            u.full_name ASC,
+            dr.created_at ASC
+        '''
+
+        try:
+            self.db.cursor.execute(query, tuple(params))
+            rows = self.db.cursor.fetchall()
+            grouped = defaultdict(list)
+
+            for r in rows:
+                key = (r['report_date'], r['full_name'])
+                grouped[key].append(r)
+
+            rows = []
+
+            for (report_date, member_name), reports in grouped.items():
+
+                first = reports[0]
+
+                rows.append({
+                    "report_date": report_date,
+                    "full_name": member_name,
+                    "team_name": first.get("team_name", "-"),
+
+                    "today_work": "\n".join(
+                        r.get("today_work", "")
+                        for r in reports
+                        if r.get("today_work")
+                    ),
+
+                    "tomorrow_work": "\n".join(
+                        r.get("tomorrow_work", "")
+                        for r in reports
+                        if r.get("tomorrow_work")
+                    ),
+
+                    "problems_issues": "\n".join(
+                        r.get("problems_issues", "")
+                        for r in reports
+                        if r.get("problems_issues")
+                    ),
+
+                    "shared_matters": "\n".join(
+                        r.get("shared_matters", "")
+                        for r in reports
+                        if r.get("shared_matters")
+                    )
+                })
+            if not rows:
+                self._show_message("No reports found.", "info")
+                return
+
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".xlsx",
+                filetypes=[("Excel files", "*.xlsx")],
+                initialfile=f"Admin_Daily_Reports.xlsx"
+            )
+            if not file_path:
+                return
+            base, ext = os.path.splitext(file_path)
+            if ext.lower() != ".xlsx":
+                file_path = base + ".xlsx"
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.title = "Reports"
+
+            # Title and date rows (mimic PDF)
+            ncols = 7
+            title = "Admin Daily Reports"
+            sheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+            tcell = sheet.cell(row=1, column=1, value=title)
+            tcell.font = tcell.font.copy(bold=True, size=18, color="000000")
+            tcell.alignment = tcell.alignment.copy(horizontal='center', vertical='center')
+            sheet.row_dimensions[1].height = 26
+
+            # Date row
+            date_text = f"Date : {self.start_date} ~ {self.end_date}"
+            sheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
+            dcell = sheet.cell(row=2, column=1, value=date_text)
+            dcell.font = dcell.font.copy(bold=False, size=11, color="000000")
+            dcell.alignment = dcell.alignment.copy(horizontal='left', vertical='center')
+            sheet.row_dimensions[2].height = 18
+
+            headers = [
+                "Date",
+                "Name",
+                "Team",
+                "Today's Work Detail",
+                "Tomorrow's Work Schedule",
+                "Problems/Issues",
+                "Shared Matters"
+            ]
+
+            # Header row index
+            hdr_row = 4
+
+            from openpyxl.styles import (
+                PatternFill,
+                Border,
+                Side,
+                Font,
+                Alignment
+            )
+
+            header_fill = PatternFill(
+                fill_type="solid",
+                start_color="D9D9D9",
+                end_color="D9D9D9"
+            )
+
+            side = Side(
+                border_style="thin",
+                color="000000"
+            )
+
+            for c, h in enumerate(headers, start=1):
+
+                cell = sheet.cell(
+                    row=hdr_row,
+                    column=c,
+                    value=h
+                )
+
+                cell.font = Font(
+                    bold=True,
+                    color="000000"
+                )
+
+                cell.fill = header_fill
+
+                cell.alignment = Alignment(
+                    horizontal="center",
+                    vertical="center",
+                    wrap_text=True
+                )
+
+                cell.border = Border(
+                    left=side,
+                    right=side,
+                    top=side,
+                    bottom=side
+                )
+
+            sheet.row_dimensions[hdr_row].height = 25
+
+            # Append data rows starting after header
+            for r in rows:
+                values = [
+                    r['report_date'],
+                    r.get('full_name') or "-",
+                    r.get('team_name') or "-",
+                    r.get('today_work') or "-",
+                    r.get('tomorrow_work') or "-",
+                    r.get('problems_issues') or "-",
+                    r.get('shared_matters') or "-"
+                ]
+                row_idx = sheet.max_row + 1
+                for col_idx, value in enumerate(values, start=1):
+                    cell = sheet.cell(row=row_idx, column=col_idx, value=value)
+                    cell.alignment = Alignment(wrap_text=True, vertical='top')
+                    # apply border only if data exists
+                    side = Side(
+                        border_style="thin",
+                        color="A9A9A9"
+                    )
+
+                    cell.border = Border(
+                        left=side,
+                        right=side,
+                        top=side,
+                        bottom=side
+                    )
+
+            # Auto-size columns based on longest line
+            widths = []
+            for col_idx in range(1, ncols + 1):
+                max_width = 0
+                for row_idx in range(1, sheet.max_row + 1):
+                    cell_value = sheet.cell(row=row_idx, column=col_idx).value or ""
+                    for line in str(cell_value).splitlines():
+                        max_width = max(max_width, len(line))
+                widths.append(max(max_width + 2, 15))
+                sheet.column_dimensions[get_column_letter(col_idx)].width = widths[-1]
+
+            def estimate_row_height(row_idx):
+                max_lines = 1
+                for col_idx, width in enumerate(widths, start=1):
+                    cell_value = sheet.cell(row=row_idx, column=col_idx).value or ""
+                    lines = []
+                    for paragraph in str(cell_value).splitlines():
+                        current = ""
+                        for word in paragraph.split(" "):
+                            test_line = (current + " " + word).strip()
+                            if len(test_line) <= width:
+                                current = test_line
+                            else:
+                                if current:
+                                    lines.append(current)
+                                current = word
+                        if current:
+                            lines.append(current)
+                    max_lines = max(max_lines, len(lines))
+                return max(18, max_lines * 15)
+
+            for row_idx in range(3, sheet.max_row + 1):
+                sheet.row_dimensions[row_idx].height = estimate_row_height(row_idx)
+                
+            from openpyxl.styles import Border, Side
+
+            side = Side(
+                border_style="thin",
+                color="A9A9A9"
+            )
+
+            for row in sheet.iter_rows(
+                min_row=4,              # header row
+                max_row=sheet.max_row,
+                min_col=1,
+                max_col=7               # Date -> Shared Matters
+            ):
+                for cell in row:
+                    cell.border = Border(
+                        left=side,
+                        right=side,
+                        top=side,
+                        bottom=side
+                    )
+
+            workbook.save(file_path)
+            self._show_message("Excel exported successfully!", "success")
+        except Exception as e:
+            self._show_message(str(e, "error"))

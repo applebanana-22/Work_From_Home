@@ -68,7 +68,7 @@ class AdminTeams(ctk.CTkFrame):
 
         self.form_title = ctk.CTkLabel(
             self.form_frame,
-            text="Create New Team",
+            text=" New Team Creation Form ",
             font=("Arial", 16, "bold"),
             text_color=("black", "white")
         )
@@ -79,11 +79,37 @@ class AdminTeams(ctk.CTkFrame):
             pady=(12, 5)
         )
 
-        # ================= ENTRY =================
+        # ================= TEAM NAME LABEL =================
+
+        team_name_label_frame = ctk.CTkFrame(
+            self.form_frame,
+            fg_color="transparent"
+        )
+
+        team_name_label_frame.pack(
+            anchor="w",
+            padx=15,
+            pady=(10, 2)
+        )
+
+        ctk.CTkLabel(
+            team_name_label_frame,
+            text="Team Name",
+            font=("Arial", 13, "bold"),
+            text_color=("black", "white")
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            team_name_label_frame,
+            text=" *",
+            font=("Arial", 20, "bold"),
+            text_color="#EF4444"
+        ).pack(side="left")
+
+        # ================= TEAM NAME =================
 
         self.team_name_entry = ctk.CTkEntry(
             self.form_frame,
-            placeholder_text="Enter team name...",
             height=40,
             fg_color=("white", "#2B2B2B"),
             text_color=("black", "white"),
@@ -95,6 +121,84 @@ class AdminTeams(ctk.CTkFrame):
             padx=15,
             pady=5
         )
+        
+        # ================= INLINE ERROR LABEL =================
+
+        self.team_error_label = ctk.CTkLabel(
+            self.form_frame,
+            text="",
+            text_color="#EF4444",
+            font=("Arial", 12)
+        )
+
+        self.team_error_label.pack(
+            anchor="w",
+            padx=18,
+            pady=(0, 5)
+        )
+
+        # ================= DESCRIPTION LABEL =================
+
+        desc_label_frame = ctk.CTkFrame(
+            self.form_frame,
+            fg_color="transparent"
+        )
+
+        desc_label_frame.pack(
+            anchor="w",
+            padx=15,
+            pady=(10, 2)
+        )
+
+        ctk.CTkLabel(
+            desc_label_frame,
+            text="Team Description",
+            font=("Arial", 13, "bold"),
+            text_color=("black", "white")
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            desc_label_frame,
+            text=" *",
+            font=("Arial", 20, "bold"),
+            text_color="#EF4444"
+        ).pack(side="left")
+
+        # ================= DESCRIPTION =================
+
+        self.team_desc_entry = ctk.CTkTextbox(
+            self.form_frame,
+            height=40,
+            fg_color=("white", "#2B2B2B"),
+            text_color=("black", "white"),
+            border_color=("#D1D5DB", "#444"),
+            border_width=1
+        )
+
+        self.team_desc_entry.pack(
+            fill="x",
+            padx=15,
+            pady=5
+        )
+        
+        
+        
+        # ================= DESCRIPTION ERROR LABEL =================
+
+        self.desc_error_label = ctk.CTkLabel(
+            self.form_frame,
+            text="",
+            text_color="#EF4444",
+            font=("Arial", 12)
+        )
+
+        self.desc_error_label.pack(
+            anchor="w",
+            padx=18,
+            pady=(0, 5)
+        )
+
+        
 
         # ================= BUTTON ROW =================
 
@@ -113,10 +217,10 @@ class AdminTeams(ctk.CTkFrame):
 
         self.cancel_btn = ctk.CTkButton(
             self.form_btn_row,
-            text="Cancel",
+            text="Clear",
             fg_color="gray40",
             hover_color="gray60",
-            command=self.reset_form
+            command=self.clear_form
         )
 
         self.cancel_btn.pack(side="left")
@@ -125,7 +229,7 @@ class AdminTeams(ctk.CTkFrame):
 
         self.save_team_btn = ctk.CTkButton(
             self.form_btn_row,
-            text="Create Team",
+            text="Submit",
             fg_color="#10B981",
             hover_color="#0E9A6B",
             command=self.save_team
@@ -165,6 +269,8 @@ class AdminTeams(ctk.CTkFrame):
 
         self.load_teams()
 
+    
+
     # =========================================================
     # TOGGLE FORM
     # =========================================================
@@ -175,9 +281,14 @@ class AdminTeams(ctk.CTkFrame):
             self.reset_form()
             return
 
-        # clear entry before showing
         self.team_name_entry.delete(0, "end")
-        self.team_name_entry._activate_placeholder()
+        
+
+        self.team_desc_entry.delete("1.0", "end")
+
+        self.team_desc_entry.configure(
+            text_color=("black", "white")
+        )
 
         self.form_frame.pack(
             after=self.header_frame,
@@ -196,31 +307,41 @@ class AdminTeams(ctk.CTkFrame):
 
         self.form_frame.pack_forget()
 
-        # clear entry
+        # Clear inputs
         self.team_name_entry.delete(0, "end")
+        self.team_desc_entry.delete("1.0", "end")
 
-        # restore placeholder
-        self.team_name_entry._activate_placeholder()
+        # Reset border colors
+        self.team_name_entry.configure(
+            border_color=("#D1D5DB", "#444")
+        )
 
-        # remove focus
-        self.focus()
+        self.team_desc_entry.configure(
+            border_color=("#D1D5DB", "#444"),
+            text_color=("black", "white")
+        )
 
-        # reset states
+        # Clear error labels
+        self.team_error_label.configure(text="")
+        self.desc_error_label.configure(text="")
+
+        # Reset state
         self.edit_mode = False
         self.edit_team_id = None
         self.form_visible = False
 
-        # reset title
+        # Reset title/button
         self.form_title.configure(
             text="Create New Team"
         )
 
-        # reset button
         self.save_team_btn.configure(
-            text="Create Team",
+            text="Submit",
             fg_color="#10B981",
             hover_color="#0E9A6B"
         )
+
+        self.focus()
 
     # =========================================================
     # SAVE TEAM
@@ -233,20 +354,66 @@ class AdminTeams(ctk.CTkFrame):
         pattern = r"^[A-Z](?=.*\d).{3,}$"
 
         if not team_name:
-            messagebox.showwarning(
-                "Input Error",
-                "Team name cannot be empty."
+
+            self.team_name_entry.configure(
+                border_color="#EF4444"
             )
+
+            self.team_error_label.configure(
+                text="Team name is required."
+            )
+
             return
+
+        else:
+
+            self.team_name_entry.configure(
+                border_color=("#D1D5DB", "#444")
+            )
+
+            self.team_error_label.configure(
+                text=""
+            )
 
         if not re.match(pattern, team_name):
 
-            messagebox.showwarning(
-                "Format Error",
-                "Must start with Capital, 4+ chars, include number (e.g., Team1)"
+            self.team_name_entry.configure(
+                border_color="#EF4444"
+            )
+
+            self.team_error_label.configure(
+                text="Must start with Capital, 4+ chars, include number."
             )
 
             return
+        team_desc = self.team_desc_entry.get(
+            "1.0",
+            "end"
+        ).strip()
+
+        
+
+        if not team_desc:
+
+            self.team_desc_entry.configure(
+                border_color="#EF4444"
+            )
+
+            self.desc_error_label.configure(
+                text="Description is required."
+            )
+
+            return
+
+        else:
+
+            self.team_desc_entry.configure(
+                border_color=("#D1D5DB", "#444")
+            )
+
+            self.desc_error_label.configure(
+                text=""
+            )
 
         try:
 
@@ -254,32 +421,61 @@ class AdminTeams(ctk.CTkFrame):
 
             if self.edit_mode:
 
-                if self.db.update_team(
-                    self.edit_team_id,
-                    team_name
-                ):
+                existing_teams = self.db.get_all_teams()
 
-                    messagebox.showinfo(
-                        "Success",
-                        "Team updated!"
-                    )
+                for team in existing_teams:
+
+                    if (
+                        team['team_name'].lower() == team_name.lower()
+                        and team['team_id'] != self.edit_team_id
+                    ):
+
+                        self.team_name_entry.configure(
+                            border_color="#EF4444"
+                        )
+
+                        self.show_error_toast(
+                            "Team name already exists."
+                        )
+
+
+
+                        return
+
+                updated = self.db.update_team(
+                    self.edit_team_id,
+                    team_name,
+                    team_desc
+                )
 
             # CREATE TEAM
 
             else:
 
-                if self.db.create_team(team_name):
+                existing_teams = self.db.get_all_teams()
+
+                for team in existing_teams:
+
+                    if team['team_name'].lower() == team_name.lower():
+
+                        self.team_name_entry.configure(
+                            border_color="#EF4444"
+                        )
+
+                        self.show_error_toast(
+                            "Team name already exists."
+                        )
+
+                        return
+
+                if self.db.create_team(
+                    team_name,
+                    team_desc
+                ):
 
                     messagebox.showinfo(
                         "Success",
                         f"Team '{team_name}' created!"
-                    )
-
-                else:
-
-                    messagebox.showerror(
-                        "Error",
-                        "Team already exists."
                     )
 
             self.reset_form()
@@ -292,6 +488,40 @@ class AdminTeams(ctk.CTkFrame):
                 str(e)
             )
 
+    def show_error_toast(self, message):
+
+        toast = ctk.CTkFrame(
+            self,
+            fg_color="#EF4444",
+            corner_radius=8
+        )
+
+        toast.place(
+            relx=1.0,
+            y=20,
+            anchor="ne"
+        )
+
+        label = ctk.CTkLabel(
+            toast,
+            text=message,
+            text_color="white",
+            font=("Arial", 12, "bold")
+        )
+
+        label.pack(
+            padx=20,
+            pady=10
+        )
+
+        # Auto hide after 3 seconds
+        self.after(
+            3000,
+            toast.destroy
+        )
+    
+    
+    
     # =========================================================
     # LOAD TEAMS
     # =========================================================
@@ -321,6 +551,7 @@ class AdminTeams(ctk.CTkFrame):
 
             tid = team['team_id']
             tname = team['team_name']
+            desc = team['description']
 
             # ROW
 
@@ -361,6 +592,16 @@ class AdminTeams(ctk.CTkFrame):
                 anchor="w"
             ).pack(anchor="w")
 
+            ctk.CTkLabel(
+                info_frame,
+                text=desc if desc else "No description",
+                font=("Arial", 12),
+                text_color=("gray30", "gray70"),
+                wraplength=700,
+                justify="left",
+                anchor="w"
+            ).pack(anchor="w", pady=(3, 0))
+
             # BUTTON FRAME
 
             btn_frame = ctk.CTkFrame(
@@ -399,19 +640,35 @@ class AdminTeams(ctk.CTkFrame):
                 height=30,
                 fg_color="#F39C12",
                 hover_color="#D68910",
-                command=lambda t_id=tid, t_name=tname:
-                self.load_edit_form(t_id, t_name)
+                command=lambda t_id=tid, t_name=tname, t_desc=desc:
+                self.load_edit_form(t_id, t_name, t_desc)
 
             ).pack(
                 side="right",
                 padx=3
             )
+    # =========================================================
+    # CLEAR FORM
+    # =========================================================
+
+    def clear_form(self):
+
+        self.team_name_entry.delete(0, "end")
+
+        self.team_desc_entry.delete("1.0", "end")
+
+
+        self.team_desc_entry.configure(
+            text_color=("black", "white")
+        )
+
+        self.focus()
 
     # =========================================================
     # LOAD EDIT FORM
     # =========================================================
 
-    def load_edit_form(self, team_id, team_name):
+    def load_edit_form(self, team_id, team_name, team_desc):
 
         if not self.form_visible:
             self.toggle_form()
@@ -424,13 +681,24 @@ class AdminTeams(ctk.CTkFrame):
         )
 
         self.save_team_btn.configure(
-            text="Update Team",
-            fg_color="#3498DB",
-            hover_color="#2980B9"
+            text="Submit",
+            fg_color="#10B981",
+            hover_color="#0E9A6B",
         )
 
         self.team_name_entry.delete(0, "end")
         self.team_name_entry.insert(0, team_name)
+
+        self.team_desc_entry.delete("1.0", "end")
+
+        self.team_desc_entry.insert(
+            "1.0",
+            team_desc if team_desc else ""
+        )
+
+        self.team_desc_entry.configure(
+            text_color=("black", "white")
+        )
 
     # =========================================================
     # DELETE TEAM

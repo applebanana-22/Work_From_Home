@@ -101,12 +101,13 @@ class LeaderDashboard(ctk.CTkFrame):
             
             # UPDATED QUERY: Fetches all members of the team OR anyone who is a team leader
             query = """
-                SELECT u.employee_id, u.full_name, u.role, u.status,
-                COALESCE(a.location_type, 'N/A') AS mode,
+                SELECT u.id, u.employee_id, u.full_name, u.role, u.status,
+                COALESCE(s.status, u.current_status, 'Office') AS mode,
                 COALESCE(TIME_FORMAT(a.check_in, '%h:%i %p'), '---') AS in_t,
                 COALESCE(TIME_FORMAT(a.check_out, '%h:%i %p'), '---') AS out_t
                 FROM users u
                 LEFT JOIN attendance a ON u.id = a.user_id AND a.attendance_date = CURDATE()
+                LEFT JOIN wfh_schedules s ON u.id = s.user_id AND s.schedule_date = CURDATE()
                 WHERE (u.team_id = (SELECT team_id FROM users WHERE employee_id = %s) AND u.role = 'member')
                    OR u.role = 'leader'
             """
@@ -115,8 +116,8 @@ class LeaderDashboard(ctk.CTkFrame):
             
             for m in self.db.cursor.fetchall():
                 live = (m['status'] or "OFFLINE").upper()
-                self.info_tree.insert("", "end", values=(m['employee_id'], m['full_name'], m['role'].upper(), m['mode'], m['in_t'], m['out_t']))
-                self.status_tree.insert("", "end", values=(f"● {live}",), tags=(live,))
+                self.info_tree.insert("", "end", iid=str(m['id']), values=(m['employee_id'], m['full_name'], m['role'].upper(), m['mode'], m['in_t'], m['out_t']))
+                self.status_tree.insert("", "end", iid=f"status_{m['id']}", values=(f"● {live}",), tags=(live,))
         except Exception as e:
             print(f"❌ Error: {e}")
 
@@ -125,12 +126,10 @@ class LeaderDashboard(ctk.CTkFrame):
         try:
             target_id = str(data.get('user_id'))
             new_status = str(data.get('status')).upper()
-            for idx, item in enumerate(self.info_tree.get_children()):
-                if str(self.info_tree.item(item)['values'][0]) == target_id:
-                    status_item = self.status_tree.get_children()[idx]
-                    self.status_tree.set(status_item, column="status", value=f"● {new_status}")
-                    self.status_tree.item(status_item, tags=(new_status,))
-                    break
+            status_iid = f"status_{target_id}"
+            if self.status_tree.exists(status_iid):
+                self.status_tree.set(status_iid, column="status", value=f"● {new_status}")
+                self.status_tree.item(status_iid, tags=(new_status,))
         except: pass
 
     def sync_scroll(self):
@@ -147,6 +146,11 @@ class LeaderDashboard(ctk.CTkFrame):
                 self.sio.connect('http://192.168.100.83:5000', transports=['websocket']) 
             @self.sio.on("status_update")
             def on_update(data):
-                if self.winfo_exists():
-                    self.after(0, lambda: self.update_row_only(data))
-        except: pass
+                # UI Destroy ဖြစ်မဖြစ်ကို အရင်စစ်ပြီးမှ အလုပ်ဆက်လုပ်ပါမယ်
+                if hasattr(self, '_is_destroyed') and not self._is_destroyed:
+                    try:
+                        self.after(0, lambda: self.update_row_only(data))
+                    except Exception:
+                        pass
+        except Exception as e: 
+            print(f"Socket connection error: {e}")

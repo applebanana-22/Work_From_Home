@@ -181,42 +181,69 @@ class Database:
         except Exception as e:
             print(f"DB Status Update Error: {e}")
             
-    def insert_reply(self, announcement_id, user, message):
-        """
-        Insert a reply into the announcement_replies table.
-        """
-        try:
-            query = """
-                INSERT INTO announcement_replies
-                (announcement_id, message, created_by, created_at)
-                VALUES (%s, %s, %s, NOW())
-            """
-            self.cursor.execute(
-                query,
-                (announcement_id, message, user['full_name'])
-            )
-            self.conn.commit()
-        except Exception as e:
-            self.conn.rollback()
-            raise e
+    # def insert_reply(self, announcement_id, user, message):
+    #     """
+    #     Insert a reply into the announcement_replies table.
+    #     """
+    #     try:
+    #         query = """
+    #             INSERT INTO announcement_replies
+    #             (announcement_id, message, created_by, created_at)
+    #             VALUES (%s, %s, %s, NOW())
+    #         """
+    #         self.cursor.execute(
+    #             query,
+    #             (announcement_id, message, user['full_name'])
+    #         )
+    #         self.conn.commit()
+    #     except Exception as e:
+    #         self.conn.rollback()
+    #         raise e
     
-    def create_team(self, name):
-        try:
-            self.cursor.execute("INSERT INTO teams (team_name) VALUES (%s)", (name,))
-            self.conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error creating team: {e}")
-            return False
+    def insert_reply(self, announcement_id, user, reply_text):
+        self.cursor.execute("""
+            INSERT INTO announcement_replies
+            (announcement_id, message, created_by, user_id, created_at)
+            VALUES (%s, %s, %s, %s, NOW())
+        """, (
+            announcement_id,
+            reply_text,
+            user["full_name"],
+            user["id"]
+        ))
+        self.conn.commit()
+    
+    def create_team(self, team_name, desccription):
 
-    def update_team(self, team_id, new_name):
-        try:
-            self.cursor.execute("UPDATE teams SET team_name = %s WHERE team_id = %s", (new_name, team_id))
-            self.conn.commit()
-            return True
-        except Exception as e:
-            print(f"Error updating team: {e}")
-            return False
+        query = """
+        INSERT INTO teams (team_name, description)
+        VALUES (%s, %s)
+        """
+
+        values = (team_name, desccription)
+
+        self.cursor.execute(query, values)
+        self.conn.commit()
+
+        return True
+
+    def update_team(self, team_id, team_name, description):
+
+        query = """
+        UPDATE teams
+        SET team_name=%s,
+            description=%s
+        WHERE team_id=%s
+        """
+
+        self.cursor.execute(
+            query,
+            (team_name, description, team_id)
+        )
+
+        self.conn.commit()
+
+        return self.cursor.rowcount > 0
 
     def delete_team(self, team_id):
         try:
