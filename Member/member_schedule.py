@@ -115,7 +115,7 @@ class MemberSchedule(ctk.CTkFrame):
         self.user = user
         self.setup_ui()
         self.auto_refresh()
-
+        
     def setup_ui(self):
         self.wrapper = ctk.CTkFrame(self, fg_color="transparent")
         self.wrapper.pack(fill="both", expand=True, padx=80, pady=5)

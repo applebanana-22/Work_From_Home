@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkinter import ttk
+import socketio
 
 class MemberDashboard(ctk.CTkFrame):
     def __init__(self, master, user, db):
@@ -8,6 +9,7 @@ class MemberDashboard(ctk.CTkFrame):
         self.db = db
         self._is_destroyed = False
         self._after_id = None # Track the timer to prevent "invalid command" errors
+        self.sio = socketio.Client(reconnection=True, reconnection_delay=5)
 
         self.setup_ui()
         
@@ -15,6 +17,7 @@ class MemberDashboard(ctk.CTkFrame):
         self.bind("<Expose>", lambda e: self.apply_treeview_style())
         
         self.auto_refresh()
+        self.connect_tracking_server()
 
     def setup_ui(self):
         # --- 1. Welcome Section ---
@@ -99,10 +102,15 @@ class MemberDashboard(ctk.CTkFrame):
 
     def load_team_data(self):
         try:
+            # JOIN with wfh_schedules for today to ensure the location matches the 'Daily List' source of truth
             query = """
-                SELECT employee_id, full_name, current_status, status 
-                FROM users WHERE team_id = %s AND role != 'leader'
-                ORDER BY full_name ASC
+                SELECT 
+                    u.employee_id, u.full_name, u.status,
+                    COALESCE(s.status, u.current_status, 'Office') as location
+                FROM users u
+                LEFT JOIN wfh_schedules s ON u.id = s.user_id AND s.schedule_date = CURDATE()
+                WHERE u.team_id = %s AND u.role != 'leader'
+                ORDER BY u.full_name ASC
             """
             self.db.cursor.execute(query, (self.user['team_id'],))
             members = self.db.cursor.fetchall()
@@ -111,7 +119,7 @@ class MemberDashboard(ctk.CTkFrame):
 
             for i, m in enumerate(members):
                 name_val = f" 👤 {m['full_name']}"
-                loc = m['current_status'] or "Office"
+                loc = m['location']
                 loc_val = f"🏢 {loc}" if loc == "Office" else f"🏠 {loc}"
                 raw_status = (m['status'] or "offline").upper()
                 act_val = f"● {raw_status}"
@@ -122,6 +130,30 @@ class MemberDashboard(ctk.CTkFrame):
 
         except Exception as e:
             print(f"Table Error: {e}")
+
+    def connect_tracking_server(self):
+        """Sync activity status (Active/Away) via tracking server in real-time"""
+        try:
+            if not self.sio.connected:
+                self.sio.connect('http://192.168.100.83:5000', transports=['websocket']) 
+            @self.sio.on("status_update")
+            def on_update(data):
+                if not self._is_destroyed:
+                    self.after(0, lambda: self.update_row_only(data))
+        except: pass
+
+    def update_row_only(self, data):
+        """Update specific user activity status immediately when broadcasted by server"""
+        try:
+            target_id = str(data.get('user_id'))
+            new_status = str(data.get('status')).upper()
+            for idx, item in enumerate(self.info_tree.get_children()):
+                if str(self.info_tree.item(item)['values'][0]) == target_id:
+                    status_item = self.status_tree.get_children()[idx]
+                    self.status_tree.set(status_item, column="activity", value=f"● {new_status}")
+                    self.status_tree.item(status_item, tags=(new_status,))
+                    break
+        except: pass
 
     def sync_scroll(self, container):
         """Creates a linked scrollbar and mousewheel sync"""
@@ -167,8 +199,8 @@ class MemberDashboard(ctk.CTkFrame):
         if self._is_destroyed: return
         self.refresh_stats()
         self.load_team_data()
-        # Save ID to cancel on destroy
-        self._after_id = self.after(15000, self.auto_refresh)
+        # Frequency increased to 5 seconds to ensure Location changes (WFH/Office) feel real-time
+        self._after_id = self.after(5000, self.auto_refresh)
 
     # def refresh_stats(self):
     #     try:
@@ -230,6 +262,9 @@ class MemberDashboard(ctk.CTkFrame):
         
     def destroy(self):
         self._is_destroyed = True
+        try:
+            if self.sio.connected: self.sio.disconnect()
+        except: pass
         if self._after_id:
             self.after_cancel(self._after_id)
         super().destroy()

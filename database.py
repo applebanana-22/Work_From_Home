@@ -57,11 +57,41 @@ class Database:
             sql_att = "INSERT INTO attendance (user_id, attendance_date, check_in, location_type) VALUES (%s, %s, %s, %s)"
             self.cursor.execute(sql_att, (user_id, today, now_time, location))
             
-            sql_user = "UPDATE users SET current_status = %s WHERE id = %s"
-            self.cursor.execute(sql_user, (location, user_id))
+            # Sync with users table and wfh_schedules to ensure dashboard counts are accurate
+            self.update_user_status(user_id, location)
             return True
         except Exception as e:
             print(f"Check-in Error: {e}")
+            return False
+
+    def update_user_status(self, user_id, status):
+        """Update user's current status and sync with wfh_schedules for today"""
+        self.ensure_connection()
+        try:
+            # 1. Update users table for real-time tracking
+            query_user = "UPDATE users SET current_status = %s WHERE id = %s"
+            self.cursor.execute(query_user, (status, user_id))
+            
+            # 2. Sync with wfh_schedules for today (this ensures dashboard counts match the schedule log)
+            self.cursor.execute("SELECT id FROM wfh_schedules WHERE user_id = %s AND schedule_date = CURDATE()", (user_id,))
+            sched = self.cursor.fetchone()
+            
+            if sched:
+                # Update existing schedule entry for today
+                self.cursor.execute("UPDATE wfh_schedules SET status = %s WHERE id = %s", (status, sched['id']))
+            else:
+                # Create a schedule entry for today if it doesn't exist (e.g. for Leaders or unplanned activity)
+                self.cursor.execute("""
+                    INSERT INTO wfh_schedules (user_id, leader_id, schedule_date, status) 
+                    VALUES (%s, %s, CURDATE(), %s)
+                """, (user_id, user_id, status))
+            
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Status sync error: {e}")
+            if self.conn:
+                self.conn.rollback()
             return False
         
     def get_all_teams(self):
@@ -84,13 +114,28 @@ class Database:
             return None
     
     def get_status_counts(self):
+        """Fetch real-time counts for all employees in the company using today's schedule"""
         try:
-            self.cursor.execute("SELECT COUNT(*) as count FROM users WHERE current_status = 'Office'")
-            office_count = self.cursor.fetchone()['count']
- 
-            self.cursor.execute("SELECT COUNT(*) as count FROM users WHERE current_status = 'WFH'")
-            wfh_count = self.cursor.fetchone()['count']
- 
+            self.ensure_connection()
+            # This query ensures all user accounts are counted.
+            # It prioritizes today's entry in wfh_schedules, falls back to current_status,
+            # and defaults to 'Office' if neither is set.
+            query = """
+                SELECT 
+                    SUM(CASE WHEN status = 'Office' THEN 1 ELSE 0 END) as office_count,
+                    SUM(CASE WHEN status = 'WFH' THEN 1 ELSE 0 END) as wfh_count
+                FROM (
+                    SELECT 
+                        COALESCE(s.status, u.current_status, 'Office') as status
+                    FROM users u
+                    LEFT JOIN wfh_schedules s ON u.id = s.user_id AND s.schedule_date = CURDATE()
+                ) t
+            """
+            self.cursor.execute(query)
+            res = self.cursor.fetchone()
+            office_count = int(res['office_count'] or 0)
+            wfh_count = int(res['wfh_count'] or 0)
+
             return office_count, wfh_count
         except Exception as e:
             print(f"Error counting status: {e}")

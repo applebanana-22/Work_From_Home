@@ -112,6 +112,8 @@ class Dashboard(ctk.CTk):
     def create_status_header(self, parent_frame):
         try: off_count, wfh_count = self.db.get_status_counts()
         except: off_count, wfh_count = 0, 0 
+        
+        total_count = off_count + wfh_count
 
         status_f = ctk.CTkFrame(parent_frame, fg_color="transparent")
         status_f.pack(side="right", padx=30)
@@ -120,7 +122,10 @@ class Dashboard(ctk.CTk):
         ctk.CTkLabel(status_f, text=str(off_count), font=("Arial", 12, "bold")).pack(side="left", padx=(5, 15))
 
         ctk.CTkLabel(status_f, text="🏠 WFH:", font=("Arial", 12, "bold"), text_color="#3498DB").pack(side="left")
-        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 12, "bold")).pack(side="left", padx=5)
+        ctk.CTkLabel(status_f, text=str(wfh_count), font=("Arial", 12, "bold")).pack(side="left", padx=(5, 15))
+        
+        ctk.CTkLabel(status_f, text="👥 Total:", font=("Arial", 12, "bold"), text_color="#9B59B6").pack(side="left")
+        ctk.CTkLabel(status_f, text=str(total_count), font=("Arial", 12, "bold")).pack(side="left", padx=5)
 
     def setup_bottom_sidebar(self):
         """Populates the fixed bottom frame that does not scroll"""
@@ -195,11 +200,8 @@ class Dashboard(ctk.CTk):
         if self.user['role'].lower() == 'member': return
         new_status = "Office" if "Office" in selected_value else "WFH"
         try:
-            self.db.ensure_connection()
-            query = "UPDATE users SET current_status = %s WHERE id = %s"
-            self.db.cursor.execute(query, (new_status, self.user['id']))
-            self.db.conn.commit()
-            self.setup_header() 
+            if self.db.update_user_status(self.user['id'], new_status):
+                self.setup_header() 
         except: pass
 
     def sync_leader_schedule(self):
