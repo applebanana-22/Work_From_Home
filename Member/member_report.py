@@ -4,6 +4,7 @@ from datetime import datetime
 from database import Database
 from tkinter import messagebox, ttk
 from tkcalendar import Calendar
+import mysql.connector
 
 class DatePickerButton(ctk.CTkFrame):
     def __init__(self, master, initial_date=None):
@@ -105,6 +106,7 @@ class MemberReportFrame(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.user = user
         self.db = Database()
+        self.ensure_report_columns()
         self.configure(fg_color="transparent")
         
         self.now = datetime.now()
@@ -128,6 +130,26 @@ class MemberReportFrame(ctk.CTkFrame):
     def clear_view(self):
         for widget in self.winfo_children(): widget.destroy()
 
+    def ensure_report_columns(self):
+        try:
+            self.db.cursor.execute("SELECT today_work, tomorrow_work, problems_issues, shared_matters FROM daily_reports LIMIT 1")
+        except mysql.connector.Error as e:
+            msg = str(e).lower()
+            if "unknown column" in msg:
+                try:
+                    self.db.cursor.execute(
+                        "ALTER TABLE daily_reports "
+                        "ADD COLUMN IF NOT EXISTS today_work TEXT, "
+                        "ADD COLUMN IF NOT EXISTS tomorrow_work TEXT, "
+                        "ADD COLUMN IF NOT EXISTS problems_issues TEXT, "
+                        "ADD COLUMN IF NOT EXISTS shared_matters TEXT"
+                    )
+                    self.db.conn.commit()
+                except Exception as alter_err:
+                    print("Schema migration error:", alter_err)
+            else:
+                print("Report schema check error:", e)
+
     def get_db_categories(self):
         try:
             self.db.cursor.execute("SELECT name FROM report_categories ORDER BY name ASC")
@@ -145,7 +167,8 @@ class MemberReportFrame(ctk.CTkFrame):
             return
 
         try:
-            query = """SELECT report_date, category, tasks, hours FROM daily_reports
+            query = """SELECT report_date, today_work, tomorrow_work, problems_issues, shared_matters
+                       FROM daily_reports
                        WHERE user_id = %s AND report_date BETWEEN %s AND %s
                        ORDER BY report_date DESC, created_at ASC"""
             self.db.cursor.execute(query, (self.user['id'], start, end))
@@ -154,15 +177,26 @@ class MemberReportFrame(ctk.CTkFrame):
             messagebox.showerror("Database Error", str(e))
             return
 
-        from collections import defaultdict
-        grouped = defaultdict(list)
-        for r in reports: grouped[str(r['report_date'])].append(r)
-        self.count_lbl.configure(text=f"({len(grouped)} records)")
+        grouped = {}
+        for r in reports:
+            date_key = str(r['report_date'])
+            if date_key not in grouped:
+                grouped[date_key] = r
 
-        for date, rows in sorted(grouped.items(), reverse=True):
-            total_hours = sum(float(r['hours']) for r in rows)
-            
-            # Using tuples for instant mode switching
+        self.count_lbl.configure(text=f"({len(grouped)} records)")
+        if not grouped:
+            ctk.CTkLabel(
+                self.scroll,
+                text="No records found.",
+                font=("Arial", 15, "bold"),
+                text_color=self.COLOR_TEXT_TER
+            ).pack(
+                pady=20
+            )
+
+            return
+
+        for date, row in sorted(grouped.items(), reverse=True):
             card = ctk.CTkFrame(self.scroll, corner_radius=12, fg_color=self.COLOR_CARD_BG,
                                 border_width=1, border_color=self.COLOR_BORDER)
             card.pack(fill="x", pady=6, padx=10)
@@ -171,17 +205,39 @@ class MemberReportFrame(ctk.CTkFrame):
             info.pack(side="left", fill="both", expand=True, padx=14, pady=10)
 
             ctk.CTkLabel(info, text=date, font=("Arial", 13, "bold"), text_color=self.COLOR_TEXT_MAIN).pack(anchor="w")
-            ctk.CTkLabel(info, text=f"Total: {total_hours}h", font=("Arial", 11), text_color=self.COLOR_TEXT_SEC).pack(anchor="w")
-            
-            summary = f"{len(rows)} task" if len(rows) == 1 else f"{len(rows)} tasks"
-            ctk.CTkLabel(info, text=summary, font=("Arial", 11), text_color=self.COLOR_TEXT_TER).pack(anchor="w")
+            preview = row.get('today_work', "") or "No details yet."
+
+            lines = preview.splitlines()
+
+            if len(lines) > 2:
+                preview = "\n".join(lines[:2]) + " ..."
+            elif len(preview) > 120:
+                preview = preview[:120] + "..."
+
+            ctk.CTkLabel(
+                info,
+                text=preview,
+                wraplength=650,
+                justify="left",
+                anchor="w",
+                text_color=self.COLOR_TEXT_SEC
+            ).pack(anchor="w", fill="x", pady=(4, 0))
 
             btn_frame = ctk.CTkFrame(card, fg_color="transparent")
             btn_frame.pack(side="right", padx=12, pady=10)
 
             def _btn(text, color, hover, cmd):
-                return ctk.CTkButton(btn_frame, text=text, width=60, height=30, corner_radius=8,
-                                    fg_color=color, hover_color=hover, command=cmd)
+                return ctk.CTkButton(
+                    btn_frame,
+                    text=text,
+                    width=60,
+                    height=30,
+                    corner_radius=8,
+                    font=("Arial", 12, "bold"),
+                    fg_color=color,
+                    hover_color=hover,
+                    command=cmd
+                )
 
             _btn("View", "#1f538d", "#174a7a", lambda d=date: (self.save_filter_state(), self.show_detail_view(d))).pack(side="left", padx=4)
             _btn("Edit", "#F39C12", "#D68910",lambda d=date: (self.save_filter_state(), self.edit_report(d))).pack(side="left", padx=4)
@@ -212,12 +268,12 @@ class MemberReportFrame(ctk.CTkFrame):
         ctk.CTkFrame(inner, width=1, height=32, fg_color=("#DBDBDB", "#2A3A4A")).pack(side="left", padx=(0, 20))
 
         def _btn(parent, text, color, hover, cmd):
-            ctk.CTkButton(parent, text=text, width=60, height=36, corner_radius=9, font=("Arial", 12, "bold"),
+            ctk.CTkButton(parent, text=text, width=80, height=36, corner_radius=9, font=("Arial", 12, "bold"),
                          fg_color=color, hover_color=hover, command=cmd).pack(side="left", padx=4)
 
         _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view)
         _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters)
-        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_pdf_reports)
+        _btn(inner, "📄 Export", "#C0392B", "#922B21", self.export_pdf_reports)
 
         list_header = ctk.CTkFrame(self, fg_color="transparent")
         list_header.pack(fill="x", padx=80, pady=(4, 2))
@@ -259,29 +315,11 @@ class MemberReportFrame(ctk.CTkFrame):
         )
         self.date_picker.pack(side="left")
 
-
-        # --- Row 3: Progress bar + Total ---
-        progress_frame = ctk.CTkFrame(header, fg_color="transparent")
-        progress_frame.pack(fill="x", padx=10, pady=(4, 6))
-
-        self.progress = ctk.CTkProgressBar(
-            progress_frame,
-            height=10,
-            progress_color="#10B981"
-        )
-        self.progress.set(0)
-        self.progress.pack(side="left", fill="x", expand=True, padx=(0, 10))
-
-        self.stats_lbl = ctk.CTkLabel(
-            progress_frame,
-            text="Total: 0.0 / 8.0 Hours",
-            font=("Arial", 16, "bold"),
-            text_color="#F1C40F"
-        )
-        self.stats_lbl.pack(side="right")
-
         self.form_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent", height=380)
         self.form_scroll.pack(fill="both", expand=True, padx=80, pady=10)
+
+        self.report_fields = {}
+        self._render_report_form()
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(fill="x", padx=80, pady=(0, 20))
@@ -297,59 +335,27 @@ class MemberReportFrame(ctk.CTkFrame):
             command=self.save_all_reports
         )
         self.save_btn.pack(side="right", padx=10)
-       
-        self.add_btn = ctk.CTkButton(self.form_scroll, text="＋ Add More Tasks", fg_color="transparent", 
-                                     border_width=1, border_color="#10B981", text_color="#10B981", command=self.add_item_row)
-        self.add_item_row()
-        self.add_btn.pack(pady=10, anchor="e", padx=10)
 
-    def add_item_row(self):
-        if hasattr(self, "add_btn"): self.add_btn.pack_forget()
-        container = ctk.CTkFrame(self.form_scroll, fg_color=self.COLOR_CONTAINER_BG, corner_radius=10)
-        container.pack(fill="x", pady=8, padx=5)
- 
-        top = ctk.CTkFrame(container, fg_color="transparent")
-        top.pack(fill="x", padx=15, pady=(10, 5))
- 
-        cat_var = ctk.StringVar(value="")
-        ctk.CTkOptionMenu(top, values=self.get_db_categories(), variable=cat_var, width=220,
-                        fg_color=("#FFFFFF", "#1e1e26"), text_color=("black", "white"), button_color="#10B981").pack(side="left")
- 
-        ctk.CTkLabel(top, text="Hrs:", text_color=("black", "white")).pack(side="left", padx=(15, 5))
-        hour_var = ctk.StringVar(value="0")
-        hour_var.trace_add("write", self.update_total_hours)
-        ctk.CTkEntry(top, textvariable=hour_var, width=55, justify="center", fg_color=("#FFFFFF", "#1e1e26"), text_color=("black", "white")).pack(side="left")
- 
-        row_data = {"hour_var": hour_var, "cat_var": cat_var}
-        ctk.CTkButton(top, text="✕", width=30, height=30, fg_color="#E74C3C",
-                    command=lambda: self.remove_item_row(container, row_data)).pack(side="right", padx=5)
- 
-        desc = ctk.CTkTextbox(container, height=80, fg_color=("#FFFFFF", "#1e1e26"), border_width=1, border_color=("#DBDBDB", "#333333"), text_color=("black", "white"))
-        desc.pack(fill="x", padx=15, pady=(5, 15))
- 
-        row_data["desc_txt"] = desc
-        self.report_rows.append(row_data)
-        if hasattr(self, "add_btn"): self.add_btn.pack(pady=10, anchor="e", padx=10)
-        self.update_total_hours()
+    def _render_report_form(self, data=None):
+        self.report_fields.clear()
 
-    def update_total_hours(self, *args):
-        total = 0
-        for row in self.report_rows:
-            try:
-                val = float(row["hour_var"].get()) if row["hour_var"].get() else 0
-                total += val
-            except: pass
-        self.stats_lbl.configure(text=f"Total: {total:.1f} / 8.0 Hours", text_color="#10B981" if total >= 8 else "#F1C40F")
-        self.progress.set(min(total / 8, 1.0))
+        def add_section(title, key, placeholder=""):
+            section = ctk.CTkFrame(self.form_scroll, fg_color=self.COLOR_CONTAINER_BG, corner_radius=10)
+            section.pack(fill="x", pady=8, padx=5)
+            ctk.CTkLabel(section, text=title, font=("Arial", 14, "bold"), text_color=self.COLOR_TEXT_MAIN).pack(anchor="w", padx=15, pady=(12, 6))
+            text_box = ctk.CTkTextbox(section, height=120, fg_color=("#FFFFFF", "#1e1e26"), border_width=1, border_color=("#DBDBDB", "#333333"), text_color=("black", "white"))
+            text_box.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+            if data and data.get(key):
+                text_box.insert("1.0", data.get(key, ""))
+            self.report_fields[key] = text_box
+
+        add_section("Today's Work Detail", "today_work")
+        add_section("Tomorrow's Work Schedule", "tomorrow_work")
+        add_section("Problems / Issues", "problems_issues")
+        add_section("Shared Matters", "shared_matters")
 
     def save_all_reports(self):
         try:
-            total = sum(float(row["hour_var"].get() or 0) for row in self.report_rows)
-
-            if total > 8:
-                messagebox.showerror("Error", "Total hours cannot exceed 8 hours!")
-                return
-
             selected_date = str(self.date_picker.get_date())
 
             self.db.cursor.execute(
@@ -361,36 +367,33 @@ class MemberReportFrame(ctk.CTkFrame):
                 messagebox.showerror("Error", f"Report for {selected_date} already exists!")
                 return
 
-            saved_count = 0
+            today_work = self.report_fields['today_work'].get("1.0", "end-1c").strip()
+            tomorrow_work = self.report_fields['tomorrow_work'].get("1.0", "end-1c").strip()
+            problems_issues = self.report_fields['problems_issues'].get("1.0", "end-1c").strip()
+            shared_matters = self.report_fields['shared_matters'].get("1.0", "end-1c").strip()
 
-            for row in self.report_rows:
-                tasks = row["desc_txt"].get("1.0", "end-1c").strip()
-                hours = row["hour_var"].get()
-                cat = row["cat_var"].get()
+            if not today_work:
+                messagebox.showwarning("Warning", "Please enter today's work detail.")
+                return
 
-                # validation
-                if not tasks:
-                    messagebox.showwarning("Warning", "Please write task description.")
-                    return
-
-                if float(hours or 0) <= 0:
-                    messagebox.showwarning("Warning", "Hours must be greater than 0.")
-                    return
-
-                self.db.cursor.execute(
-                    """
-                    INSERT INTO daily_reports
-                    (user_id, report_date, tasks, category, hours)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (self.user['id'], selected_date, tasks, cat, hours)
+            self.db.cursor.execute(
+                """
+                INSERT INTO daily_reports
+                (user_id, report_date, today_work, tomorrow_work, problems_issues, shared_matters)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    self.user['id'],
+                    selected_date,
+                    today_work,
+                    tomorrow_work,
+                    problems_issues,
+                    shared_matters
                 )
-
-                saved_count += 1
+            )
 
             self.db.conn.commit()
-
-            messagebox.showinfo("Success", f"Saved {saved_count} sections!")
+            messagebox.showinfo("Success", "Report saved successfully.")
             self.show_history_view()
 
         except Exception as e:
@@ -399,8 +402,10 @@ class MemberReportFrame(ctk.CTkFrame):
 
     def show_detail_view(self, date):
         self.clear_view()
+
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=80, pady=20)
+
         ctk.CTkButton(
             top,
             text="← Back",
@@ -411,21 +416,124 @@ class MemberReportFrame(ctk.CTkFrame):
             corner_radius=8,
             command=self.show_history_view
         ).pack(side="left")
-        ctk.CTkLabel(top, text=f"Details - {date}", font=("Arial", 20, "bold"), text_color=("black", "white")).pack(side="left", padx=20)
-        scroll = ctk.CTkScrollableFrame(self, fg_color=self.COLOR_SCROLL_BG)
-        scroll.pack(fill="both", expand=True, padx=80, pady=10)
+
+        ctk.CTkLabel(
+            top,
+            text=f"Details - {date}",
+            font=("Arial", 20, "bold"),
+            text_color=("black", "white")
+        ).pack(side="left", padx=20)
+
+        self.form_scroll = ctk.CTkScrollableFrame(
+            self,
+            fg_color="transparent"
+        )
+        self.form_scroll.pack(
+            fill="both",
+            expand=True,
+            padx=80,
+            pady=10
+        )
+
         try:
-            self.db.cursor.execute("SELECT category, tasks, hours FROM daily_reports WHERE user_id = %s AND report_date = %s", (self.user['id'], date))
-            for r in self.db.cursor.fetchall():
-                card = ctk.CTkFrame(scroll, fg_color=self.COLOR_CARD_BG, corner_radius=10, border_width=1, border_color=self.COLOR_BORDER)
-                card.pack(fill="x", pady=8, padx=5)
-                ctk.CTkLabel(card, text=f"[{r['category']}]  {r['hours']}h", font=("Arial", 13, "bold"), text_color=self.COLOR_TEXT_MAIN).pack(anchor="w", padx=10, pady=(8, 2))
-                ctk.CTkLabel(card, text=r['tasks'], wraplength=600, text_color=self.COLOR_TEXT_SEC).pack(anchor="w", padx=10, pady=(0, 8))
-        except Exception as e: print("Detail error:", e)
+            self.db.cursor.execute(
+                """
+                SELECT today_work, tomorrow_work,
+                    problems_issues, shared_matters
+                FROM daily_reports
+                WHERE user_id=%s AND report_date=%s
+                LIMIT 1
+                """,
+                (self.user['id'], date)
+            )
+
+            row = self.db.cursor.fetchone()
+
+            if not row:
+                ctk.CTkLabel(
+                    self.form_scroll,
+                    text="No report found.",
+                    font=("Arial", 14),
+                    text_color=self.COLOR_TEXT_TER
+                ).pack(pady=20)
+                return
+
+            def add_readonly_section(title, content):
+
+                content = content or "-"
+
+                # Auto height based on actual content
+                lines = content.split("\n")
+
+                total_lines = 0
+
+                for line in lines:
+                    # estimate wrapped lines
+                    wrapped = max(1, (len(line) // 85) + 1)
+                    total_lines += wrapped
+
+                # smaller minimum height
+                textbox_height = max(45, total_lines * 24)
+
+                section = ctk.CTkFrame(
+                    self.form_scroll,
+                    fg_color=self.COLOR_CONTAINER_BG,
+                    corner_radius=10
+                )
+                section.pack(fill="x", pady=8, padx=5)
+
+                ctk.CTkLabel(
+                    section,
+                    text=title,
+                    font=("Arial", 14, "bold"),
+                    text_color=self.COLOR_TEXT_MAIN
+                ).pack(anchor="w", padx=15, pady=(12, 6))
+
+                text_box = ctk.CTkTextbox(
+                    section,
+                    height=int(textbox_height),
+                    fg_color=("#FFFFFF", "#1e1e26"),
+                    border_width=1,
+                    border_color=("#DBDBDB", "#333333"),
+                    text_color=("black", "white"),
+                    wrap="word"
+                )
+
+                text_box.pack(
+                    fill="both",
+                    expand=True,
+                    padx=15,
+                    pady=(0, 15)
+                )
+
+                text_box.insert("1.0", content)
+                text_box.configure(state="disabled")
+
+            add_readonly_section(
+                "Today's Work Detail",
+                row.get('today_work', "")
+            )
+
+            add_readonly_section(
+                "Tomorrow's Work Schedule",
+                row.get('tomorrow_work', "")
+            )
+
+            add_readonly_section(
+                "Problems / Issues",
+                row.get('problems_issues', "")
+            )
+
+            add_readonly_section(
+                "Shared Matters",
+                row.get('shared_matters', "")
+            )
+
+        except Exception as e:
+            print("Detail error:", e)
 
     def edit_report(self, date):
         self.clear_view()
-        self.report_rows = []
         top = ctk.CTkFrame(self, fg_color="transparent")
         top.pack(fill="x", padx=80, pady=20)
         ctk.CTkButton(
@@ -439,25 +547,21 @@ class MemberReportFrame(ctk.CTkFrame):
             command=self.show_history_view
         ).pack(side="left")
         ctk.CTkLabel(top, text=f"Edit Report - {date}", font=("Arial", 20, "bold"), text_color=("black", "white")).pack(side="left", padx=20)
- 
-        progress_frame = ctk.CTkFrame(self, fg_color="transparent")
-        progress_frame.pack(fill="x", padx=80, pady=(0, 6))
-        self.progress = ctk.CTkProgressBar(progress_frame, height=10, progress_color="#10B981")
-        self.progress.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self.stats_lbl = ctk.CTkLabel(progress_frame, text="Total: 0.0 / 8.0 Hours", font=("Arial", 14, "bold"), text_color="#F1C40F")
-        self.stats_lbl.pack(side="right")
-        
+
         self.form_scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.form_scroll.pack(fill="both", expand=True, padx=80, pady=10)
- 
+
         try:
-            self.db.cursor.execute("SELECT id, category, tasks, hours FROM daily_reports WHERE user_id=%s AND report_date=%s", (self.user['id'], date))
-            rows = self.db.cursor.fetchall()
-            for r in rows: self.add_item_row_with_data(r)
-            self.update_total_hours()
-            self.add_btn = ctk.CTkButton(self.form_scroll, text="＋ Add More Tasks", fg_color="transparent", border_width=1, border_color="#10B981", text_color="#10B981", command=self.add_item_row)
-            self.add_btn.pack(pady=10, anchor="e", padx=10)
-        except Exception as e: print("Edit load error:", e)
+            self.db.cursor.execute(
+                "SELECT today_work, tomorrow_work, problems_issues, shared_matters "
+                "FROM daily_reports WHERE user_id=%s AND report_date=%s LIMIT 1",
+                (self.user['id'], date)
+            )
+            data = self.db.cursor.fetchone() or {}
+            self.report_fields = {}
+            self._render_report_form(data)
+        except Exception as e:
+            print("Edit load error:", e)
 
         footer = ctk.CTkFrame(self, fg_color="transparent")
         footer.pack(fill="x", padx=80, pady=(0, 20))
@@ -472,58 +576,40 @@ class MemberReportFrame(ctk.CTkFrame):
             hover_color="#D68910",
             command=lambda: self.update_report(date)
         ).pack(side="right", padx=10)
-    def add_item_row_with_data(self, data):
-        container = ctk.CTkFrame(self.form_scroll, fg_color=self.COLOR_CONTAINER_BG, corner_radius=10)
-        container.pack(fill="x", pady=8, padx=5)
-        top = ctk.CTkFrame(container, fg_color="transparent")
-        top.pack(fill="x", padx=15, pady=(10, 5))
-        cat_var = ctk.StringVar(value=data['category'])
-        ctk.CTkOptionMenu(top, values=self.get_db_categories(), variable=cat_var, width=220, fg_color=("#FFFFFF", "#1e1e26"), text_color=("black", "white"), button_color="#10B981").pack(side="left")
-        hour_var = ctk.StringVar(value=str(data['hours']))
-        hour_var.trace_add("write", self.update_total_hours)
-        ctk.CTkEntry(top, textvariable=hour_var, width=55, fg_color=("#FFFFFF", "#1e1e26"), text_color=("black", "white")).pack(side="left", padx=10)
-        row_data = {"id": data['id'], "cat_var": cat_var, "hour_var": hour_var}
-        ctk.CTkButton(top, text="✕", width=30, height=30, fg_color="#E74C3C", command=lambda: self.delete_single_row(container, row_data)).pack(side="right")
-        desc = ctk.CTkTextbox(container, height=80, fg_color=("#FFFFFF", "#1e1e26"), text_color=("black", "white"))
-        desc.insert("1.0", data['tasks'])
-        desc.pack(fill="x", padx=15, pady=(5, 15))
-        row_data["desc_txt"] = desc
-        self.report_rows.append(row_data)
 
     def update_report(self, date):
         try:
-            if sum(float(row["hour_var"].get() or 0) for row in self.report_rows) > 8:
-                messagebox.showerror("Error", "Total hours cannot exceed 8 hours!")
+            today_work = self.report_fields['today_work'].get("1.0", "end-1c").strip()
+            tomorrow_work = self.report_fields['tomorrow_work'].get("1.0", "end-1c").strip()
+            problems_issues = self.report_fields['problems_issues'].get("1.0", "end-1c").strip()
+            shared_matters = self.report_fields['shared_matters'].get("1.0", "end-1c").strip()
+
+            if not today_work:
+                messagebox.showwarning("Warning", "Please enter today's work detail.")
                 return
+
             self.db.cursor.execute("DELETE FROM daily_reports WHERE user_id=%s AND report_date=%s", (self.user['id'], date))
-            for row in self.report_rows:
-                tasks, hours, cat = row["desc_txt"].get("1.0", "end-1c").strip(), row["hour_var"].get(), row["cat_var"].get()
-                if tasks and float(hours or 0) > 0:
-                    self.db.cursor.execute("INSERT INTO daily_reports (user_id, report_date, tasks, category, hours) VALUES (%s,%s,%s,%s,%s)", (self.user['id'], date, tasks, cat, hours))
+            self.db.cursor.execute(
+                """
+                INSERT INTO daily_reports
+                (user_id, report_date, today_work, tomorrow_work, problems_issues, shared_matters)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    self.user['id'],
+                    date,
+                    today_work,
+                    tomorrow_work,
+                    problems_issues,
+                    shared_matters
+                )
+            )
             self.db.conn.commit()
             messagebox.showinfo("Updated", "Report updated successfully")
             self.show_history_view()
         except Exception as e:
             self.db.conn.rollback()
             messagebox.showerror("Error", str(e))
-
-    def delete_single_row(self, container, data):
-        if messagebox.askyesno("Delete", "Remove this task?"):
-            try:
-                if "id" in data:
-                    self.db.cursor.execute("DELETE FROM daily_reports WHERE id=%s", (data["id"],))
-                    self.db.conn.commit()
-                container.destroy()
-                self.report_rows.remove(data)
-                self.update_total_hours()
-            except Exception as e: messagebox.showerror("Error", str(e))
-
-    def remove_item_row(self, container, data):
-        if len(self.report_rows) > 1:
-            container.destroy()
-            self.report_rows.remove(data)
-            self.update_total_hours()
-        else: messagebox.showwarning("Warning", "You need at least one report section.")
 
     def delete_report(self, date):
         if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete all reports for {date}?"):
@@ -545,14 +631,14 @@ class MemberReportFrame(ctk.CTkFrame):
         try:
             from fpdf import FPDF
             from tkinter import filedialog
-            from collections import defaultdict
 
             start = self.start_cal.get_date()
             end = self.end_cal.get_date()
 
             self.db.cursor.execute(
                 """
-                SELECT report_date, category, tasks, hours
+                SELECT report_date, today_work, tomorrow_work,
+                    problems_issues, shared_matters
                 FROM daily_reports
                 WHERE user_id = %s
                 AND report_date BETWEEN %s AND %s
@@ -566,11 +652,6 @@ class MemberReportFrame(ctk.CTkFrame):
             if not rows:
                 return messagebox.showinfo("No Data", "No reports found.")
 
-            grouped = defaultdict(list)
-
-            for r in rows:
-                grouped[r['report_date']].append(r)
-
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".pdf",
                 filetypes=[("PDF files", "*.pdf")],
@@ -580,84 +661,209 @@ class MemberReportFrame(ctk.CTkFrame):
             if not file_path:
                 return
 
-            pdf = FPDF()
+            class PDF(FPDF):
+
+                def header(self):
+                    # Main title
+                    self.set_font("Arial", "B", 20)
+                    self.cell(
+                        0,
+                        12,
+                        "Daily Report History",
+                        ln=True,
+                        align="C"
+                    )
+
+                    self.ln(4)
+
+                    # Name + Date range
+                    self.set_font("Arial", "B", 11)
+
+                    # Name row
+                    self.set_font("Arial", "B", 11)
+                    self.cell(20, 8, "Name :", ln=0)
+
+                    self.set_font("Arial", "", 11)
+                    self.cell(
+                        0,
+                        8,
+                        f"{getattr(self, 'user_name', 'User')}",
+                        ln=True
+                    )
+
+                    # Date row
+                    self.set_font("Arial", "B", 11)
+                    self.cell(20, 8, "Date   :", ln=0)
+
+                    self.set_font("Arial", "", 11)
+                    self.cell(
+                        0,
+                        8,
+                        f"{getattr(self, 'start_date', '')} ~ {getattr(self, 'end_date', '')}",
+                        ln=True
+                    )
+
+                    self.ln(4)
+
+                    # Smaller header font so titles fit
+                    self.set_font("Arial", "B", 10)
+
+                    headers = [
+                        "Date",
+                        "Today's Work Detail",
+                        "Tomorrow's Work Schedule",
+                        "Problems/Issues",
+                        "Shared Matters"
+                    ]
+
+                    widths = self.col_widths
+
+                    for i, header in enumerate(headers):
+                        self.cell(
+                            widths[i],
+                            12,
+                            header,
+                            border=1,
+                            align="C"
+                        )
+
+                    self.ln()
+
+            pdf = PDF("L", "mm", "A4")
+            
+            pdf.user_name = self.user.get('full_name', 'User')
+            pdf.start_date = start
+            pdf.end_date = end
+
+            # Landscape widths
+            pdf.col_widths = [32, 68, 68, 52, 52]
+
+            pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
 
-            # ===== TITLE =====
-            pdf.set_font("Arial", 'B', 16)
-            pdf.cell(
-                0,
-                10,
-                f"Daily Reports: {self.user.get('full_name', 'User')}",
-                ln=True,
-                align='C'
-            )
+            # Body font
+            body_font_size = 8
+            pdf.set_font("Arial", "", body_font_size)
 
-            pdf.ln(10)
+            line_height = 5
 
-            # ===== TABLE HEADER =====
-            pdf.set_font("Arial", 'B', 10)
+            def split_text(text, width):
+                """
+                Split text into lines based on column width.
+                """
+                if not text:
+                    return ["-"]
 
-            headers = ["Date", "Category", "Hrs", "Task"]
-            widths = [35, 40, 20, 95]
+                pdf.set_font("Arial", "", body_font_size)
 
-            for i, h in enumerate(headers):
-                pdf.cell(widths[i], 10, h, border=1, align='C')
+                lines = []
 
-            pdf.ln()
+                for paragraph in str(text).split("\n"):
 
-            # ===== TABLE BODY =====
-            pdf.set_font("Arial", '', 9)
+                    words = paragraph.split(" ")
+                    current_line = ""
 
-            for date, tasks in grouped.items():
+                    for word in words:
 
-                for i, r in enumerate(tasks):
+                        test_line = (
+                            current_line + " " + word
+                        ).strip()
 
-                    # date merged effect
-                    date_border = 'LR'
+                        if pdf.get_string_width(test_line) <= width - 2:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+                            current_line = word
 
-                    if i == len(tasks) - 1:
-                        date_border = 'LRB'
+                    if current_line:
+                        lines.append(current_line)
 
-                    pdf.cell(
-                        widths[0],
-                        10,
-                        str(date) if i == 0 else "",
-                        border=date_border,
-                        align='C'
+                return lines if lines else ["-"]
+
+            for r in rows:
+
+                cells = [
+                    str(r['report_date']),
+                    str(r.get('today_work') or "-"),
+                    str(r.get('tomorrow_work') or "-"),
+                    str(r.get('problems_issues') or "-"),
+                    str(r.get('shared_matters') or "-")
+                ]
+
+                split_cells = []
+
+                max_lines = 1
+
+                for i, text in enumerate(cells):
+                    lines = split_text(
+                        text,
+                        pdf.col_widths[i]
                     )
 
-                    pdf.cell(
-                        widths[1],
-                        10,
-                        r['category'],
-                        border=1,
-                        align='C'
-                    )
+                    split_cells.append(lines)
 
-                    pdf.cell(
-                        widths[2],
-                        10,
-                        f"{float(r['hours']):.2f}",
-                        border=1,
-                        align='C'
-                    )
+                    if len(lines) > max_lines:
+                        max_lines = len(lines)
 
-                    pdf.cell(
-                        widths[3],
-                        10,
-                        str(r['tasks'])[:55],
-                        border=1
-                    )
+                bottom_padding = 3
+                row_height = (max_lines * line_height) + bottom_padding
 
-                    pdf.ln()
+                # Add new page if needed
+                if pdf.get_y() + row_height > 190:
+                    pdf.add_page()
+                    pdf.set_font("Arial", "", body_font_size)
+
+                x = pdf.get_x()
+                y = pdf.get_y()
+
+                # Draw all borders first
+                for i, width in enumerate(pdf.col_widths):
+                    pdf.rect(
+                        x,
+                        y,
+                        width,
+                        row_height
+                    )
+                    x += width
+
+                # Write text
+                x = pdf.l_margin
+
+                for i, lines in enumerate(split_cells):
+
+                    pdf.set_xy(x + 2, y)
+
+                    current_y = y + 2
+
+                    for line in lines:
+                        pdf.set_xy(x + 2, current_y)
+
+                        pdf.cell(
+                            pdf.col_widths[i] - 4,
+                            line_height,
+                            line,
+                            border=0
+                        )
+
+                        current_y += line_height
+
+                    x += pdf.col_widths[i]
+
+                pdf.set_y(y + row_height)
 
             pdf.output(file_path)
 
-            messagebox.showinfo("Success", "PDF exported!")
+            messagebox.showinfo(
+                "Success",
+                "PDF exported successfully!"
+            )
 
         except Exception as e:
-            messagebox.showerror("Export Error", str(e))
+            messagebox.showerror(
+                "Export Error",
+                str(e)
+            )
         
     def save_filter_state(self):
         if hasattr(self, "start_cal") and hasattr(self, "end_cal"):

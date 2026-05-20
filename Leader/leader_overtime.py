@@ -238,6 +238,7 @@ class LeaderOvertime(ctk.CTkFrame):
         self.create_main_page()
         self.create_add_page()
         self.create_edit_page()
+        self.create_member_requests_page()
         
         # Show main page initially
         self.show_page("main")
@@ -333,7 +334,7 @@ class LeaderOvertime(ctk.CTkFrame):
 
     def show_page(self, page_name):
         """Show the specified page and hide others"""
-        for page in [self.main_page, self.add_page, self.edit_page]:
+        for page in [self.main_page, self.add_page, self.edit_page, self.member_requests_page]:
             page.grid_forget()
             
         if page_name == "main":
@@ -345,6 +346,9 @@ class LeaderOvertime(ctk.CTkFrame):
             self.reset_add_form()
         elif page_name == "edit":
             self.edit_page.grid(row=0, column=0, sticky="nsew")
+        elif page_name == "member_requests":
+            self.member_requests_page.grid(row=0, column=0, sticky="nsew")
+            self.load_member_requests()
 
     def create_main_page(self):
         self.main_page = ctk.CTkFrame(self.pages, fg_color="transparent")
@@ -360,6 +364,16 @@ class LeaderOvertime(ctk.CTkFrame):
             text="🕒 Overtime Management",
             font=("Arial", 22, "bold")
         ).pack(side="left")
+
+        ctk.CTkButton(
+            header,
+            text="Request OT from member",
+            fg_color="#2980B9",
+            hover_color="#21618C",
+            height=40,
+            corner_radius=10,
+            command=lambda: self.show_page("member_requests")
+        ).pack(side="right", padx=(0, 10)) # Added padding to separate buttons
 
         ctk.CTkButton(
             header,
@@ -735,6 +749,244 @@ class LeaderOvertime(ctk.CTkFrame):
         except Exception as e:
             self.db.conn.rollback()
             self._show_message(f"System Error: {e}", "error")
+
+    def create_member_requests_page(self):
+        # Placeholder for the new page to display member overtime requests
+        self.member_requests_page = ctk.CTkFrame(self.pages, fg_color="transparent")
+        self.member_requests_page.grid_rowconfigure(1, weight=1)
+        self.member_requests_page.grid_columnconfigure(0, weight=1)
+
+        # Create a header frame for the back button and title
+        header_frame = ctk.CTkFrame(self.member_requests_page, fg_color="transparent")
+        header_frame.grid(row=0, column=0, sticky="ew", padx=80, pady=(10, 20))
+        header_frame.grid_columnconfigure(1, weight=1) # Allow the title column to expand
+
+        # Back button
+        back_btn = ctk.CTkButton(
+            header_frame,
+            text="← Back to List",
+            text_color=("black", "white"),
+            width=100,
+            fg_color=("#DBDBDB", "#333333"),
+            font=("Arial", 12),
+            height=35,
+            command=lambda: self.show_page("main")
+        )
+        back_btn.grid(row=0, column=0, sticky="w")
+
+        # Title
+        ctk.CTkLabel(
+            header_frame,
+            text="Member Overtime Requests",
+            font=("Arial", 22, "bold")
+        ).grid(row=0, column=1, sticky="w", padx=(20, 0))
+
+        self.member_requests_list_frame = ctk.CTkScrollableFrame(
+            self.member_requests_page,
+            fg_color=self.COLOR_SCROLL_BG,
+            corner_radius=12,
+            border_width=1,
+            border_color=self.COLOR_BORDER,
+            height=400
+        )
+        self.member_requests_list_frame.grid(row=1, column=0, sticky="nsew", padx=80, pady=(0, 10))
+
+        self.load_member_requests() # This method will fetch and display the requests
+
+    def load_member_requests(self):
+        """Load and display overtime requests from members."""
+        for widget in self.member_requests_list_frame.winfo_children():
+            widget.destroy()
+
+        # Query to get all pending overtime requests from members in the leader's team
+        query = """
+            SELECT o.*, u.full_name, p.project_name
+            FROM overtime_requests o
+            JOIN users u ON o.member_id = u.id
+            JOIN projects p ON o.project_id = p.id
+            WHERE u.team_id = %s AND o.status = 'Pending'
+            ORDER BY o.created_at DESC
+        """
+        self.db.cursor.execute(query, (self.team_id,))
+        rows = self.db.cursor.fetchall()
+
+        if not rows:
+            ctk.CTkLabel(
+                self.member_requests_list_frame,
+                text="📭 No pending overtime requests from members.",
+                font=("Arial", 14),
+                text_color="#888888"
+            ).pack(pady=40)
+            return
+
+        for row in rows:
+            self._create_member_request_card(row)
+
+    def _create_member_request_card(self, row):
+        """Creates a card for a member's overtime request."""
+        card = ctk.CTkFrame(
+            self.member_requests_list_frame,
+            corner_radius=12,
+            fg_color=self.COLOR_CONTAINER_BG,
+            border_width=1,
+            border_color=self.COLOR_BORDER
+        )
+        card.pack(fill="x", padx=15, pady=10)
+
+        content = ctk.CTkFrame(card, fg_color="transparent")
+        content.pack(fill="x", padx=15, pady=12)
+
+        left = ctk.CTkFrame(content, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True)
+
+        # Top row: Member Name and Date
+        top_row = ctk.CTkFrame(left, fg_color="transparent")
+        top_row.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(
+            top_row,
+            text=f"👤 {row['full_name']} 📅 {row['ot_date'].strftime('%Y-%m-%d')}",
+            font=("Arial", 14, "bold"),
+            text_color=self.COLOR_TEXT_MAIN
+        ).pack(side="left", anchor="w")
+
+        # Middle row: Project and Hours
+        middle_row = ctk.CTkFrame(left, fg_color="transparent")
+        middle_row.pack(fill="x", pady=(0, 8))
+
+        ctk.CTkLabel(
+            middle_row,
+            text=f"📁 {row['project_name']} ⏱️ {row['hours']:.2f} hours",
+            font=("Arial", 12),
+            text_color=self.COLOR_TEXT_SEC
+        ).pack(side="left", anchor="w")
+
+        # Reason/Tasks
+        if row['reason']:
+            ctk.CTkLabel(
+                left,
+                text=f"💬 {row['reason']}",
+                font=("Arial", 11, "italic"),
+                text_color=self.COLOR_TEXT_TER,
+                wraplength=400,
+                justify="left"
+            ).pack(fill="x", anchor="w", pady=(0, 5))
+
+        # Right section for status badge and action buttons
+        right_section = ctk.CTkFrame(content, fg_color="transparent")
+        right_section.pack(side="right", fill="y")
+
+        # Status Badge
+        status_config = {
+            'Pending': {'text': 'Pending', 'color': '#F39C12', 'icon': '⏳'},
+            'Accepted': {'text': 'Accepted', 'color': '#2ECC71', 'icon': '✅'},
+            'Rejected': {'text': 'Rejected', 'color': '#E74C3C', 'icon': '❌'},
+            'Cancelled': {'text': 'Cancelled', 'color': '#7F8C8D', 'icon': '🚫'}
+        }
+        config = status_config.get(row['status'], {'text': row['status'], 'color': '#888888', 'icon': '❓'})
+
+        badge_content = ctk.CTkFrame(
+            right_section,
+            fg_color=self.COLOR_CARD_BG,
+            corner_radius=12,
+            height=25,
+            width=80
+        )
+        badge_content.pack(pady=3)
+        badge_content.pack_propagate(False)
+
+        ctk.CTkLabel(
+            badge_content,
+            text=f"{config['icon']} {config['text']}",
+            font=("Arial", 11, "bold"),
+            text_color=config['color']
+        ).pack()
+
+        # Action Buttons Frame
+        action_frame = ctk.CTkFrame(right_section, fg_color="transparent")
+        action_frame.pack()
+
+        # Approve Button (only for Pending requests)
+        if row['status'] == 'Pending':
+            approve_btn = ctk.CTkButton(
+                action_frame,
+                text="Approve",
+                width=60,
+                height=30,
+                corner_radius=14,
+                fg_color="#2ECC71",
+                hover_color="#27AE60",
+                font=("Arial", 11),
+                command=lambda id=row['id']: self._update_member_request_status(id, 'Accepted')
+            )
+            approve_btn.pack(pady=3)
+
+            # Reject Button (only for Pending requests)
+            reject_btn = ctk.CTkButton(
+                action_frame,
+                text="Reject",
+                width=60,
+                height=30,
+                corner_radius=14,
+                fg_color="#E74C3C",
+                hover_color="#C0392B",
+                font=("Arial", 11),
+                command=lambda id=row['id']: self._show_reject_dialog(id)
+            )
+            reject_btn.pack(pady=3)
+
+    def _update_member_request_status(self, request_id, new_status, reject_reason=None):
+        """Updates the status of a member's overtime request."""
+        try:
+            if new_status == 'Rejected' and reject_reason:
+                self.db.cursor.execute("""
+                    UPDATE overtime_requests
+                    SET status = %s, rejected_reason = %s
+                    WHERE id = %s
+                """, (new_status, reject_reason, request_id))
+            else:
+                self.db.cursor.execute("""
+                    UPDATE overtime_requests
+                    SET status = %s
+                    WHERE id = %s
+                """, (new_status, request_id))
+
+            # Notify the member
+            self.db.cursor.execute("SELECT member_id, ot_date FROM overtime_requests WHERE id = %s", (request_id,))
+            request_info = self.db.cursor.fetchone()
+            if request_info:
+                member_id = request_info['member_id']
+                ot_date = request_info['ot_date'].strftime('%Y-%m-%d')
+                if new_status == 'Accepted':
+                    msg = f"Your overtime request for {ot_date} has been Accepted."
+                elif new_status == 'Rejected':
+                    msg = f"Your overtime request for {ot_date} has been Rejected. Reason: {reject_reason}"
+                else:
+                    msg = f"Your overtime request for {ot_date} status changed to {new_status}."
+
+                self.db.cursor.execute("""
+                    INSERT INTO notifications (user_id, message, is_read, created_at)
+                    VALUES (%s, %s, 0, NOW())
+                """, (member_id, msg))
+
+            self.db.conn.commit()
+            self._show_message(f"Request {new_status} successfully!", "success")
+            self.load_member_requests() # Refresh the list
+        except Exception as e:
+            self.db.conn.rollback()
+            self._show_message(f"System Error: {e}", "error")
+
+    def _show_reject_dialog(self, request_id):
+        """Shows a dialog for the leader to enter a rejection reason."""
+        dialog = ctk.CTkInputDialog(
+            text="Enter reason for rejection:",
+            title="Reject Overtime Request"
+        )
+        reason = dialog.get_input()
+        if reason:
+            self._update_member_request_status(request_id, 'Rejected', reason)
+        else:
+            self._show_message("Rejection cancelled or no reason provided.", "info")
 
     def create_edit_page(self):
         self.edit_page = ctk.CTkFrame(self.pages, fg_color="transparent")

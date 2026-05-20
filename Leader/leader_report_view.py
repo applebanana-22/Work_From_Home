@@ -159,19 +159,121 @@ class LeaderReportView(ctk.CTkFrame):
             text_color=("#333333", "#FFFFFF")
         ).pack(side="left")
 
-        # Right side container
-        right_frame = ctk.CTkFrame(header, fg_color="transparent")
-        right_frame.pack(side="right")
+        # (counts UI moved below title, before filters)
 
-        # Category button
+
+        # Filter Card - Theme Aware Colors
+        # ── Counts Bar ─────────────────────────────────────
+        counts_bar = ctk.CTkFrame(
+            self.container,
+            corner_radius=14,
+            fg_color=("#F9F9F9", "#1E1E1E"),
+            border_width=1,
+            border_color=("#E0E0E0", "#2C2C2C")
+        )
+        counts_bar.pack(fill="x", padx=content_padx, pady=(0, 10))
+
+        # LEFT SIDE CONTAINER
+        left_wrap = ctk.CTkFrame(counts_bar, fg_color="transparent")
+        left_wrap.pack(anchor="w", padx=18, pady=14)
+
+        # TOP ROW (DATE + FILTER BUTTON)
+        top_row = ctk.CTkFrame(left_wrap, fg_color="transparent")
+        top_row.pack(anchor="w", pady=(0, 6))
+
+        # Date picker
+        self.count_date = DatePickerButton(
+            top_row,
+            initial_date=datetime.today().date()
+        )
+        self.count_date.pack(side="left", padx=(0, 8))
+
+        # FILTER BUTTON
         ctk.CTkButton(
-            right_frame,
-            text="📂 Category",
-            width=120, height=36, corner_radius=9,
+            top_row,
+            text="🔍 Filter",
+            width=80,
+            height=36,
+            corner_radius=8,
+            fg_color="#2471A3",
+            hover_color="#1A5276",
             font=("Arial", 12, "bold"),
-            fg_color="#8E44AD", hover_color="#6C3483",
-            command=self.show_category_ui
-        ).pack()
+            command=self.refresh_counts
+        ).pack(side="left")
+
+        # SECOND ROW (SMALL CARDS)
+        stats_wrap = ctk.CTkFrame(left_wrap, fg_color="transparent")
+        stats_wrap.pack(anchor="w")
+
+        def create_small_card(parent, title, color, command=None):
+
+            card = ctk.CTkFrame(
+                parent,
+                width=130,
+                height=72,
+                corner_radius=15,
+                fg_color=("#FFFFFF", "#2B2B2B"),
+                border_width=1,
+                border_color=("#DDDDDD", "#3A3A3A")
+            )
+
+            card.pack(side="left", padx=(0, 16))
+            card.pack_propagate(False)
+            card.grid_propagate(False)
+
+            title_lbl = ctk.CTkLabel(
+                card,
+                text=title,
+                font=("Arial", 13),
+                text_color=("#666666", "#888888")
+            )
+
+            title_lbl.pack(
+                pady=(10, 0)
+            )
+
+            value_lbl = ctk.CTkLabel(
+                card,
+                text="0",
+                font=("Arial", 20, "bold"),
+                text_color=color,
+                cursor="hand2" if command else ""
+            )
+
+            value_lbl.pack(
+                pady=(2, 0)
+            )
+
+            if command:
+                value_lbl.bind("<Button-1>", lambda e: command())
+                title_lbl.bind("<Button-1>", lambda e: command())
+                card.bind("<Button-1>", lambda e: command())
+
+            return value_lbl
+
+        # Cards
+        self.total_lbl = create_small_card(
+            stats_wrap,
+            "Total Members",
+            "#3498DB"
+        )
+
+        self.submitted_btn = create_small_card(
+            stats_wrap,
+            "Submitted",
+            "#10B981",
+            lambda: self.show_member_list(True)
+        )
+
+        self.not_submitted_btn = create_small_card(
+            stats_wrap,
+            "Not Submitted",
+            "#E74C3C",
+            lambda: self.show_member_list(False)
+        )
+
+        # INITIAL LOAD ONLY
+        self.refresh_counts()
 
         # Filter Card - Theme Aware Colors
         filter_card = ctk.CTkFrame(
@@ -206,7 +308,7 @@ class LeaderReportView(ctk.CTkFrame):
         _lbl(inner, "Member")
         self.member_entry = ctk.CTkEntry(
             inner, placeholder_text="Search member…",
-            width=100, height=36, corner_radius=8,
+            width=150, height=36, corner_radius=8,
             border_color=("#CCCCCC", "#2C2C2C"), border_width=1,
             fg_color=("#FFFFFF", "#1E1E1E"),
             text_color=("#000000", "#FFFFFF"),
@@ -245,6 +347,8 @@ class LeaderReportView(ctk.CTkFrame):
         self.scroll.pack(fill="both", expand=True, padx=content_padx, pady=(0, 10))
 
         self.refresh_view()
+        # initial counts for today
+        self.refresh_counts()
 
     def refresh_view(self):
         for w in self.scroll.winfo_children():
@@ -259,15 +363,16 @@ class LeaderReportView(ctk.CTkFrame):
         member_search = self.member_entry.get().strip()
         today_date = datetime.today().date()
 
-        query = '''SELECT u.full_name, dr.report_date, dr.category, dr.tasks, dr.hours
-                    FROM users u
-                    JOIN daily_reports dr ON u.id = dr.user_id
-                    WHERE u.team_id=%s AND dr.report_date BETWEEN %s AND %s AND u.role='member' '''
+        query = '''SELECT u.full_name, dr.report_date, dr.today_work, dr.tomorrow_work, dr.problems_issues, dr.shared_matters
+                FROM users u
+                JOIN daily_reports dr ON u.id = dr.user_id
+                WHERE u.team_id=%s AND dr.report_date BETWEEN %s AND %s AND u.role='member' '''
         params = [team_id, start, end]
         if member_search:
             query += " AND u.full_name LIKE %s"
             params.append(f"%{member_search}%")
-        query += " ORDER BY dr.report_date ASC, u.full_name ASC, dr.created_at ASC"
+
+        query += " ORDER BY dr.report_date DESC, u.full_name ASC, dr.created_at DESC"
 
         try:
             self.db.cursor.execute(query, tuple(params))
@@ -279,6 +384,17 @@ class LeaderReportView(ctk.CTkFrame):
                 grouped[key].append(r)
                 
             self.count_lbl.configure(text=f"({len(grouped)} records)")
+            
+            if not grouped:
+                ctk.CTkLabel(
+                    self.scroll,
+                    text="No records found.",
+                    font=("Arial", 15, "bold"),
+                    text_color=("#666666", "#AAAAAA")
+                ).pack(
+                    pady=20
+                )
+                return
 
             last_date = None
             for (date_val, member), tasks in grouped.items():
@@ -310,18 +426,164 @@ class LeaderReportView(ctk.CTkFrame):
                 info.pack(side="left", fill="both", expand=True, padx=10, pady=6)
 
                 ctk.CTkLabel(info, text=member, font=("Arial", 12, "bold"), text_color=("#333333", "#E8EDF2")).pack(anchor="w")
-                total_hours = sum(float(t['hours']) for t in tasks)
-                ctk.CTkLabel(info, text=f"Total: {total_hours}h", font=("Arial", 10), text_color="#7F8C8D").pack(anchor="w")
+                # Show preview like member report
+                preview = tasks[0].get('today_work', "") if tasks else ""
+                preview = preview or "No details yet."
+
+                lines = preview.splitlines()
+
+                # More than 2 lines -> show ...
+                if len(lines) > 2:
+                    preview = "\n".join(lines[:2]) + " ..."
+                elif len(preview) > 120:
+                    preview = preview[:120] + "..."
+
+                ctk.CTkLabel(
+                    info,
+                    text=preview,
+                    wraplength=650,
+                    justify="left",
+                    anchor="w",
+                    text_color=("#555555", "#AAB7C4")
+                ).pack(anchor="w", fill="x", pady=(4, 0))
 
                 btn_frame = ctk.CTkFrame(card, fg_color="transparent")
                 btn_frame.pack(side="right", padx=12, pady=6)
 
                 ctk.CTkButton(
-                    btn_frame, text="View", width=60, height=25, corner_radius=8,
-                    fg_color="#1f538d", hover_color="#174a7a",
+                    btn_frame,
+                    text="View",
+                    width=60,
+                    height=30,
+                    corner_radius=8,
+                    font=("Arial", 12, "bold"),
+                    fg_color="#1f538d",
+                    hover_color="#174a7a",
                     command=lambda tlist=tasks, m=member, d=date_val:
                     self.open_detail_with_state(m, d, tlist)
                 ).pack()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+    
+    def refresh_counts(self):
+        try:
+            sel_date = self.count_date.get_date()
+
+            # TOTAL MEMBERS
+            q_total = """
+                SELECT COUNT(*) AS cnt
+                FROM users
+                WHERE role='member'
+                AND team_id=%s
+            """
+
+            self.db.cursor.execute(
+                q_total,
+                (self.team_id,)
+            )
+
+            total = self.db.cursor.fetchone()['cnt'] or 0
+
+            # SUBMITTED MEMBERS
+            q_submitted = """
+                SELECT COUNT(DISTINCT dr.user_id) AS cnt
+                FROM daily_reports dr
+                JOIN users u ON u.id = dr.user_id
+                WHERE u.team_id=%s
+                AND u.role='member'
+                AND dr.report_date=%s
+            """
+
+            self.db.cursor.execute(
+                q_submitted,
+                (self.team_id, sel_date)
+            )
+
+            submitted = self.db.cursor.fetchone()['cnt'] or 0
+
+            # NOT SUBMITTED
+            not_submitted = total - submitted
+
+            # UPDATE UI
+            self.total_lbl.configure(
+                text=str(total)
+            )
+
+            self.submitted_btn.configure(
+                text=str(submitted)
+            )
+
+            self.not_submitted_btn.configure(
+                text=str(not_submitted)
+            )
+
+        except Exception as e:
+            print("Count Error:", e)
+    
+    def show_member_list(self, submitted=True):
+        """Render member list for the selected date in the current view (no popup)."""
+        try:
+            sel_date = self.count_date.get_date()
+        except Exception:
+            sel_date = datetime.today().date()
+
+        if submitted:
+            q = '''SELECT DISTINCT u.full_name FROM users u
+                   JOIN daily_reports dr ON u.id=dr.user_id
+                   WHERE u.team_id=%s AND dr.report_date=%s AND u.role='member'
+                   ORDER BY u.full_name ASC'''
+            params = (self.team_id, sel_date)
+            title = f"Submitted on {sel_date}"
+        else:
+            q = '''SELECT u.full_name FROM users u
+                   WHERE u.team_id=%s AND u.role='member' AND u.id NOT IN
+                   (SELECT user_id FROM daily_reports WHERE report_date=%s)
+                   ORDER BY u.full_name ASC'''
+            params = (self.team_id, sel_date)
+            title = f"Not Submitted on {sel_date}"
+
+        try:
+            self.db.cursor.execute(q, params)
+            rows = self.db.cursor.fetchall()
+            names = [r['full_name'] for r in rows] if rows else []
+
+            # build view inside main container
+            self.clear_container()
+
+            content_padx = 80
+
+            top = ctk.CTkFrame(self.container, fg_color="transparent")
+            top.pack(fill="x", padx=content_padx, pady=20)
+
+            ctk.CTkButton(
+                top,
+                text="← Back",
+                width=80,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8,
+                command=self.back_to_list
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                top,
+                text=title,
+                font=("Arial", 20, "bold"),
+                text_color=("black", "white")
+            ).pack(side="left", padx=20)
+
+            list_frame = ctk.CTkScrollableFrame(self.container, fg_color="transparent")
+            list_frame.pack(fill="both", expand=True, padx=content_padx, pady=10)
+
+            if not names:
+                ctk.CTkLabel(list_frame, text="(no members)", font=("Arial", 12)).pack(anchor="w", padx=8, pady=6)
+            else:
+                for i, n in enumerate(names, start=1):
+                    ctk.CTkLabel(list_frame, text=f"{i}. {n}", font=("Arial", 12)).pack(anchor="w", padx=8, pady=4)
+
+            # ensure counts reflect current selection
+            self.refresh_counts()
         except Exception as e:
             messagebox.showerror("Error", str(e))
             
@@ -331,33 +593,160 @@ class LeaderReportView(ctk.CTkFrame):
         self.member_search = self.member_entry.get()
         self.show_member_detail(member, date_val, tasks)
 
-    def show_member_detail(self, member_name, date_val, tasks):
-        self.clear_container()
-        content_padx = 80
-        top = ctk.CTkFrame(self.container, fg_color="transparent")
-        top.pack(fill="x", padx=content_padx, pady=14)
+    def show_member_list(self, submitted=True):
 
-        ctk.CTkButton(
-            top,
-            text="← Back",
-            width=80,
-            fg_color=("#DBDBDB", "#333333"),
-            text_color=("black", "white"),
-            hover_color=("#CFCFCF", "#444444"),
-            corner_radius=8,
-            command=self.back_to_list
-        ).pack(side="left")
-        ctk.CTkLabel(top, text=f"{member_name} - {date_val}", font=("Arial", 20, "bold"), text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20)
+        """Render submitted / not submitted member list."""
 
-        scroll = ctk.CTkScrollableFrame(self.container, fg_color=("#EEEEEE", "#1A1A1A"), corner_radius=14, border_width=1, border_color=("#DDDDDD", "#2C2C2C"))
-        scroll.pack(fill="both", expand=True, padx=content_padx, pady=(0, 10))
+        try:
+            sel_date = self.count_date.get_date()
+        except Exception:
+            sel_date = datetime.today().date()
 
-        for r in tasks:
-            card = ctk.CTkFrame(scroll, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=10, border_width=1, border_color=("#E0E0E0", "#2C2C2C"))
-            card.pack(fill="x", pady=6, padx=10)
+        if submitted:
 
-            ctk.CTkLabel(card, text=f"[{r['category']}] {r['hours']}h", font=("Arial", 13, "bold"), text_color=("#2471A3", "#E8EDF2")).pack(anchor="w", padx=10, pady=(8, 2))
-            ctk.CTkLabel(card, text=r['tasks'], wraplength=700, text_color=("#555555", "#AAB7C4")).pack(anchor="w", padx=10, pady=(0, 8))
+            q = '''
+                SELECT DISTINCT u.full_name
+                FROM users u
+                JOIN daily_reports dr ON u.id = dr.user_id
+                WHERE u.team_id=%s
+                AND dr.report_date=%s
+                AND u.role='member'
+                ORDER BY u.full_name ASC
+            '''
+
+            params = (self.team_id, sel_date)
+
+            title = f"Members who submitted on {sel_date}"
+
+        else:
+
+            q = '''
+                SELECT u.full_name
+                FROM users u
+                WHERE u.team_id=%s
+                AND u.role='member'
+                AND u.id NOT IN
+                (
+                    SELECT user_id
+                    FROM daily_reports
+                    WHERE report_date=%s
+                )
+                ORDER BY u.full_name ASC
+            '''
+
+            params = (self.team_id, sel_date)
+
+            title = f"Members who not submitted on {sel_date}"
+
+        try:
+
+            self.db.cursor.execute(q, params)
+
+            rows = self.db.cursor.fetchall()
+
+            names = [r['full_name'] for r in rows] if rows else []
+
+            self.clear_container()
+
+            content_padx = 80
+
+            # TOP BAR
+            top = ctk.CTkFrame(
+                self.container,
+                fg_color="transparent"
+            )
+
+            top.pack(
+                fill="x",
+                padx=content_padx,
+                pady=20
+            )
+
+            # BACK BUTTON (same as admin)
+            ctk.CTkButton(
+                top,
+                text="← Back",
+                width=80,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8,
+                command=self.back_to_list
+            ).pack(side="left")
+
+            # TITLE (same style as admin)
+            ctk.CTkLabel(
+                top,
+                text=title,
+                font=("Arial", 20, "bold"),
+                text_color=("black", "white")
+            ).pack(side="left", padx=20)
+
+            # MAIN CARD
+            main_card = ctk.CTkFrame(
+                self.container,
+                corner_radius=14,
+                fg_color=("#F0F0F0", "#252525"),
+                border_width=1,
+                border_color=("#DDDDDD", "#333333")
+            )
+
+            main_card.pack(
+                fill="both",
+                expand=True,
+                padx=content_padx,
+                pady=(0, 20)
+            )
+
+            # INNER LIST BOX
+            list_frame = ctk.CTkScrollableFrame(
+                main_card,
+                fg_color=("#FFFFFF", "#1E1E26"),
+                corner_radius=12,
+                border_width=1,
+                border_color=("#DDDDDD", "#333333")
+            )
+
+            list_frame.pack(
+                fill="both",
+                expand=True,
+                padx=20,
+                pady=20
+            )
+
+            if not names:
+
+                ctk.CTkLabel(
+                    list_frame,
+                    text="No member found.",
+                    font=("Arial", 12)
+                ).pack(
+                    anchor="w",
+                    padx=8,
+                    pady=6
+                )
+
+            else:
+
+                for i, n in enumerate(names, start=1):
+
+                    ctk.CTkLabel(
+                        list_frame,
+                        text=f"{i}. {n}",
+                        font=("Arial", 12),
+                        text_color=("black", "white")
+                    ).pack(
+                        anchor="w",
+                        padx=8,
+                        pady=4
+                    )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
             
     def back_to_list(self):
         self.show_reports_list()
@@ -373,131 +762,400 @@ class LeaderReportView(ctk.CTkFrame):
         self.end_date = today
         self.member_search = ""
         self.show_reports_list()
+        
+    def open_detail_with_state(self, member, date_val, tasks):
+        self.start_date = self.start_cal.get_date()
+        self.end_date = self.end_cal.get_date()
+        self.member_search = self.member_entry.get()
+        self.show_member_detail(member, date_val, tasks)
+        
+    def show_member_detail(self, member_name, date_val, tasks):
 
-    def export_to_pdf(self):
-        start = self.start_cal.get_date()
-        end = self.end_cal.get_date()
-        member_search = self.member_entry.get().strip()
-        query = '''SELECT u.full_name, dr.report_date, dr.category, dr.tasks, dr.hours
-                    FROM users u JOIN daily_reports dr ON u.id = dr.user_id
-                    WHERE u.team_id=%s AND dr.report_date BETWEEN %s AND %s AND u.role='member' '''
-        params = [self.team_id, start, end]
-        if member_search:
-            query += " AND u.full_name LIKE %s"
-            params.append(f"%{member_search}%")
-        query += " ORDER BY dr.report_date ASC, u.full_name ASC"
-
-        try:
-            self.db.cursor.execute(query, tuple(params))
-            rows = self.db.cursor.fetchall()
-            if not rows:
-                messagebox.showinfo("No Data", "No reports found.")
-                return
-            
-            grouped = defaultdict(list)
-            for r in rows: grouped[(r['report_date'], r['full_name'])].append(r)
-
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", 'B', 16)
-            pdf.cell(0, 10, f"{self.team_name} Reports", ln=True, align='C')
-            pdf.ln(10)
-            
-            pdf.set_font("Arial", 'B', 10)
-            headers = ["Date", "Member", "Category", "Hrs", "Task"]
-            w = [25, 35, 30, 15, 85]
-            for i, h in enumerate(headers): pdf.cell(w[i], 10, h, border=1, align='C')
-            pdf.ln()
-
-            pdf.set_font("Arial", '', 9)
-            for (date, member), tasks in grouped.items():
-                for i, r in enumerate(tasks):
-                    pdf.cell(w[0], 10, str(date) if i==0 else "", border='LR' if i<len(tasks)-1 else 'LRB', align='C')
-                    pdf.cell(w[1], 10, member if i==0 else "", border='LR' if i<len(tasks)-1 else 'LRB', align='C')
-                    pdf.cell(w[2], 10, r['category'], border=1, align='C')
-                    pdf.cell(w[3], 10, str(r['hours']), border=1, align='C')
-                    pdf.cell(w[4], 10, r['tasks'][:50], border=1)
-                    pdf.ln()
-
-            file_path = filedialog.asksaveasfilename(defaultextension=".pdf", initialfile=f"{self.team_name}_Reports.pdf")
-            if file_path:
-                pdf.output(file_path)
-                messagebox.showinfo("Success", "PDF saved.")
-        except Exception as e:
-            messagebox.showerror("Error", str(e))
-
-    def show_category_ui(self):
         self.clear_container()
+
         content_padx = 80
-        header = ctk.CTkFrame(self.container, fg_color="transparent")
-        header.pack(fill="x", padx=content_padx, pady=14)
+
+        top = ctk.CTkFrame(
+            self.container,
+            fg_color="transparent"
+        )
+
+        top.pack(
+            fill="x",
+            padx=content_padx,
+            pady=20
+        )
 
         ctk.CTkButton(
-            header,
+            top,
             text="← Back",
             width=80,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             hover_color=("#CFCFCF", "#444444"),
             corner_radius=8,
-            command=self.show_reports_list
+            command=self.back_to_list
         ).pack(side="left")
-        ctk.CTkLabel(header, text="Manage Categories", font=("Arial", 22, "bold"), text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20)
 
-        input_f = ctk.CTkFrame(self.container, fg_color=("#F9F9F9", "#1E1E1E"), corner_radius=14, border_width=1, border_color=("#E0E0E0", "#2C2C2C"))
-        input_f.pack(fill="x", padx=content_padx, pady=(4, 10))
+        ctk.CTkLabel(
+            top,
+            text=f"{member_name} - {date_val}",
+            font=("Arial", 20, "bold"),
+            text_color=("black", "white")
+        ).pack(side="left", padx=20)
 
-        self.cat_entry = ctk.CTkEntry(input_f, placeholder_text="New category name...", width=300, height=36, corner_radius=8,
-                                     border_color=("#CCCCCC", "#2C2C2C"), fg_color=("#FFFFFF", "#1E1E1E"), text_color=("#000000", "#FFFFFF"))
-        self.cat_entry.pack(side="left", padx=20, pady=14)
-        ctk.CTkButton(
-            input_f,
-            text="Add",
-            width=100,
-            height=30,
-            corner_radius=9,
-            font=("Arial", 12, "bold"),
-            fg_color="#10B981",
-            hover_color="#0E9F6E",
-            command=self.add_category
-        ).pack(side="left", padx=10)
-        
-        self.cat_scroll = ctk.CTkScrollableFrame(self.container, fg_color=("#EEEEEE", "#1A1A1A"), corner_radius=14, border_width=1, border_color=("#DDDDDD", "#2C2C2C"))
-        self.cat_scroll.pack(fill="both", expand=True, padx=content_padx, pady=(0, 10))
-        self.refresh_categories()
+        self.form_scroll = ctk.CTkScrollableFrame(
+            self.container,
+            fg_color="transparent"
+        )
 
-    def add_category(self):
-        name = self.cat_entry.get().strip()
-        if name:
-            try:
-                self.db.cursor.execute("INSERT INTO report_categories (name) VALUES (%s)", (name,))
-                self.db.conn.commit()
-                self.cat_entry.delete(0, 'end')
-                self.refresh_categories()
-            except:
-                messagebox.showerror("Error", "Category already exists.")
+        self.form_scroll.pack(
+            fill="both",
+            expand=True,
+            padx=content_padx,
+            pady=10
+        )
 
-    def refresh_categories(self):
-        for w in self.cat_scroll.winfo_children(): w.destroy()
-        self.db.cursor.execute("SELECT * FROM report_categories ORDER BY name ASC")
-        for cat in self.db.cursor.fetchall():
-            row = ctk.CTkFrame(self.cat_scroll, fg_color=("#FFFFFF", "#1E1E1E"), corner_radius=10, border_width=1, border_color=("#E0E0E0", "#2C2C2C"))
-            row.pack(fill="x", pady=2)
-            ctk.CTkLabel(row, text=cat['name'], text_color=("#333333", "#FFFFFF")).pack(side="left", padx=20, pady=10)
-            ctk.CTkButton(
-                row,
-                text="Delete",
-                width=70,
-                height=30,
-                corner_radius=9,
-                font=("Arial", 12),
-                fg_color="#E74C3C",
-                hover_color="#C0392B",
-                command=lambda cid=cat['id']: self.delete_category(cid)
-            ).pack(side="right", padx=10)
-            
-    def delete_category(self, cat_id):
-        if messagebox.askyesno("Confirm", "Delete this category?"):
-            self.db.cursor.execute("DELETE FROM report_categories WHERE id = %s", (cat_id,))
-            self.db.conn.commit()
-            self.refresh_categories()
+        COLOR_CONTAINER_BG = ("#F0F0F0", "#252525")
+        COLOR_TEXT_MAIN = ("#1A1A1A", "#E8EDF2")
+
+        for r in tasks:
+
+            def add_readonly_section(title, content):
+
+                content = content or "-"
+
+                lines = content.split("\n")
+
+                total_lines = 0
+
+                for line in lines:
+                    wrapped = max(1, (len(line) // 85) + 1)
+                    total_lines += wrapped
+
+                textbox_height = max(45, total_lines * 24)
+
+                section = ctk.CTkFrame(
+                    self.form_scroll,
+                    fg_color=COLOR_CONTAINER_BG,
+                    corner_radius=10
+                )
+
+                section.pack(fill="x", pady=8, padx=5)
+
+                ctk.CTkLabel(
+                    section,
+                    text=title,
+                    font=("Arial", 14, "bold"),
+                    text_color=COLOR_TEXT_MAIN
+                ).pack(anchor="w", padx=15, pady=(12, 6))
+
+                text_box = ctk.CTkTextbox(
+                    section,
+                    height=int(textbox_height),
+                    fg_color=("#FFFFFF", "#1e1e26"),
+                    border_width=1,
+                    border_color=("#DBDBDB", "#333333"),
+                    text_color=("black", "white"),
+                    wrap="word"
+                )
+
+                text_box.pack(
+                    fill="both",
+                    expand=True,
+                    padx=15,
+                    pady=(0, 15)
+                )
+
+                text_box.insert("1.0", content)
+
+                text_box.configure(state="disabled")
+
+            add_readonly_section(
+                "Today's Work Detail",
+                r.get('today_work', "")
+            )
+
+            add_readonly_section(
+                "Tomorrow's Work Schedule",
+                r.get('tomorrow_work', "")
+            )
+
+            add_readonly_section(
+                "Problems / Issues",
+                r.get('problems_issues', "")
+            )
+
+            add_readonly_section(
+                "Shared Matters",
+                r.get('shared_matters', "")
+            )
+
+    def export_to_pdf(self):
+
+        start = self.start_cal.get_date()
+        end = self.end_cal.get_date()
+        member_search = self.member_entry.get().strip()
+
+        query = '''
+            SELECT
+                u.full_name,
+                dr.report_date,
+                dr.today_work,
+                dr.tomorrow_work,
+                dr.problems_issues,
+                dr.shared_matters
+            FROM users u
+            JOIN daily_reports dr ON u.id = dr.user_id
+            WHERE u.team_id=%s
+            AND dr.report_date BETWEEN %s AND %s
+            AND u.role='member'
+        '''
+
+        params = [self.team_id, start, end]
+
+        if member_search:
+            query += " AND u.full_name LIKE %s"
+            params.append(f"%{member_search}%")
+
+        query += """
+            ORDER BY
+            dr.report_date DESC,
+            u.full_name ASC,
+            dr.created_at ASC
+        """
+
+        try:
+
+            self.db.cursor.execute(query, tuple(params))
+            rows = self.db.cursor.fetchall()
+
+            if not rows:
+                messagebox.showinfo("No Data", "No reports found.")
+                return
+
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".pdf",
+                filetypes=[("PDF files", "*.pdf")],
+                initialfile=f"{self.team_name}_Reports.pdf"
+            )
+
+            if not file_path:
+                return
+
+            class PDF(FPDF):
+
+                def header(self):
+
+                    # Title
+                    self.set_font("Arial", "B", 20)
+
+                    self.cell(
+                        0,
+                        12,
+                        f"{self.team_name} Reports",
+                        ln=True,
+                        align="C"
+                    )
+
+                    self.ln(4)
+
+                    # Date row
+                    self.set_font("Arial", "B", 11)
+
+                    self.cell(
+                        14,
+                        8,
+                        "Date :",
+                        ln=0
+                    )
+
+                    self.set_font("Arial", "", 11)
+
+                    self.cell(
+                        0,
+                        8,
+                        f"{self.start_date} ~ {self.end_date}",
+                        ln=True
+                    )
+
+                    self.ln(4)
+
+                    # Table header
+                    self.set_font("Arial", "B", 10)
+
+                    headers = [
+                        "Date",
+                        "Name",
+                        "Today's Work Detail",
+                        "Tomorrow's Work Schedule",
+                        "Problems/Issues",
+                        "Shared Matters"
+                    ]
+
+                    widths = self.col_widths
+
+                    for i, header in enumerate(headers):
+
+                        self.cell(
+                            widths[i],
+                            12,
+                            header,
+                            border=1,
+                            align="C"
+                        )
+
+                    self.ln()
+
+            pdf = PDF("L", "mm", "A4")
+
+            pdf.team_name = self.team_name
+            pdf.start_date = start
+            pdf.end_date = end
+
+            # widths
+            pdf.col_widths = [28, 38, 60, 60, 42, 42]
+
+            pdf.set_auto_page_break(auto=True, margin=15)
+
+            pdf.add_page()
+
+            body_font_size = 8
+
+            pdf.set_font("Arial", "", body_font_size)
+
+            line_height = 5
+
+            def split_text(text, width):
+
+                if not text:
+                    return ["-"]
+
+                pdf.set_font("Arial", "", body_font_size)
+
+                lines = []
+
+                for paragraph in str(text).split("\n"):
+
+                    words = paragraph.split(" ")
+
+                    current_line = ""
+
+                    for word in words:
+
+                        test_line = (
+                            current_line + " " + word
+                        ).strip()
+
+                        if pdf.get_string_width(test_line) <= width - 2:
+                            current_line = test_line
+                        else:
+                            if current_line:
+                                lines.append(current_line)
+
+                            current_line = word
+
+                    if current_line:
+                        lines.append(current_line)
+
+                return lines if lines else ["-"]
+
+            for r in rows:
+
+                cells = [
+                    str(r['report_date']),
+                    str(r.get('full_name') or "-"),
+                    str(r.get('today_work') or "-"),
+                    str(r.get('tomorrow_work') or "-"),
+                    str(r.get('problems_issues') or "-"),
+                    str(r.get('shared_matters') or "-")
+                ]
+
+                split_cells = []
+
+                max_lines = 1
+
+                for i, text in enumerate(cells):
+
+                    lines = split_text(
+                        text,
+                        pdf.col_widths[i]
+                    )
+
+                    split_cells.append(lines)
+
+                    if len(lines) > max_lines:
+                        max_lines = len(lines)
+
+                bottom_padding = 3
+
+                row_height = (
+                    max_lines * line_height
+                ) + bottom_padding
+
+                # page break
+                if pdf.get_y() + row_height > 190:
+
+                    pdf.add_page()
+
+                    pdf.set_font(
+                        "Arial",
+                        "",
+                        body_font_size
+                    )
+
+                x = pdf.get_x()
+                y = pdf.get_y()
+
+                # borders
+                for i, width in enumerate(pdf.col_widths):
+
+                    pdf.rect(
+                        x,
+                        y,
+                        width,
+                        row_height
+                    )
+
+                    x += width
+
+                # text
+                x = pdf.l_margin
+
+                for i, lines in enumerate(split_cells):
+
+                    current_y = y + 2
+
+                    for line in lines:
+
+                        pdf.set_xy(
+                            x + 2,
+                            current_y
+                        )
+
+                        pdf.cell(
+                            pdf.col_widths[i] - 4,
+                            line_height,
+                            line,
+                            border=0
+                        )
+
+                        current_y += line_height
+
+                    x += pdf.col_widths[i]
+
+                pdf.set_y(y + row_height)
+
+            pdf.output(file_path)
+
+            messagebox.showinfo(
+                "Success",
+                "PDF exported successfully!"
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )

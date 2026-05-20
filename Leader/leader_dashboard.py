@@ -99,6 +99,7 @@ class LeaderDashboard(ctk.CTkFrame):
             for tree in [self.info_tree, self.status_tree]:
                 tree.delete(*tree.get_children())
             
+            # UPDATED QUERY: Fetches all members of the team OR anyone who is a team leader
             query = """
                 SELECT u.employee_id, u.full_name, u.role, u.status,
                 COALESCE(a.location_type, 'N/A') AS mode,
@@ -106,7 +107,8 @@ class LeaderDashboard(ctk.CTkFrame):
                 COALESCE(TIME_FORMAT(a.check_out, '%h:%i %p'), '---') AS out_t
                 FROM users u
                 LEFT JOIN attendance a ON u.id = a.user_id AND a.attendance_date = CURDATE()
-                WHERE u.team_id = (SELECT team_id FROM users WHERE employee_id = %s) AND u.role = 'member'
+                WHERE (u.team_id = (SELECT team_id FROM users WHERE employee_id = %s) AND u.role = 'member')
+                   OR u.role = 'leader'
             """
             self.db.ensure_connection()
             self.db.cursor.execute(query, (self.user['employee_id'],))

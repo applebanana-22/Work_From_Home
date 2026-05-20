@@ -162,7 +162,7 @@ class LeaderSchedule(ctk.CTkFrame):
             fg_color=("#F2F4F4", "#141E2B"),
             border_width=1, border_color=("#D5D8DC", "#253545")
         )
-        filter_card.pack(fill="x", padx=2, pady=(4, 10))
+        filter_card.pack(fill="x", padx=10, pady=(4, 10))
 
         inner = ctk.CTkFrame(filter_card, fg_color="transparent")
         inner.pack(fill="x", padx=18, pady=14)
