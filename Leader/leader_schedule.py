@@ -865,9 +865,9 @@ class LeaderSchedule(ctk.CTkFrame):
             ]))
             elements.append(t)
             doc.build(elements)
-            messagebox.showinfo("Export Successful", "PDF saved successfully.")
+            self._show_message("PDF exported successfully!", "success", duration=3000)
         except Exception as e:
-            messagebox.showerror("Export Error", f"PDF Error: {e}")
+            self._show_message(f"PDF Error: {e}", "error", duration=3000)
 
     def export_to_xlsx(self):
         """Export as .xlsx with borders and auto-fit widths when possible; fallback to CSV.
@@ -931,7 +931,7 @@ class LeaderSchedule(ctk.CTkFrame):
 
                 save_path = file_path if file_path.lower().endswith('.xlsx') else file_path.rsplit('.',1)[0] + '.xlsx'
                 wb.save(save_path)
-                messagebox.showinfo("Export Successful", f"Excel exported successfully!\n\nSaved to:\n{save_path}")
+                self._show_message("Excel exported successfully!", "success", duration=3000)
                 return
             except Exception:
                 # openpyxl not available or failed — fall back to CSV
@@ -945,9 +945,9 @@ class LeaderSchedule(ctk.CTkFrame):
                 for r in data:
                     dstr = r['schedule_date'].strftime('%Y-%m-%d') if hasattr(r['schedule_date'], 'strftime') else str(r['schedule_date'])
                     writer.writerow([dstr, r['full_name'], r['status']])
-            messagebox.showinfo("Export Successful", f"Excel exported successfully!\n\nSaved to:\n{csv_path}")
+            self._show_message("Excel export failed, saved as CSV instead!", "warning", duration=3000)
         except Exception as e:
-            messagebox.showerror("Export Error", f"Export Error: {e}")
+            self._show_message(f"Export Error: {e}", "error", duration=3000)
 
     def export_to_csv(self):
         leader_team_id = self.user.get('team_id')
@@ -972,7 +972,8 @@ class LeaderSchedule(ctk.CTkFrame):
                 writer = csv.writer(f)
                 writer.writerow(["Date", "Member Name", "Status"])
                 for r in data:
-                    writer.writerow([r['schedule_date'], r['full_name'], r['status']])
-            messagebox.showinfo("Export Successful", "CSV saved successfully.")
+                    dstr = r['schedule_date'].strftime('%Y-%m-%d') if hasattr(r['schedule_date'], 'strftime') else str(r['schedule_date'])
+                    writer.writerow([dstr, r['full_name'], r['status']])
+            self._show_message("CSV exported successfully!", "success", duration=3000)
         except Exception as e:
-            messagebox.showerror("Export Error", f"CSV Error: {e}")
+            self._show_message(f"CSV Error: {e}", "error", duration=3000)

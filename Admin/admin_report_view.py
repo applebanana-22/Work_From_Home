@@ -40,11 +40,11 @@ class DatePickerButton(ctk.CTkFrame):
             width=140,
             height=36,
             corner_radius=8,
-            fg_color=("#F2F2F2", "#1E1E1E"),
-            text_color=("#000000", "#FFFFFF"),
-            hover_color=("#E5E5E5", "#2A2A2A"),
+            hover_color=("#EBEBEB", "#2A2A2A"),
             border_width=1,
-            border_color=("#CCCCCC", "#2C2C2C"),
+            fg_color=("#F9F9F9", "#1E1E1E"),
+            border_color=("#DBDBDB", "#2C2C2C"),
+            text_color=("black", "white"),
             anchor="w",
             command=self.toggle
         )
@@ -113,6 +113,7 @@ class DailyReportFrame(ctk.CTkFrame):
         self.member_search = ""
         self.selected_team = "All Teams"          # bottom report filter
         self.count_selected_team = "All Teams"   # top count filter
+        self.count_filter_date = today
 
         self.team_options = ["All Teams"]
         self.team_map = {"All Teams": None}
@@ -197,7 +198,11 @@ class DailyReportFrame(ctk.CTkFrame):
 
         self.count_date = DatePickerButton(
             top_row,
-            initial_date=datetime.today().date()
+            initial_date=getattr(
+                self,
+                "count_filter_date",
+                datetime.today().date()
+            )
         )
 
         self.count_date.pack(side="left", padx=(0, 8))
@@ -227,8 +232,8 @@ class DailyReportFrame(ctk.CTkFrame):
         self.count_filter_btn = ctk.CTkButton(
             top_row,
             text="🔍 Filter",
-            width=90,
-            height=32,
+            width=60,
+            height=36,
             corner_radius=8,
             fg_color="#2471A3",
             hover_color="#1A5276",
@@ -240,8 +245,8 @@ class DailyReportFrame(ctk.CTkFrame):
         self.count_clear_btn = ctk.CTkButton(
             top_row,
             text="✖ Clear",
-            width=80,
-            height=32,
+            width=60,
+            height=36,
             corner_radius=8,
             fg_color="#566573",
             hover_color="#424949",
@@ -340,8 +345,8 @@ class DailyReportFrame(ctk.CTkFrame):
         _lbl(inner, "Member")
         self.member_entry = ctk.CTkEntry(
             inner,
-            placeholder_text="Search name",
-            width=89,
+            placeholder_text="Search name...",
+            width=100,
             height=36,
             corner_radius=8,
             border_color=("#CCCCCC", "#2C2C2C"),
@@ -354,17 +359,17 @@ class DailyReportFrame(ctk.CTkFrame):
 
         def _btn(parent, text, color, hover, cmd, width=70):
             b = ctk.CTkButton(
-                parent, text=text, width=width, height=32,
+                parent, text=text, width=width, height=36,
                 corner_radius=9, font=("Arial", 11, "bold"),
                 fg_color=color, hover_color=hover, command=cmd
             )
             b.pack(side="left", padx=4)
             return b
 
-        _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view, width=74)
-        _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters, width=70)
-        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_to_pdf, width=70)
-        _btn(inner, "📥 CSV", "#16A085", "#117A65", self.export_to_csv, width=70)
+        _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view, width=60)
+        _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters, width=60)
+        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_to_pdf, width=60)
+        _btn(inner, "📥 Excel", "#16A085", "#117A65", self.export_to_csv, width=60)
 
         list_header = ctk.CTkFrame(self.container, fg_color="transparent")
         list_header.pack(fill="x", padx=content_padx, pady=(4, 2))
@@ -554,8 +559,7 @@ class DailyReportFrame(ctk.CTkFrame):
             print("Error refreshing counts:", e)
 
     def apply_counts_filter(self):
-        # ONLY refresh top 3 count cards
-        # DO NOT affect report history filters below
+        self.count_filter_date = self.count_date.get_date()
         self.refresh_counts()
 
     def show_member_list(self, submitted=True):
@@ -603,6 +607,7 @@ class DailyReportFrame(ctk.CTkFrame):
                 top,
                 text="← Back",
                 width=80,
+                height = 36,
                 fg_color=("#DBDBDB", "#333333"),
                 text_color=("black", "white"),
                 hover_color=("#CFCFCF", "#444444"),
@@ -683,6 +688,7 @@ class DailyReportFrame(ctk.CTkFrame):
             top,
             text="← Back",
             width=80,
+            height = 36,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             hover_color=("#CFCFCF", "#444444"),
@@ -736,20 +742,26 @@ class DailyReportFrame(ctk.CTkFrame):
 
     def clear_filters(self):
         today = datetime.today().date()
+
+        # reset ONLY lower filters
         self.start_date = today
         self.end_date = today
         self.member_search = ""
         self.selected_team = "All Teams"
-        # reset count selector if present
-        try:
-            if hasattr(self, 'count_date'):
-                self.count_date.set_date(today)
-        except Exception:
-            pass
-        self.show_reports_list()
+
+        self.start_cal.set_date(today)
+        self.end_cal.set_date(today)
+
+        self.team_menu.set("All Teams")
+
+        self.member_entry.delete(0, "end")
+
+        # refresh ONLY report list
+        self.refresh_view()
 
     def clear_counts(self):
         today = datetime.today().date()
+        self.count_filter_date = today
         try:
             if hasattr(self, 'count_date'):
                 self.count_date.set_date(today)

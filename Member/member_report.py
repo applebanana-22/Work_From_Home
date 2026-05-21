@@ -279,7 +279,7 @@ class MemberReportFrame(ctk.CTkFrame):
         top.pack(fill="x", padx=80, pady=(10, 20))
 
         ctk.CTkLabel(top, text="Daily Reports", font=("Arial", 20, "bold"), text_color=("black", "white")).pack(side="left")
-        ctk.CTkButton(top, text="+ New Report", fg_color="#10B981", command=self.show_form_view).pack(side="right")
+        ctk.CTkButton(top, text="+ New Report", width=120, height=36, corner_radius=8, fg_color="#10B981", command=self.show_form_view).pack(side="right")
 
         filter_card = ctk.CTkFrame(self, corner_radius=14, fg_color=self.COLOR_CARD_BG, border_width=1, border_color=self.COLOR_BORDER)
         filter_card.pack(fill="x", padx=80, pady=(4, 10))
@@ -298,13 +298,13 @@ class MemberReportFrame(ctk.CTkFrame):
         ctk.CTkFrame(inner, width=1, height=32, fg_color=("#DBDBDB", "#2A3A4A")).pack(side="left", padx=(0, 20))
 
         def _btn(parent, text, color, hover, cmd):
-            ctk.CTkButton(parent, text=text, width=80, height=36, corner_radius=9, font=("Arial", 12, "bold"),
+            ctk.CTkButton(parent, text=text, width=60, height=36, corner_radius=8, font=("Arial", 12, "bold"),
                          fg_color=color, hover_color=hover, command=cmd).pack(side="left", padx=4)
 
         _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view)
         _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters)
         _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_pdf_reports)
-        _btn(inner, "📥 CSV", "#16A085", "#117A65", self.export_to_csv)
+        _btn(inner, "📥 Excel", "#16A085", "#117A65", self.export_to_csv)
 
         list_header = ctk.CTkFrame(self, fg_color="transparent")
         list_header.pack(fill="x", padx=80, pady=(4, 2))
@@ -330,6 +330,7 @@ class MemberReportFrame(ctk.CTkFrame):
             top_bar,
             text="← Back",
             width=80,
+            height=36,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             command=self.show_history_view
@@ -357,8 +358,8 @@ class MemberReportFrame(ctk.CTkFrame):
         self.save_btn = ctk.CTkButton(
             footer,
             text="Save",
-            width=110,
-            height=32,
+            width=60,
+            height=30,
             corner_radius=8,
             font=("Arial", 12, "bold"),
             fg_color="#1f538d",
@@ -424,7 +425,7 @@ class MemberReportFrame(ctk.CTkFrame):
             )
 
             self.db.conn.commit()
-            self._show_message("Report saved successfully.", "success")
+            self._show_message("Report added successfully.", "success")
             self.show_history_view()
 
         except Exception as e:
@@ -441,6 +442,7 @@ class MemberReportFrame(ctk.CTkFrame):
             top,
             text="← Back",
             width=80,
+            height=36,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             hover_color=("#CFCFCF", "#444444"),
@@ -571,6 +573,7 @@ class MemberReportFrame(ctk.CTkFrame):
             top,
             text="← Back",
             width=80,
+            height = 36,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             hover_color=("#CFCFCF", "#444444"),
@@ -643,12 +646,35 @@ class MemberReportFrame(ctk.CTkFrame):
             self._show_message(str(e, "error"))
 
     def delete_report(self, date):
-        if messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete all reports for {date}?"):
+        if messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete all reports for {date}?"
+        ):
             try:
-                self.db.cursor.execute("DELETE FROM daily_reports WHERE user_id=%s AND report_date=%s", (self.user['id'], date))
+                self.db.cursor.execute(
+                    "DELETE FROM daily_reports WHERE user_id=%s AND report_date=%s",
+                    (self.user['id'], date)
+                )
+
                 self.db.conn.commit()
-                self.show_history_view()
-            except Exception as e: self._show_message(str(e, "error"))
+
+                # Show green success toast
+                self._show_message(
+                    "Report deleted successfully.",
+                    "success"
+                )
+
+                # Refresh list after a short delay
+                self.after(
+                    500,
+                    self.show_history_view
+                )
+
+            except Exception as e:
+                self._show_message(
+                    f"Delete failed: {e}",
+                    "error"
+                )
 
     def clear_filters(self):
         today = datetime.today().date()
@@ -1013,7 +1039,7 @@ class MemberReportFrame(ctk.CTkFrame):
             sheet.row_dimensions[2].height = 18
 
             # Date row
-            date_text = f"Date : {start} ~ {end}"
+            date_text = f"Date   : {start} ~ {end}"
             sheet.merge_cells(start_row=3, start_column=1, end_row=3, end_column=ncols)
             dcell = sheet.cell(row=3, column=1, value=date_text)
             dcell.font = dcell.font.copy(bold=False, size=11, color="000000")

@@ -341,6 +341,19 @@ class UserRegisterFrame(ctk.CTkFrame):
         else:
             formatted_batch = "N/A"
 
+        # Ensure username and employee ID uniqueness only
+        self.db.cursor.execute("SELECT id FROM users WHERE username = %s", (self.uname.get().strip(),))
+        if self.db.cursor.fetchone():
+            self.uname_err.configure(text="Username already exists.")
+            try: self.uname.configure(border_color="red")
+            except Exception: pass
+            return
+
+        self.db.cursor.execute("SELECT id FROM users WHERE employee_id = %s", (self.emp_id.get().strip(),))
+        if self.db.cursor.fetchone():
+            self.show_error_toast("Employee ID already exists.")
+            return
+
         try:
             sql = """INSERT INTO users (employee_id, full_name, username, password, role, team_id, batch) 
                      VALUES (%s, %s, %s, %s, %s, %s, %s)"""
@@ -355,10 +368,10 @@ class UserRegisterFrame(ctk.CTkFrame):
             )
             self.db.cursor.execute(sql, data)
             self.db.conn.commit()
-            messagebox.showinfo("Success", f"User {self.name.get()} created successfully!")
+            self.show_success_toast(f"User {self.name.get()} created successfully!")
             self.back_callback()
         except Exception as e:
-            messagebox.showerror("Database Error", str(e))
+            self.show_error_toast("Database Error", str(e))
 
     def clear_error(self):
         default_border = ["#979DA2", "#565B5E"]
@@ -404,8 +417,22 @@ class UserRegisterFrame(ctk.CTkFrame):
         except Exception: pass
         try: self.role.configure(border_color=default_border)
         except Exception: pass
-            
-            
+
+    def show_error_toast(self, title_or_message, message=None):
+        if hasattr(self.master, "master") and hasattr(self.master.master, "show_error_toast"):
+            if message is None:
+                return self.master.master.show_error_toast(title_or_message)
+            return self.master.master.show_error_toast(title_or_message, message)
+        messagebox.showerror(title_or_message if message is None else title_or_message, message if message is not None else title_or_message)
+
+    def show_success_toast(self, title_or_message, message=None):
+        if hasattr(self.master, "master") and hasattr(self.master.master, "show_success_toast"):
+            if message is None:
+                return self.master.master.show_success_toast(title_or_message)
+            return self.master.master.show_success_toast(title_or_message, message)
+        messagebox.showinfo(title_or_message if message is None else title_or_message, message if message is not None else title_or_message)
+
+
 class UserUpdateFrame(ctk.CTkFrame):
     """The Update Form UI - Pre-fills data and updates existing records"""
     def __init__(self, parent, db, user_id, back_callback):
@@ -555,6 +582,20 @@ class UserUpdateFrame(ctk.CTkFrame):
         try: self.team_dropdown.configure(border_color=default_border)
         except Exception: pass
 
+    def show_error_toast(self, title_or_message, message=None):
+        if hasattr(self.master, "master") and hasattr(self.master.master, "show_error_toast"):
+            if message is None:
+                return self.master.master.show_error_toast(title_or_message)
+            return self.master.master.show_error_toast(title_or_message, message)
+        messagebox.showerror(title_or_message if message is None else title_or_message, message if message is not None else title_or_message)
+
+    def show_success_toast(self, title_or_message, message=None):
+        if hasattr(self.master, "master") and hasattr(self.master.master, "show_success_toast"):
+            if message is None:
+                return self.master.master.show_success_toast(title_or_message)
+            return self.master.master.show_success_toast(title_or_message, message)
+        messagebox.showinfo(title_or_message if message is None else title_or_message, message if message is not None else title_or_message)
+
     def load_user_data(self):
         self.db.cursor.execute("SELECT * FROM users WHERE id=%s", (self.user_id,))
         user = self.db.cursor.fetchone()
@@ -646,6 +687,13 @@ class UserUpdateFrame(ctk.CTkFrame):
                 except Exception: pass
                 return
 
+            self.db.cursor.execute("SELECT id FROM users WHERE username = %s AND id != %s", (username, self.user_id))
+            if self.db.cursor.fetchone():
+                self.uname_err.configure(text="Username already exists.")
+                try: self.uname.configure(border_color="red")
+                except Exception: pass
+                return
+
             team_id = self.team_map.get(team_name) if role != "admin" else None
             if role == "member" and batch_input:
                 batch_val = f"Batch {batch_input}" if batch_input.isdigit() else batch_input
@@ -669,13 +717,13 @@ class UserUpdateFrame(ctk.CTkFrame):
             self.db.cursor.execute(sql, val)
             self.db.conn.commit()
 
-            messagebox.showinfo("Success", "User updated successfully!")
+            self.show_success_toast("Success", "User updated successfully!")
             self.back_callback()
 
         except Exception as e:
-            messagebox.showerror("Error", str(e))
-            
-            
+            self.show_error_toast("Error", str(e))
+
+
 class AdminUsers(ctk.CTkFrame):
     """Main User Management View"""
     def __init__(self, master, user_data):
@@ -710,24 +758,25 @@ class AdminUsers(ctk.CTkFrame):
         self.search_role = ctk.CTkOptionMenu(
             filter_frame,
             values=["Roles", "admin", "leader", "member"],
-            width=120
+            width=100,
+            height=36
         )
         self.search_role.set("Roles")
         self.search_role.pack(side="left", padx=5)
 
         teams = ["Teams"] + self.get_team_names()
-        self.search_team = ctk.CTkOptionMenu(filter_frame, values=teams, width=120)
+        self.search_team = ctk.CTkOptionMenu(filter_frame, values=teams, width=100, height=36)
         self.search_team.set("Teams")
         self.search_team.pack(side="left", padx=5)
 
-        self.search_batch = ctk.CTkEntry(filter_frame, placeholder_text="Batch", width=100)
+        self.search_batch = ctk.CTkEntry(filter_frame, placeholder_text="Batch", width=100, height=36)
         self.search_batch.pack(side="left", padx=5)
 
-        ctk.CTkButton(filter_frame, text="🔍 Filter",fg_color="#2471A3", hover_color="#1A5276", width=90, command=self.filter_users).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="✖ Clear", fg_color="#566573", hover_color="#424949", width=90, command=self.reset_filters).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="📄PDF", fg_color="#AA4242", hover_color="#B62525", width=90, command=self.export_users).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="📥CSV", fg_color="#16A085", hover_color="#107863", width=90, command=self.csvexport_user).pack(side="left", padx=5)
-        
+        ctk.CTkButton(filter_frame, text="🔍 Filter",fg_color="#2471A3", hover_color="#1A5276", width=60,height=36, command=self.filter_users).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="✖ Clear", fg_color="#566573", hover_color="#424949", width=60, height=36, command=self.reset_filters).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="📄PDF", fg_color="#AA4242", hover_color="#B62525", width=60, height=36, command=self.export_users).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="📥Excel", fg_color="#16A085", hover_color="#107863", width=60, height=36, command=self.csvexport_user).pack(side="left", padx=5)
+
         
         ctk.CTkButton(
             header, text="+ Create Account", 
@@ -780,7 +829,7 @@ class AdminUsers(ctk.CTkFrame):
     def filter_users(self):
         
         if self.search_id.get() and not self.search_id.get().isdigit():
-            messagebox.showwarning("Invalid Input", "Employee ID filter must contain only numbers.")
+            self.show_error_toast("Employee ID must contain only numbers.")
             self.search_id.focus()
             return
         
@@ -796,7 +845,7 @@ class AdminUsers(ctk.CTkFrame):
 
         if self.search_name.get():
             if self.search_name.get().isdigit():
-                messagebox.showwarning("Invalid Input", "Full Name filter cannot be numeric.")
+                self.show_error_toast("Full Name filter cannot be numeric.")
                 self.search_name.focus()
                 return
             else:
@@ -812,8 +861,8 @@ class AdminUsers(ctk.CTkFrame):
             params.append(self.search_team.get())
 
         if self.search_batch.get():
-            if not self.search_batch.get().isdigit():
-                messagebox.showwarning("Invalid Input", "Batch filter must contain only numbers.")
+            if not self.search_batch.get().isalnum():
+                self.show_error_toast("Batch filter must contain only numbers.")
                 self.search_batch.focus()
                 return
             else:
@@ -920,10 +969,7 @@ class AdminUsers(ctk.CTkFrame):
 
             # No Data
             if not rows:
-                messagebox.showwarning(
-                    "No Data",
-                    "No matching users found to export."
-                )
+                self.show_error_toast("No matching users found to export.")
                 return
 
             # Current Date
@@ -1066,11 +1112,47 @@ class AdminUsers(ctk.CTkFrame):
 
         except Exception as e:
 
-            messagebox.showerror(
-                "Export Error",
-                str(e)
-            )    
-    def show_success_toast(self, message):
+            self.show_error_toast("Error occurred while exporting Excel file.")
+
+    def show_error_toast(self, title_or_message, message=None):
+
+        text = title_or_message if message is None else f"{title_or_message}: {message}"
+
+        toast = ctk.CTkFrame(
+            self,
+            fg_color="#EF4444",
+            corner_radius=8
+        )
+
+        toast.place(
+            relx=1.0,
+            y=20,
+            anchor="ne"
+        )
+
+        label = ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=320
+        )
+
+        label.pack(
+            padx=25,
+            pady=12
+        )
+
+        # Auto hide after 3 seconds
+        self.after(
+            3000,
+            toast.destroy
+        )
+    
+       
+    def show_success_toast(self, title_or_message, message=None):
+
+        text = title_or_message if message is None else f"{title_or_message}: {message}"
 
         toast = ctk.CTkFrame(
             self,
@@ -1086,7 +1168,7 @@ class AdminUsers(ctk.CTkFrame):
 
         label = ctk.CTkLabel(
             toast,
-            text=message,
+            text=text,
             text_color="white",
             font=("Arial", 12, "bold")
         )
@@ -1154,7 +1236,7 @@ class AdminUsers(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             if not rows:
-                self.show_success_toast("No matching users found to export.")
+                self.show_error_toast("No matching users found to export.")
                 return
 
             # Save PDF
@@ -1372,7 +1454,7 @@ class AdminUsers(ctk.CTkFrame):
             ctk.CTkButton(
                 btn_frame,
                 text="Edit",
-                width=70,
+                width=60,
                 height=30,
                 fg_color="#F39C12",
                 hover_color="#D68910",
@@ -1382,7 +1464,7 @@ class AdminUsers(ctk.CTkFrame):
             ctk.CTkButton(
                 btn_frame,
                 text="Delete",
-                width=70,
+                width=60,
                 height=30,
                 fg_color="#E74C3C",
                 hover_color="#C0392B",
@@ -1403,9 +1485,16 @@ class AdminUsers(ctk.CTkFrame):
 
     def handle_delete(self, uid):
         if uid == self.user['id']:
-            messagebox.showwarning("Denied", "You cannot delete yourself!")
+            self.show_error_toast("Denied", "You cannot delete yourself!")
             return
         if messagebox.askyesno("Confirm", "Are you sure you want to delete this user?"):
-            self.db.cursor.execute("DELETE FROM users WHERE id=%s", (uid,))
-            self.db.conn.commit()
-            self.refresh_list()
+            try:
+                self.db.cursor.execute("DELETE FROM users WHERE id=%s", (uid,))
+                self.db.conn.commit()
+                if self.db.cursor.rowcount:
+                    self.show_success_toast("User deleted successfully!")
+                    self.refresh_list()
+                else:
+                    self.show_error_toast("Delete failed.")
+            except Exception as e:
+                self.show_error_toast("Error", str(e))

@@ -46,11 +46,11 @@ class DatePickerButton(ctk.CTkFrame):
             width=140,
             height=36,
             corner_radius=8,
-            fg_color=("#F2F2F2", "#1E1E1E"),
-            text_color=("#000000", "#FFFFFF"),
-            hover_color=("#E5E5E5", "#2A2A2A"),
+            hover_color=("#EBEBEB", "#2A2A2A"),
             border_width=1,
-            border_color=("#CCCCCC", "#2C2C2C"),
+            fg_color=("#F9F9F9", "#1E1E1E"),
+            border_color=("#DBDBDB", "#2C2C2C"),
+            text_color=("black", "white"),
             anchor="w",
             command=self.toggle
         )
@@ -217,17 +217,28 @@ class LeaderReportView(ctk.CTkFrame):
         )
         self.count_date.pack(side="left", padx=(0, 8))
 
-        # FILTER BUTTON
         ctk.CTkButton(
             top_row,
             text="🔍 Filter",
-            width=80,
+            width=60,
             height=36,
             corner_radius=8,
             fg_color="#2471A3",
             hover_color="#1A5276",
             font=("Arial", 12, "bold"),
             command=self.refresh_counts
+        ).pack(side="left", padx=(0, 6))
+
+        ctk.CTkButton(
+            top_row,
+            text="✖ Clear",
+            width=60,
+            height=36,
+            corner_radius=8,
+            fg_color="#566573",
+            hover_color="#424949",
+            font=("Arial", 12, "bold"),
+            command=self.clear_counts
         ).pack(side="left")
 
         # SECOND ROW (SMALL CARDS)
@@ -336,8 +347,8 @@ class LeaderReportView(ctk.CTkFrame):
         # Member search
         _lbl(inner, "Member")
         self.member_entry = ctk.CTkEntry(
-            inner, placeholder_text="Search member…",
-            width=150, height=36, corner_radius=8,
+            inner, placeholder_text="Search name…",
+            width=100, height=36, corner_radius=8,
             border_color=("#CCCCCC", "#2C2C2C"), border_width=1,
             fg_color=("#FFFFFF", "#1E1E1E"),
             text_color=("#000000", "#FFFFFF"),
@@ -349,16 +360,16 @@ class LeaderReportView(ctk.CTkFrame):
         def _btn(parent, text, color, hover, cmd, width=75):
             b = ctk.CTkButton(
                 parent, text=text, width=width, height=36,
-                corner_radius=9, font=("Arial", 12, "bold"),
+                corner_radius=8, font=("Arial", 12, "bold"),
                 fg_color=color, hover_color=hover, command=cmd
             )
             b.pack(side="left", padx=4)
             return b
 
-        _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view, width=80)
-        _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters, width=70)
-        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_to_pdf, width=70)
-        _btn(inner, "📥 CSV", "#16A085", "#117A65", self.export_to_csv, width=70)
+        _btn(inner, "🔍 Filter", "#2471A3", "#1A5276", self.refresh_view, width=60)
+        _btn(inner, "✖ Clear", "#566573", "#424949", self.clear_filters, width=60)
+        _btn(inner, "📄 PDF", "#C0392B", "#922B21", self.export_to_pdf, width=60)
+        _btn(inner, "📥 Excel", "#16A085", "#117A65", self.export_to_csv, width=60)
         
         # List header
         list_header = ctk.CTkFrame(self.container, fg_color="transparent")
@@ -549,7 +560,18 @@ class LeaderReportView(ctk.CTkFrame):
 
         except Exception as e:
             print("Count Error:", e)
-    
+            
+    def clear_counts(self):
+        today = datetime.today().date()
+
+        try:
+            if hasattr(self, 'count_date'):
+                self.count_date.set_date(today)
+        except Exception:
+            pass
+
+        self.refresh_counts()
+        
     def show_member_list(self, submitted=True):
         """Render member list for the selected date in the current view (no popup)."""
         try:
@@ -589,6 +611,7 @@ class LeaderReportView(ctk.CTkFrame):
                 top,
                 text="← Back",
                 width=80,
+                height = 36,
                 fg_color=("#DBDBDB", "#333333"),
                 text_color=("black", "white"),
                 hover_color=("#CFCFCF", "#444444"),
@@ -697,6 +720,7 @@ class LeaderReportView(ctk.CTkFrame):
                 top,
                 text="← Back",
                 width=80,
+                height = 36,
                 fg_color=("#DBDBDB", "#333333"),
                 text_color=("black", "white"),
                 hover_color=("#CFCFCF", "#444444"),

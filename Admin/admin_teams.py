@@ -473,7 +473,7 @@ class AdminTeams(ctk.CTkFrame):
                     team_desc
                 ):
 
-                    messagebox.showinfo(
+                    self.show_success_toast(
                         "Success",
                         f"Team '{team_name}' created!"
                     )
@@ -483,12 +483,11 @@ class AdminTeams(ctk.CTkFrame):
 
         except Exception as e:
 
-            messagebox.showerror(
-                "Error",
-                str(e)
-            )
+            self.show_error_toast("Error", str(e))
 
-    def show_error_toast(self, message):
+    def show_error_toast(self, title_or_message, message=None):
+
+        text = title_or_message if message is None else f"{title_or_message}: {message}"
 
         toast = ctk.CTkFrame(
             self,
@@ -504,7 +503,41 @@ class AdminTeams(ctk.CTkFrame):
 
         label = ctk.CTkLabel(
             toast,
-            text=message,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold")
+        )
+
+        label.pack(
+            padx=20,
+            pady=10
+        )
+
+        # Auto hide after 3 seconds
+        self.after(
+            3000,
+            toast.destroy
+        )
+        
+    def show_success_toast(self, title_or_message, message=None):
+
+        text = title_or_message if message is None else f"{title_or_message}: {message}"
+
+        toast = ctk.CTkFrame(
+            self,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+
+        toast.place(
+            relx=1.0,
+            y=20,
+            anchor="ne"
+        )
+
+        label = ctk.CTkLabel(
+            toast,
+            text=text,
             text_color="white",
             font=("Arial", 12, "bold")
         )
@@ -718,7 +751,7 @@ class AdminTeams(ctk.CTkFrame):
 
             if self.db.delete_team(team_id):
 
-                messagebox.showinfo(
+                self.show_success_toast(
                     "Success",
                     "Team deleted successfully."
                 )
@@ -727,14 +760,11 @@ class AdminTeams(ctk.CTkFrame):
 
             else:
 
-                messagebox.showerror(
+                self.show_error_toast(
                     "Error",
                     "Delete failed."
                 )
 
         except Exception as e:
 
-            messagebox.showerror(
-                "Error",
-                str(e)
-            )
+            self.show_error_toast("Error", str(e))
