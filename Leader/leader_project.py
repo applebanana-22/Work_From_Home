@@ -84,8 +84,9 @@ class LeaderProject(ctk.CTkFrame):
                 ctk.CTkLabel(info_f, text=proj['project_name'], font=("Arial", 16, "bold"),
                              text_color=("#2D3436", "#ECF0F1")).pack(anchor="w")
 
-
                 #print(f"status = {proj['status']}")
+                is_complete = 1 if "100" in proj['status'] or "Pending" in proj['status'] else 0
+                # print(is_complete)
 
                 # Dynamic status color based on progress string
                 status_color = "#F1C40F" if "Pending" in proj['status'] else "#2ECC71"
@@ -111,9 +112,10 @@ class LeaderProject(ctk.CTkFrame):
                 ctk.CTkButton(
                     btn_f, 
                     text="Edit", 
+                    state = "disabled" if is_complete else "normal",
                     width=60, 
                     height=32, 
-                    fg_color="#F39C12", 
+                    fg_color="#F39C12" if not is_complete else "grey",
                     text_color=("#2D3436", "#ECF0F1"),
                     hover_color="#D35400",
                     command=lambda p=proj: self.update_project(p['id'], p['project_name'])
@@ -123,9 +125,10 @@ class LeaderProject(ctk.CTkFrame):
                 ctk.CTkButton(
                     btn_f, 
                     text="Delete", 
+                    state = "disabled" if not is_complete else "normal",
                     width=60, 
                     height=32, 
-                    fg_color="#E74C3C",
+                    fg_color="#E74C3C" if is_complete else "grey",
                     text_color=("#2D3436", "#ECF0F1"),
                     command=lambda pid=proj['id']: self.delete_project(pid)
                 ).pack(side="left", padx=5)
