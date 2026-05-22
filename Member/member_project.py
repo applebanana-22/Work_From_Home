@@ -19,19 +19,32 @@ class DatePickerButton(ctk.CTkFrame):
         style = ttk.Style()
         style.theme_use("clam")
 
+        appearance = ctk.get_appearance_mode()
+        if appearance == "Light":
+            cal_bg = "#FFFFFF"
+            cal_fg = "black"
+            h_bg = "#EAECEE"
+            h_fg = "#2471A3"
+        else:
+            cal_bg = "#1A1A2E"
+            cal_fg = "white"
+            h_bg = "#16213E"
+            h_fg = "#4FC3F7" 
+
         style.configure("Custom.Calendar",
-            background="#1A1A2E",
-            foreground="white",
-            headersbackground="#16213E",
-            headersforeground="#4FC3F7",
+            background=cal_bg,
+            foreground=cal_fg,
+            headersbackground=h_bg,
+            headersforeground=h_fg,
             selectbackground="#3498DB",
             selectforeground="white",
-            normalbackground="#1A1A2E",
-            normalforeground="#CCCCCC",
-            weekendbackground="#1A1A2E",
+            normalbackground=cal_bg,
+            normalforeground=cal_fg,
+            weekendbackground=cal_bg,
             weekendforeground="#F39C12",
             othermonthforeground="#555555",
-            bordercolor="#2A2A4A",
+            bordercolor=h_bg,
+            textcolor=("#475569", "#8899AA"),
             relief="flat"
         )
 
@@ -42,10 +55,12 @@ class DatePickerButton(ctk.CTkFrame):
             width=170,
             height=36,
             corner_radius=10,
-            fg_color="#1E2A3A",
-            hover_color="#2C3E50",
+            #fg_color="#1E2A3A",
+            fg_color = ("#EAECEE", "#1E2A3A"),
+            hover_color = ("#D5D8DC", "#2C3E50"),
             border_width=1,
-            border_color="#3D5166",
+            border_color=("#ABB2B9", "#3D5166"),
+            text_color=("#475569", "#8899AA"),
             anchor="w",
             command=self.toggle
         )
@@ -54,10 +69,11 @@ class DatePickerButton(ctk.CTkFrame):
         # -------- FLOATING PANEL --------
         self.panel = ctk.CTkFrame(
             self.winfo_toplevel(),
-            fg_color="#141E2B",
+            fg_color=("#FFFFFF", "#141E2B"),
             corner_radius=12,
             border_width=1,
-            border_color="#2A3A4A"
+            #border_color=("#D1D5DB", "#2A3A4A")
+            border_color=("#ABB2B9", "#2A3A4A")
         )
 
         # -------- REAL CALENDAR --------
@@ -183,7 +199,7 @@ class MemberProject(ctk.CTkFrame):
     def build_layer1(self):
         # Header
         header = ctk.CTkFrame(self.layer1, fg_color="transparent")
-        header.pack(fill="x", pady=(10, 20))
+        header.pack(fill="x", padx=80, pady=(10, 20))
 
         ctk.CTkLabel(
             header,
@@ -211,7 +227,7 @@ class MemberProject(ctk.CTkFrame):
             scrollbar_button_hover_color="#808080"
         )
         
-        self.scroll.pack(fill="both", expand=True, anchor="w", padx=20, pady=(10, 0))
+        self.scroll.pack(fill="both", expand=True, anchor="w", padx=80, pady=(10, 0))
 
         self.refresh_tasks()
 
@@ -330,11 +346,13 @@ class MemberProject(ctk.CTkFrame):
         # LEFT SIDE LABEL CONTAINER
         label_frame = ctk.CTkFrame(progress_row, fg_color="transparent")
         label_frame.pack(side="left")
-        # Red Star
-        ctk.CTkLabel(label_frame, text="*", font=("Inter", 14, "bold"), text_color=self.colors["accent_red"]).pack(side="left")
 
-        progress_label = ctk.CTkLabel(progress_row, text="PROGRESS (%)", font=("Inter", 12, "bold"), text_color=self.colors["text_muted"])
+        progress_label = ctk.CTkLabel(label_frame, text="PROGRESS (%)", font=("Inter", 12, "bold"), text_color=self.colors["text_muted"])
         progress_label.pack(side="left")
+
+        # Red Star
+        ctk.CTkLabel(label_frame, text="*", font=("Inter", 14, "bold"), text_color=self.colors["accent_red"]).pack()
+
 
         self.progress_entry = ctk.CTkEntry(progress_row, width=170, height=30, corner_radius=8)
         # self.progress_entry.pack(padx=40, pady=(5, 15))
@@ -403,17 +421,17 @@ class MemberProject(ctk.CTkFrame):
             w.destroy()
 
         header = ctk.CTkFrame(self.layer3, fg_color="transparent")
-        header.pack(fill="x", pady=10)
+        header.pack(fill="x", padx=80, pady=10)
 
-        ctk.CTkButton(header, text="← Back", width=100, fg_color=self.colors["accent_blue"], hover_color="#2563EB",
-                text_color=("#2D3436", "#ECF0F1"),corner_radius=8, command=self.back_from_history).pack(side="left", padx=10)
+        ctk.CTkButton(header, text="← Back", width=80, fg_color=("#DBDBDB", "#333333"), 
+                text_color=("black", "white"),corner_radius=8, command=self.back_from_history).pack(side="left", padx=10)
 
         ctk.CTkLabel(header, text="Task History", font=("Inter", 24, "bold")).pack(side="left", padx=20)
 
         container = ctk.CTkScrollableFrame(self.layer3, fg_color="transparent",
                                             scrollbar_button_color="#A0A0A0", # Grey scrollbar
                                             scrollbar_button_hover_color="#808080")
-        container.pack(fill="both", expand=True, padx=20, pady=(10, 0))
+        container.pack(fill="both", expand=True, padx=80, pady=(10, 0))
 
         self.db.cursor.execute("""
             SELECT * FROM progress_history WHERE task_id=%s ORDER BY update_date DESC, id DESC
@@ -446,9 +464,9 @@ class MemberProject(ctk.CTkFrame):
         btn_f = ctk.CTkFrame(card, fg_color="transparent")
         btn_f.pack(side="right", padx=10)
 
-        ctk.CTkButton(btn_f, text="Edit", width=60, fg_color=self.colors["accent_amber"],text_color=("#2D3436", "#ECF0F1"),
+        ctk.CTkButton(btn_f, text="Edit", width=60, height=30, fg_color=self.colors["accent_amber"],text_color=("#2D3436", "#ECF0F1"),
                       command=lambda r=row: self.edit_history(r)).pack(side="left", padx=2)
-        ctk.CTkButton(btn_f, text="Delete", width=60, fg_color=self.colors["accent_red"],text_color=("#2D3436", "#ECF0F1"),
+        ctk.CTkButton(btn_f, text="Delete", width=60, height=30, fg_color=self.colors["accent_red"],text_color=("#2D3436", "#ECF0F1"),
                       command=lambda r=row: self.delete_history(r)).pack(side="left", padx=2)
 
     # =========================================================

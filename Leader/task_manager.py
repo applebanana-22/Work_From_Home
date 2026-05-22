@@ -18,22 +18,35 @@ class DatePickerButton(ctk.CTkFrame):
         else:
             self._date = tomorrow
 
+        # self._date = initial_date or datetime.today().date()
         self._open = False
 
         # -------- STYLE (THIS FIXES YOUR DESIGN) --------
         style = ttk.Style()
         style.theme_use("clam")
 
+        appearance = ctk.get_appearance_mode()
+        if appearance == "Light":
+            cal_bg = "#FFFFFF"
+            cal_fg = "black"
+            h_bg = "#EAECEE"
+            h_fg = "#2471A3"
+        else:
+            cal_bg = "#1A1A2E"
+            cal_fg = "white"
+            h_bg = "#16213E"
+            h_fg = "#4FC3F7" 
+
         style.configure("Custom.Calendar",
-            background="#1A1A2E",
-            foreground="white",
-            headersbackground="#16213E",
-            headersforeground="#4FC3F7",
+            background=cal_bg,
+            foreground=cal_fg,
+            headersbackground=h_bg,
+            headersforeground=h_fg,
             selectbackground="#3498DB",
             selectforeground="white",
-            normalbackground="#1A1A2E",
-            normalforeground="#CCCCCC",
-            weekendbackground="#1A1A2E",
+            normalbackground=cal_bg,
+            normalforeground=cal_fg,
+            weekendbackground=cal_bg,
             weekendforeground="#F39C12",
             othermonthforeground="#555555",
             bordercolor="#2A2A4A",
@@ -47,10 +60,11 @@ class DatePickerButton(ctk.CTkFrame):
             width=170,
             height=36,
             corner_radius=10,
-            fg_color="#1E2A3A",
-            hover_color="#2C3E50",
+            fg_color=("#EAECEE", "#1E2A3A"),
+            hover_color=("#D5D8DC", "#2C3E50"),
             border_width=1,
-            border_color="#3D5166",
+            border_color=("#ABB2B9", "#3D5166"),
+            text_color=("#475569", "#8899AA"),
             anchor="w",
             command=self.toggle
         )
@@ -59,10 +73,10 @@ class DatePickerButton(ctk.CTkFrame):
         # -------- FLOATING PANEL --------
         self.panel = ctk.CTkFrame(
             self.winfo_toplevel(),
-            fg_color="#141E2B",
+            fg_color=("#FFFFFF", "#141E2B"),
             corner_radius=12,
             border_width=1,
-            border_color="#2A3A4A"
+            border_color=("#ABB2B9", "#2A3A4A")
         )
 
         # -------- REAL CALENDAR --------
@@ -122,7 +136,7 @@ class DatePickerButton(ctk.CTkFrame):
 
 class TaskManager(ctk.CTkFrame):
     def __init__(self, master, project_id, project_name, user, back_callback):
-        super().__init__(master)
+        super().__init__(master,fg_color="transparent")
         self.db = Database()
         self.project_id = project_id
         self.project_name = project_name
@@ -136,8 +150,11 @@ class TaskManager(ctk.CTkFrame):
             
         # --- Header ---
         self.header_f = ctk.CTkFrame(self, fg_color="transparent")
-        self.header_f.pack(fill="x", padx=20, pady=15)
+        self.header_f.pack(fill="x", padx=80, pady=15)
 
+        ctk.CTkButton(self.header_f, text="← Back", width=80, fg_color=("#DBDBDB", "#333333"),
+         text_color=("black", "white"),corner_radius=8,
+         command=self.back_callback).pack(side="left", padx=10)
 
         ctk.CTkLabel(self.header_f, text=f"Project: {project_name}", 
                      font=("Arial", 22, "bold")).pack(side="left")
@@ -158,7 +175,7 @@ class TaskManager(ctk.CTkFrame):
         # CONTROL WRAPPER (SEARCH + BUTTON + FORM)
         # =========================================================
         self.control_wrapper = ctk.CTkFrame(self, fg_color="transparent")
-        self.control_wrapper.pack(fill="x", padx=20, pady=5)
+        self.control_wrapper.pack(fill="x", padx=80, pady=5)
 
         # ---------------- SEARCH (always visible) ----------------
         self.search_entry = ctk.CTkEntry(
@@ -174,8 +191,9 @@ class TaskManager(ctk.CTkFrame):
             self.control_wrapper,
             text="+ Add Task",
             state = "disabled" if is_complete else "normal",
-            fg_color="#2563EB" if not is_complete else "grey",
-            hover_color="#1D4ED8",
+            fg_color="#10B981" if not is_complete else "grey",
+            width=140, height=36,
+            hover_color="#059669",
             command=self.toggle_form
         )
         self.toggle_form_btn.pack(side="left", padx=10)
@@ -198,9 +216,9 @@ class TaskManager(ctk.CTkFrame):
         task_label_row = ctk.CTkFrame(task_container, fg_color="transparent")
         task_label_row.pack(anchor="w")
 
-        ctk.CTkLabel(task_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
         ctk.CTkLabel(task_label_row, text="Task Name", font=("Arial", 12, "bold")).pack(side="left")
-
+        ctk.CTkLabel(task_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
+        
         # Task name
         self.task_entry = ctk.CTkEntry(task_container, placeholder_text="Task Name", width=180)
         self.task_entry.pack(pady=(4, 0))
@@ -234,8 +252,8 @@ class TaskManager(ctk.CTkFrame):
         member_label_row = ctk.CTkFrame(member_container, fg_color="transparent")
         member_label_row.pack(anchor="w")
 
-        ctk.CTkLabel(member_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
         ctk.CTkLabel(member_label_row, text="Member", font=("Arial", 12, "bold")).pack(side="left")
+        ctk.CTkLabel(member_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
 
         members = self.get_team_members()
         self.member_dropdown = ctk.CTkOptionMenu(
@@ -257,8 +275,8 @@ class TaskManager(ctk.CTkFrame):
             text="Add",
             fg_color="#10B981",
             hover_color="#059669",
-            width=90,
-            height=36,
+            width=60,
+            height=30,
             font=("Arial", 12, "bold"),
             text_color=("#2D3436", "#ECF0F1"),
             command=self.add_task_with_confirm
@@ -273,18 +291,7 @@ class TaskManager(ctk.CTkFrame):
             label_text="Task Breakdown",
             fg_color=("#F5F5F5", "#121212")
         )
-        self.list_frame.pack(fill="both", expand=True, padx=20, pady=10)
-
-        # =========================================================
-        # BACK BUTTON
-        # =========================================================
-        ctk.CTkButton(
-            self,
-            text="← Back",
-            fg_color="gray",
-            text_color=("#2D3436", "#ECF0F1"),
-            command=self.back_callback
-        ).pack(pady=10)
+        self.list_frame.pack(fill="both", expand=True, padx=80, pady=10)
 
         # =========================================================
         # INITIAL LOAD
@@ -392,17 +399,17 @@ class TaskManager(ctk.CTkFrame):
                 is_complete = 1 if row['progress'] == 100 else 0
 
                 # Edit Button (Orange Style)
-                ctk.CTkButton(actions_f, text="Edit", state = "disabled" if is_complete else "normal", width=60, height=32,
+                ctk.CTkButton(actions_f, text="Edit", state = "disabled" if is_complete else "normal", width=60, height=30,
                               fg_color="#F39C12" if not is_complete else "grey", hover_color="#D35400", font=("Arial", 12),text_color=("#2D3436", "#ECF0F1"),
                               command=lambda r=row: self.start_edit_task(r)).pack(side="left", padx=5)
 
                 # Delete Button (Red Style)
-                ctk.CTkButton(actions_f, text="Delete", state = "disabled" if is_complete else "normal", width=60, height=32,
+                ctk.CTkButton(actions_f, text="Delete", state = "disabled" if is_complete else "normal", width=60, height=30,
                               fg_color="#C0392B" if not is_complete else "grey", hover_color="#A93226",text_color=("#2D3436", "#ECF0F1"),
                               command=lambda tid=row['id']: self.delete_task_with_confirm(tid)).pack(side="left", padx=5)
                 
                 
-                ctk.CTkButton(actions_f, text="History", width=70,
+                ctk.CTkButton(actions_f, text="History", width=60, height=30,
                                 fg_color="#2980B9",text_color=("#2D3436", "#ECF0F1"),
                                 command=lambda tid=row['id']: self.view_history(tid)).pack(side="left", padx=5)
                 
@@ -577,6 +584,10 @@ class TaskManager(ctk.CTkFrame):
         member = self.member_dropdown.get()
         deadline = self.deadline_picker.get_date().strftime('%Y-%m-%d')
         
+        # if not name or member in ["Select Member", "No Member"]:
+        #     messagebox.showwarning("Missing Info", "Enter task name and select a member.")
+        #     return
+        
         has_error = False
 
         if not name:
@@ -589,6 +600,11 @@ class TaskManager(ctk.CTkFrame):
 
         # If there are errors, show all at once
         if has_error:
+            # messagebox.showwarning(
+            #     "Missing Fields",
+            #     "\n".join(errors),
+            #     parent=self
+            # )
             return
 
         if messagebox.askyesno("Confirm", f"Do you want to assign task '{name}' to {member} with a deadline of {deadline}?", parent=self):
@@ -613,7 +629,16 @@ class TaskManager(ctk.CTkFrame):
     def view_history(self, task_id):
         win = ctk.CTkToplevel(self)
         win.title("Progress History")
-        win.geometry("500x400")
+        width = 500
+        height = 400
+
+        screen_width = win.winfo_screenwidth()
+        screen_height = win.winfo_screenheight()
+
+        x = int((screen_width / 2) - (width / 2))
+        y = int((screen_height / 2) - (height / 2))
+
+        win.geometry(f"{width}x{height}+{x}+{y}")
         
         # ✅ IMPORTANT FIX
         win.transient(self)

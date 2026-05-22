@@ -2,7 +2,11 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
+<<<<<<< HEAD
     def __init__(self, host="192.168.100.45"):
+=======
+    def __init__(self, host="localhost"):
+>>>>>>> 1a1404d (task_manager+member_project UI fixed)
         self.host = host
         self.connect()
 
@@ -12,7 +16,7 @@ class Database:
             self.conn = mysql.connector.connect(
                 host=self.host, 
                 user="root",
-                password="",  
+                password="root",  
                 database="wfh_system",
                 autocommit=True,
                 connect_timeout=10 
