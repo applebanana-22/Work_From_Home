@@ -439,12 +439,13 @@ class MemberOvertime(ctk.CTkFrame):
         # --- Back Button ---
         back_btn = ctk.CTkButton(
             self.add_page,
-            text="Back",
+            text="← Back",
             text_color=("black", "white"),
-            width=100,
+            width=80,
             fg_color=("#DBDBDB", "#333333"),
-            font=("Arial", 12),
-            height=35,
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            height=36,
             command=lambda: self.show_page("main")
         )
         back_btn.grid(row=0, column=0, sticky="nw", padx=60, pady=(10, 0))
@@ -1158,7 +1159,17 @@ class MemberOvertime(ctk.CTkFrame):
         """Handle reject action with reason input (styled popup)"""
         popup = ctk.CTkToplevel(self)
         popup.title("Reject Overtime")
-        popup.geometry("400x250")
+        
+        # Centering logic relative to parent window
+        width, height = 400, 250
+        popup.update_idletasks()
+        parent = self.winfo_toplevel()
+        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+        
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
         popup.grab_set()
 
         ctk.CTkLabel(
@@ -1187,8 +1198,8 @@ class MemberOvertime(ctk.CTkFrame):
         ctk.CTkButton(
             btn_frame, 
             text="✓ Confirm", 
-            width=60, 
-            height=30,
+            width=100, 
+            height=32,
             corner_radius=14,
             fg_color="#E74C3C", 
             hover_color="#C0392B", 
@@ -1199,8 +1210,8 @@ class MemberOvertime(ctk.CTkFrame):
         ctk.CTkButton(
             btn_frame, 
             text="✗ Cancel", 
-            width=60, 
-            height=30,
+            width=100, 
+            height=32,
             corner_radius=14,
             fg_color="#95A5A6", 
             hover_color="#7F8C8D", 
@@ -1254,12 +1265,13 @@ class MemberOvertime(ctk.CTkFrame):
         # Back button
         back_btn = ctk.CTkButton(
             self.edit_page,
-            text="Back",
+            text="← Back",
             text_color=("black", "white"),
-            width=100,
-            fg_color=("#DBDBDB", "#333333"), 
-            font=("Arial", 12),
-            height=35,
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            height=36,
             command=lambda: self.show_page("main")
         )
         back_btn.grid(row=0, column=0, sticky="nw", padx=60, pady=(10, 0))

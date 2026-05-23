@@ -485,7 +485,7 @@ class LeaderOvertime(ctk.CTkFrame):
             text="Request OT from member",
             fg_color="#2980B9",
             hover_color="#21618C",
-            width=160,
+            width=210,
             height=40,
             corner_radius=10,
             font=("Arial", 12, "bold"),
@@ -618,15 +618,15 @@ class LeaderOvertime(ctk.CTkFrame):
         
         # Back button
         back_btn = ctk.CTkButton(
-            self.add_page,
-            text="Back",
-            text_color=("black", "white"),
-            width=100,
-            fg_color=("#DBDBDB", "#333333"), 
-            # hover_color="#2A2A2A",
-            font=("Arial", 12),
-            height=35,
-            command=lambda: self.show_page("main")
+                self.add_page,
+                text="← Back",
+                width=80,
+                height=36,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8,
+                command=lambda: self.show_page("main")
         )
         back_btn.grid(row=0, column=0, sticky="nw", padx=80, pady=(10, 0))
         
@@ -1086,12 +1086,13 @@ class LeaderOvertime(ctk.CTkFrame):
 
         back_btn = ctk.CTkButton(
             header,
-            text="Back",
-            text_color=("black", "white"),
-            width=100,
+            text="← Back",
+            width=80,
+            height = 36,
             fg_color=("#DBDBDB", "#333333"),
-            font=("Arial", 12),
-            height=35,
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
             command=lambda: self.show_page("main")
         )
         back_btn.pack(side="left")
@@ -1453,15 +1454,67 @@ class LeaderOvertime(ctk.CTkFrame):
 
     def _show_reject_dialog(self, request_id):
         """Shows a dialog for the leader to enter a rejection reason."""
-        dialog = ctk.CTkInputDialog(
-            text="Enter reason for rejection:",
-            title="Reject Overtime Request"
-        )
-        reason = dialog.get_input()
-        if reason:
-            self._update_member_request_status(request_id, 'Rejected', reason)
-        else:
-            self._show_message("Rejection cancelled or no reason provided.", "info")
+        popup = ctk.CTkToplevel(self)
+        popup.title("Reject Overtime")
+        
+        # Centering logic relative to parent window
+        width, height = 400, 250
+        popup.update_idletasks()
+        parent = self.winfo_toplevel()
+        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (width // 2)
+        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (height // 2)
+        popup.geometry(f"{width}x{height}+{x}+{y}")
+        
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)
+        popup.grab_set()
+
+        ctk.CTkLabel(
+            popup, 
+            text="Please provide reason for rejection:", 
+            font=("Arial", 14, "bold")
+        ).pack(pady=(15, 10))
+
+        reason_box = ctk.CTkTextbox(popup, height=100)
+        reason_box.pack(fill="x", padx=20)
+
+        def confirm():
+            reason = reason_box.get("0.0", "end").strip()
+            if reason:
+                self._update_member_request_status(request_id, 'Rejected', reason)
+                popup.destroy()
+            else:
+                self._show_message("Reason is required to reject.", "warning")
+
+        def cancel():
+            popup.destroy()
+
+        btn_frame = ctk.CTkFrame(popup, fg_color="transparent")
+        btn_frame.pack(pady=15)
+
+        ctk.CTkButton(
+            btn_frame, 
+            text="✓ Confirm", 
+            width=100, 
+            height=32,
+            corner_radius=14,
+            fg_color="#E74C3C", 
+            hover_color="#C0392B", 
+            text_color="white", 
+            command=confirm
+        ).pack(side="left", padx=10)
+
+        ctk.CTkButton(
+            btn_frame, 
+            text="✗ Cancel", 
+            width=100, 
+            height=32,
+            corner_radius=14,
+            fg_color="#95A5A6", 
+            hover_color="#7F8C8D", 
+            text_color="white", 
+            command=cancel
+        ).pack(side="left", padx=10)
 
     def create_edit_page(self):
         self.edit_page = ctk.CTkFrame(self.pages, fg_color="transparent")
@@ -1471,13 +1524,13 @@ class LeaderOvertime(ctk.CTkFrame):
         # Back button
         back_btn = ctk.CTkButton(
             self.edit_page,
-            text="← Back to List",
+            text="← Back",
+            width=80,
+            height=36,
+            fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
-            width=100,
-            fg_color=("#DBDBDB", "#333333"), 
-            # hover_color="#2A2A2A",
-            font=("Arial", 12),
-            height=35,
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
             command=lambda: self.show_page("main")
         )
         back_btn.grid(row=0, column=0, sticky="nw", padx=80, pady=(10, 0))
@@ -1637,12 +1690,13 @@ class LeaderOvertime(ctk.CTkFrame):
                 
                 ctk.CTkButton(
                     btn_frame,
-                    text="Back to List",
-                    fg_color="#2980B9",
-                    hover_color="#1F618D",
-                    height=40,
-                    width=120,
-                    font=("Arial", 13),
+                    text="← Back",
+                    width=80,
+                    height = 36,
+                    fg_color=("#DBDBDB", "#333333"),
+                    text_color=("black", "white"),
+                    hover_color=("#CFCFCF", "#444444"),
+                    corner_radius=8,
                     command=lambda: self.show_page("main")
                 ).pack(pady=10)
             else:
@@ -1794,7 +1848,7 @@ class LeaderOvertime(ctk.CTkFrame):
             
             if count > 0:
                 self.btn_badge.configure(text=str(count))
-                self.btn_badge.place(relx=0.92, rely=0.2, anchor="center")
+                self.btn_badge.place(relx=0.9, rely=0.5, anchor="center")
             else:
                 self.btn_badge.place_forget()
         except Exception as e:
@@ -2023,7 +2077,7 @@ class LeaderOvertime(ctk.CTkFrame):
                     text="Delete",
                     width=60,
                     height=30,
-                    corner_radius=14,
+                    corner_radius=8,
                     fg_color="#E74C3C",
                     hover_color="#C0392B",
                     font=("Arial", 11),
@@ -2039,7 +2093,7 @@ class LeaderOvertime(ctk.CTkFrame):
                         text="Edit",
                         width=60,
                         height=30,
-                        corner_radius=14,
+                        corner_radius=8,
                         fg_color="#F39C12",
                         hover_color="#D68910",
                         font=("Arial", 11),
