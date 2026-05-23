@@ -36,8 +36,8 @@ class DatePickerButton(ctk.CTkFrame):
         self.btn = ctk.CTkButton(
             self,
             text=self._fmt(),
-            width=120,
-            height=28,
+            width=170,
+            height=36,
             corner_radius=10,
             fg_color=("#F9F9FA", "#343638"),       
             border_color=("#979DA2", "#565B5E"),   
@@ -99,6 +99,11 @@ class DatePickerButton(ctk.CTkFrame):
     def clear(self):
         self._date = None
         self.btn.configure(text=" 📅 Select Date")
+
+    def set_date(self, d):
+        self._date = d
+        self.cal.selection_set(d)
+        self.btn.configure(text=self._fmt())
 
 class AutocompleteComboBox(ctk.CTkFrame):
     def __init__(self, master, values, width=200, height=35, placeholder_text=""):
@@ -209,6 +214,11 @@ class MemberOvertime(ctk.CTkFrame):
         super().__init__(master, fg_color="transparent")
         self.db = Database()
         self.user = user  # Login ဝင်ထားသော Member data
+        self._is_destroyed = False
+        self._after_id = None
+
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=1)
         
         # Automatic Theme Constants (Tuples) - matching member_report.py
         self.COLOR_CARD_BG = ("#FFFFFF", "#1E1E1E")
@@ -219,20 +229,20 @@ class MemberOvertime(ctk.CTkFrame):
         self.COLOR_SCROLL_BG = ("#F5F5F5", "#1A1A1A")
         self.COLOR_CONTAINER_BG = ("#F0F0F0", "#252525")
 
+        self.leader_names = []
+        self.project_names = []
+        self._load_initial_data()
+
         # Initialize page structure
         self.pages = ctk.CTkFrame(self, fg_color="transparent")
         self.pages.grid(row=0, column=0, sticky="nsew")
         self.pages.grid_rowconfigure(0, weight=1)
         self.pages.grid_columnconfigure(0, weight=1)
 
-        # Center the container
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=1)
-        self.pages.grid(row=0, column=0) # Remove sticky
-
         # Initialize all pages
         self.create_main_page()
         self.create_add_page()
+        self.create_edit_page()
         
         # Show main page initially
         self.show_page("main")
@@ -240,9 +250,17 @@ class MemberOvertime(ctk.CTkFrame):
         # Initial data load
         self.refresh_all_data()
 
+        # Start background check for status updates
+        self.auto_refresh()
+
+    def _load_initial_data(self):
+        """Load leader and project names for the dropdowns."""
+        self.leader_names = self._get_leader_names()
+        self.project_names = self._get_project_names()
+
     def _get_project_names(self):
         try:
-            self.db.cursor.execute("SELECT project_name FROM projects ORDER BY project_name")
+            self.db.cursor.execute("SELECT project_name FROM projects WHERE team_id = %s ORDER BY project_name", (self.user['team_id'],))
             return [row['project_name'] for row in self.db.cursor.fetchall()]
         except Exception as e:
             print(f"Error fetching project names: {e}")
@@ -250,11 +268,32 @@ class MemberOvertime(ctk.CTkFrame):
 
     def _get_member_names(self):
         try:
-            # Assuming you want to list all members
-            self.db.cursor.execute("SELECT full_name FROM users WHERE role = 'member' ORDER BY full_name")
-            return [row['full_name'] for row in self.db.cursor.fetchall()]
+            self.db.cursor.execute("SELECT full_name FROM users WHERE role = 'member' AND team_id = %s ORDER BY full_name", (self.user['team_id'],))
+            member_names = [row['full_name'] for row in self.db.cursor.fetchall()]
+            print(f"Fetched member names: {member_names}")
+            return member_names
         except Exception as e:
             print(f"Error fetching member names: {e}")
+            return []
+
+    def _get_user_id_by_full_name(self, full_name):
+        try:
+            self.db.cursor.execute("SELECT id FROM users WHERE full_name = %s AND team_id = %s", (full_name, self.user['team_id']))
+            result = self.db.cursor.fetchone()
+            print(f"Fetched user ID for {full_name}: {result}")
+            return result['id'] if result else None
+        except Exception as e:
+            print(f"Error fetching user ID for {full_name}: {e}")
+            return None
+
+    def _get_leader_names(self):
+        try:
+            self.db.cursor.execute("SELECT full_name FROM users WHERE role = 'leader' AND team_id = %s ORDER BY full_name", (self.user['team_id'],))
+            leader_names = [row['full_name'] for row in self.db.cursor.fetchall()]
+            print(f"Fetched leader names: {leader_names}")
+            return leader_names
+        except Exception as e:
+            print(f"Error fetching leader names: {e}")
             return []
 
     def _show_message(self, message, message_type="info", duration=3000):
@@ -309,7 +348,10 @@ class MemberOvertime(ctk.CTkFrame):
             self.refresh_all_data()
         elif page_name == "add":
             self.add_page.grid(row=0, column=0, sticky="nsew")
+            self._refresh_add_form_data() # Refresh dropdowns
             # self.reset_add_form() # We will create this later
+        elif page_name == "edit":
+            self.edit_page.grid(row=0, column=0, sticky="nsew")
 
     def create_main_page(self):
         self.main_page = ctk.CTkFrame(self.pages, fg_color="transparent")
@@ -318,7 +360,7 @@ class MemberOvertime(ctk.CTkFrame):
 
         # --- Header ---
         header = ctk.CTkFrame(self.main_page, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=80, pady=20)
+        header.grid(row=0, column=0, sticky="ew", padx=60, pady=20)
         
         ctk.CTkLabel(
             header, 
@@ -334,6 +376,7 @@ class MemberOvertime(ctk.CTkFrame):
             hover_color="#0E9769",
             height=40,
             corner_radius=10,
+            font=("Arial", 12, "bold"),
             command=lambda: self.show_page("add")
         ).pack(side="right")
 
@@ -350,12 +393,24 @@ class MemberOvertime(ctk.CTkFrame):
             corner_radius=12,
             height=40
         )
-        self.segmented_btn.grid(row=1, column=0, sticky="ew", padx=80, pady=10)
+        self.segmented_btn.grid(row=1, column=0, sticky="ew", padx=60, pady=10)
         self.segmented_btn.set("📋 Pending Requests")  # Set default tab
+
+        # --- Badge for History Tab ---
+        self.history_badge = ctk.CTkLabel(
+            self.segmented_btn,
+            text="",
+            font=("Arial", 10, "bold"),
+            fg_color="#E74C3C",
+            text_color="white",
+            width=20, height=20,
+            corner_radius=10
+        )
+        self.history_badge.place_forget() # Hide initially
 
         # --- Content Frame (changes based on selected tab) ---
         self.content_frame = ctk.CTkFrame(self.main_page, fg_color="transparent")
-        self.content_frame.grid(row=2, column=0, sticky="nsew", padx=80, pady=10)
+        self.content_frame.grid(row=2, column=0, sticky="nsew", padx=60, pady=10)
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(0, weight=1)
 
@@ -384,7 +439,7 @@ class MemberOvertime(ctk.CTkFrame):
         # --- Back Button ---
         back_btn = ctk.CTkButton(
             self.add_page,
-            text="← Back to List",
+            text="Back",
             text_color=("black", "white"),
             width=100,
             fg_color=("#DBDBDB", "#333333"),
@@ -392,11 +447,11 @@ class MemberOvertime(ctk.CTkFrame):
             height=35,
             command=lambda: self.show_page("main")
         )
-        back_btn.grid(row=0, column=0, sticky="nw", padx=80, pady=(10, 0))
+        back_btn.grid(row=0, column=0, sticky="nw", padx=60, pady=(10, 0))
 
         # --- Scrollable Form Container ---
         add_scrollable = ctk.CTkScrollableFrame(self.add_page, fg_color="transparent")
-        add_scrollable.grid(row=1, column=0, sticky="nsew", padx=80, pady=10)
+        add_scrollable.grid(row=1, column=0, sticky="nsew", padx=60, pady=10)
         add_scrollable.grid_columnconfigure(0, weight=1)
 
         # --- Form Frame ---
@@ -409,6 +464,7 @@ class MemberOvertime(ctk.CTkFrame):
         )
         form_frame.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
         form_frame.grid_columnconfigure(0, weight=1)
+        form_frame.grid_columnconfigure(1, weight=1)
         form_frame.grid_columnconfigure(2, weight=1)
 
         # --- Title ---
@@ -424,67 +480,95 @@ class MemberOvertime(ctk.CTkFrame):
         # --- Form Content ---
         content_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         content_frame.grid(row=1, column=1, sticky="nsew", padx=30, pady=10)
+        content_frame.grid_columnconfigure(0, weight=1)
+        content_frame.grid_columnconfigure(1, weight=1)
 
-        # --- Member ---
-        ctk.CTkLabel(content_frame, text="👤 Member *", font=("Arial", 14, "bold"), anchor="w").grid(row=0, column=0, sticky="w", pady=(10, 5))
-        self.add_member_combo = ctk.CTkComboBox(
+        # --- Leader ---
+        leader_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        leader_label_frame.grid(row=0, column=0, sticky="w", pady=(10, 5), padx=(0, 10))
+        ctk.CTkLabel(leader_label_frame, text="👤 Leader", font=("Arial", 14, "bold"), anchor="w").pack(side="left")
+        ctk.CTkLabel(leader_label_frame, text=" *", text_color="#EF4444", font=("Arial", 14, "bold")).pack(side="left")
+        self.add_leader_combo = ctk.CTkComboBox(
             content_frame,
-            values=self._get_member_names(),
-            width=350,
+            values=self.leader_names,
+            width=300,
             corner_radius=10,
             fg_color=self.COLOR_CARD_BG,
+            state="readonly",
             border_color=self.COLOR_BORDER,
             button_color=self.COLOR_BORDER,
             border_width=1
         )
-        self.add_member_combo.set("Select member...")
-        self.add_member_combo.grid(row=1, column=0, sticky="ew", pady=(0, 15))
+        self.add_leader_combo.grid(row=1, column=0, sticky="ew", pady=(0, 0), padx=(0, 10))
+        self.leader_error_label = ctk.CTkLabel(content_frame, text="", text_color="#EF4444")
+        self.leader_error_label.grid(row=2, column=0, sticky="w", pady=(0, 10), padx=(0, 10))
 
         # --- Project ---
-        ctk.CTkLabel(content_frame, text="📁 Project *", font=("Arial", 14, "bold"), anchor="w").grid(row=2, column=0, sticky="w", pady=(5, 5))
+        project_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        project_label_frame.grid(row=0, column=1, sticky="w", pady=(10, 5))
+        ctk.CTkLabel(project_label_frame, text="📁 Project", font=("Arial", 14, "bold"), anchor="w").pack(side="left")
+        ctk.CTkLabel(project_label_frame, text=" *", text_color="#EF4444", font=("Arial", 14, "bold")).pack(side="left")
         self.add_project_combo = ctk.CTkComboBox(
             content_frame,
-            values=self._get_project_names(),
-            width=350,
+            values=self.project_names,
+            width=300,
             corner_radius=10,
             fg_color=self.COLOR_CARD_BG,
+            state="readonly",
             border_color=self.COLOR_BORDER,
             button_color=self.COLOR_BORDER,
             border_width=1
         )
-        self.add_project_combo.set("Select project...")
-        self.add_project_combo.grid(row=3, column=0, sticky="ew", pady=(0, 15))
+        self.add_project_combo.grid(row=1, column=1, sticky="ew", pady=(0, 0))
+        self.project_error_label = ctk.CTkLabel(content_frame, text="", text_color="#EF4444")
+        self.project_error_label.grid(row=2, column=1, sticky="w", pady=(0, 10))
 
         # --- Date ---
-        ctk.CTkLabel(content_frame, text="📅 Date *", font=("Arial", 14, "bold"), anchor="w").grid(row=4, column=0, sticky="w", pady=(5, 5))
-        self.add_date_picker = DatePickerButton(content_frame, initial_date=date.today(), allow_past=True)
-        self.add_date_picker.grid(row=5, column=0, sticky="w", pady=(0, 15))
+        date_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        date_label_frame.grid(row=3, column=0, sticky="w", pady=(5, 5), padx=(0, 10))
+        ctk.CTkLabel(date_label_frame, text="📅 Date", font=("Arial", 14, "bold"), anchor="w").pack(side="left")
+        ctk.CTkLabel(date_label_frame, text=" *", text_color="#EF4444", font=("Arial", 14, "bold")).pack(side="left")
+        self.add_date_picker = DatePickerButton(content_frame, initial_date=None, allow_past=False)
+        self.add_date_picker.grid(row=4, column=0, sticky="w", pady=(0, 0), padx=(0, 10))
+        self.date_error_label = ctk.CTkLabel(content_frame, text="", text_color="#EF4444")
+        self.date_error_label.grid(row=5, column=0, sticky="w", pady=(0, 10), padx=(0, 10))
 
         # --- Hours ---
-        ctk.CTkLabel(content_frame, text="⏱️ Hours * (1-8 hours)", font=("Arial", 14, "bold"), anchor="w").grid(row=6, column=0, sticky="w", pady=(5, 5))
+        hours_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        hours_label_frame.grid(row=3, column=1, sticky="w", pady=(5, 5))
+        ctk.CTkLabel(hours_label_frame, text="⏱️ Hours", font=("Arial", 14, "bold"), anchor="w").pack(side="left")
+        ctk.CTkLabel(hours_label_frame, text=" *", text_color="#EF4444", font=("Arial", 14, "bold")).pack(side="left")
+        ctk.CTkLabel(hours_label_frame, text=" (1-8 hours)", font=("Arial", 12)).pack(side="left")
         self.add_hours_entry = ctk.CTkEntry(
             content_frame,
             placeholder_text="e.g., 2.5",
-            width=350,
+            width=300,
             corner_radius=10,
             fg_color=self.COLOR_CARD_BG,
             border_color=self.COLOR_BORDER,
             border_width=1
         )
-        self.add_hours_entry.grid(row=7, column=0, sticky="ew", pady=(0, 15))
+        self.add_hours_entry.grid(row=4, column=1, sticky="ew", pady=(0, 8))
+        self.hours_error_label = ctk.CTkLabel(content_frame, text="", text_color="#EF4444")
+        self.hours_error_label.grid(row=5, column=1, sticky="w", pady=(0, 10))
 
         # --- Reason ---
-        ctk.CTkLabel(content_frame, text="📝 Reason / Tasks *", font=("Arial", 14, "bold"), anchor="w").grid(row=8, column=0, sticky="w", pady=(5, 5))
+        reason_label_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        reason_label_frame.grid(row=6, column=0, columnspan=2, sticky="w", pady=(5, 5))
+        ctk.CTkLabel(reason_label_frame, text="📝 Reason / Tasks", font=("Arial", 14, "bold"), anchor="w").pack(side="left")
+        ctk.CTkLabel(reason_label_frame, text=" *", text_color="#EF4444", font=("Arial", 14, "bold")).pack(side="left")
         self.add_reason_text = ctk.CTkTextbox(
             content_frame,
-            height=120,
+            height=100,
             wrap="word",
             corner_radius=10,
             fg_color=self.COLOR_CARD_BG,
             border_color=self.COLOR_BORDER,
             border_width=1
         )
-        self.add_reason_text.grid(row=9, column=0, sticky="ew", pady=(0, 20))
+        self.add_reason_text.grid(row=7, column=0, columnspan=2, sticky="ew", pady=(0, 0))
+        self.reason_error_label = ctk.CTkLabel(content_frame, text="", text_color="#EF4444")
+        self.reason_error_label.grid(row=8, column=0, columnspan=2, sticky="w", pady=(0, 12))
 
         # --- Buttons ---
         button_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
@@ -506,60 +590,118 @@ class MemberOvertime(ctk.CTkFrame):
             text="Submit Request",
             width=150,
             height=35,
+            fg_color="#27AE60",
+            hover_color="#1E8449",
+            text_color="white",
             command=self._validate_and_submit
         ).pack(side="left")
+
+    def _refresh_add_form_data(self):
+        """Refreshes the data in the dropdowns on the add page."""
+        self._load_initial_data() # Re-load the data
+        
+        self.add_leader_combo.configure(values=self.leader_names)
+        self.add_project_combo.configure(values=self.project_names)
+        
+        # Set default values if list is not empty
+        if self.leader_names:
+            self.add_leader_combo.set("Select leader...")
+        else:
+            self.add_leader_combo.set("No leaders found")
+
+        if self.project_names:
+            self.add_project_combo.set("Select project...")
+        else:
+            self.add_project_combo.set("No projects found")
     
-    def _validate_and_submit(self):
-        # Reset all field appearances to normal
-        self._set_error_state(self.add_member_combo, False)
+    def reset_add_form(self):
+        """Resets the add overtime request form fields."""
+        self.add_leader_combo.set("Select leader...")
+        self.add_project_combo.set("Select project...")
+        self.add_date_picker.clear()
+        self.add_hours_entry.delete(0, ctk.END)
+        self.add_reason_text.delete("1.0", ctk.END)
+        self._refresh_add_form_data() # Refresh dropdowns with latest data
+        
+        # Reset error states
+        self._set_error_state(self.add_leader_combo, False)
         self._set_error_state(self.add_project_combo, False)
         self._set_error_state(self.add_date_picker.btn, False)
         self._set_error_state(self.add_hours_entry, False)
         self._set_error_state(self.add_reason_text, False)
 
+    def _validate_and_submit(self):
+        is_valid = True
+
+        # Reset previous errors
+        self.leader_error_label.configure(text="")
+        self.add_leader_combo.configure(border_color=self.COLOR_BORDER)
+        self.project_error_label.configure(text="")
+        self.add_project_combo.configure(border_color=self.COLOR_BORDER)
+        self.date_error_label.configure(text="")
+        self.add_date_picker.btn.configure(border_color=("#979DA2", "#565B5E"))
+        self.hours_error_label.configure(text="")
+        self.add_hours_entry.configure(border_color=self.COLOR_BORDER)
+        self.reason_error_label.configure(text="")
+        self.add_reason_text.configure(border_color=self.COLOR_BORDER)
+
         # --- Validation ---
-        member_name = self.add_member_combo.get()
-        if not member_name or member_name == "Select member...":
-            self._show_message("Please select a valid member.", "error")
-            self._set_error_state(self.add_member_combo, True)
-            return
+        leader_name = self.add_leader_combo.get()
+        if not leader_name or leader_name == "Select leader...":
+            self.add_leader_combo.configure(border_color="#EF4444")
+            self.leader_error_label.configure(text="Please select a valid leader.")
+            is_valid = False
 
         project_name = self.add_project_combo.get()
         if not project_name or project_name == "Select project...":
-            self._show_message("Please select a valid project.", "error")
-            self._set_error_state(self.add_project_combo, True)
-            return
+            self.add_project_combo.configure(border_color="#EF4444")
+            self.project_error_label.configure(text="Please select a valid project.")
+            is_valid = False
 
         ot_date = self.add_date_picker.get_date()
         if not ot_date:
-            self._show_message("Please select a valid date.", "error")
-            self._set_error_state(self.add_date_picker.btn, True)
-            return
+            self.add_date_picker.btn.configure(border_color="#EF4444")
+            self.date_error_label.configure(text="Please select a valid date.")
+            is_valid = False
 
         hours_str = self.add_hours_entry.get().strip()
+        hours = 0
         if not hours_str:
-            self._show_message("Hours field cannot be empty.", "error")
-            self._set_error_state(self.add_hours_entry, True)
-            return
-        try:
-            hours = float(hours_str)
-            if not (1 <= hours <= 8):
-                self._show_message("Hours must be between 1 and 8.", "error")
-                self._set_error_state(self.add_hours_entry, True)
-                return
-        except ValueError:
-            self._show_message("Please enter a valid number for hours.", "error")
-            self._set_error_state(self.add_hours_entry, True)
-            return
+            self.add_hours_entry.configure(border_color="#EF4444")
+            self.hours_error_label.configure(text="Hours field cannot be empty.")
+            is_valid = False
+        else:
+            try:
+                hours = float(hours_str)
+                if not (1 <= hours <= 8):
+                    self.add_hours_entry.configure(border_color="#EF4444")
+                    self.hours_error_label.configure(text="Hours must be between 1 and 8.")
+                    is_valid = False
+            except ValueError:
+                self.add_hours_entry.configure(border_color="#EF4444")
+                self.hours_error_label.configure(text="Please enter a valid number for hours.")
+                is_valid = False
 
         reason = self.add_reason_text.get("1.0", "end-1c").strip()
         if not reason:
-            self._show_message("The reason/tasks field is required.", "error")
-            self._set_error_state(self.add_reason_text, True)
+            self.add_reason_text.configure(border_color="#EF4444")
+            self.reason_error_label.configure(text="The reason/tasks field is required.")
+            is_valid = False
+
+        if not is_valid:
+            return
+
+        # Get IDs for submission
+        leader_id = self._get_user_id_by_full_name(leader_name)
+
+        if not leader_id:
+            self.add_leader_combo.configure(border_color="#EF4444")
+            self.leader_error_label.configure(text="Selected leader not found in database.")
             return
 
         # --- Submission ---
-        self.submit_overtime_request(member_name, project_name, ot_date, hours, reason)
+        member_id = self.user['id']
+        self.submit_overtime_request(member_id, leader_id, project_name, ot_date, hours, reason)
 
     def _set_error_state(self, widget, is_error):
         """Sets the visual state of a widget based on validation."""
@@ -572,13 +714,12 @@ class MemberOvertime(ctk.CTkFrame):
     def reset_add_form(self):
         """Resets all fields in the add overtime form."""
         # Reset visual state first
-        self._set_error_state(self.add_member_combo, False)
         self._set_error_state(self.add_project_combo, False)
         self._set_error_state(self.add_date_picker.btn, False)
         self._set_error_state(self.add_hours_entry, False)
         self._set_error_state(self.add_reason_text, False)
 
-        self.add_member_combo.set("Select member...")
+        self.add_leader_combo.set("Select leader...")
         self.add_project_combo.set("Select project...")
         self.add_date_picker.clear()
         self.add_date_picker.btn.configure(text=" 📅 Select Date")
@@ -587,60 +728,101 @@ class MemberOvertime(ctk.CTkFrame):
         
         # Update dropdown values
         self.add_project_combo.configure(values=self._get_project_names())
-        self.add_member_combo.configure(values=self._get_member_names())
+        self.add_leader_combo.configure(values=self._get_leader_names())
         
         self.show_page("main") # Go back to main page on cancel
 
-    def submit_overtime_request(self, member_name, project_name, ot_date, hours, reason):
+    def submit_overtime_request(self, member_id, leader_id, project_name, ot_date, hours, reason):
         """Handles database insertion of the new OT request."""
         try:
-            # Get member_id from member_name
-            self.db.cursor.execute("SELECT id FROM users WHERE full_name = %s", (member_name,))
-            member_result = self.db.cursor.fetchone()
-            if not member_result:
-                self._show_message("Selected member not found.", "error")
-                return
-            member_id = member_result['id']
-
             # Get project_id from project_name
-            self.db.cursor.execute("SELECT id FROM projects WHERE project_name = %s", (project_name,))
+            self.db.cursor.execute("SELECT id FROM projects WHERE project_name = %s AND team_id = %s", (project_name, self.user['team_id']))
             project_result = self.db.cursor.fetchone()
             if not project_result:
-                self._show_message("Selected project not found.", "error")
+                try:
+                    self.add_project_combo.configure(border_color="#EF4444")
+                except Exception:
+                    pass
+                try:
+                    self.project_error_label.configure(text="Selected project not found.")
+                except Exception:
+                    pass
                 return
             project_id = project_result['id']
 
+            # Duplicate check: prevent the same member from creating multiple
+            # OT requests for the same day with Pending/Accepted status.
+            try:
+                ot_date_str = ot_date.strftime('%Y-%m-%d') if hasattr(ot_date, 'strftime') else str(ot_date)
+            except Exception:
+                ot_date_str = str(ot_date)
+
+            self.db.cursor.execute("""
+                SELECT SUM(hours) as total_hours FROM overtime_requests
+                WHERE member_id = %s AND DATE(ot_date) = %s
+                AND status IN ('Pending', 'Accepted')
+            """, (member_id, ot_date_str))
+            result = self.db.cursor.fetchone()
+            existing_hours = float(result['total_hours'] or 0)
+
+            if existing_hours + hours > 8:
+                remaining = 8 - existing_hours
+                msg = f"Total OT cannot exceed 8 hours per day. Remaining: {remaining:g}h" if remaining > 0 else "Daily OT limit (8h) reached."
+                self._show_message(msg, "warning")
+                return
+
             # --- Database Insertion ---
+            # Insert only the columns that exist in the current DB schema.
+            # The `overtime_requests` table in wfh_system.sql has no `created_by` column,
+            # and `created_at` has a default timestamp, so we don't insert those.
             query = """
                 INSERT INTO overtime_requests 
-                (member_id, project_id, ot_date, hours, reason, status, created_at, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (member_id, project_id, ot_date, hours, reason, status, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            current_time = datetime.now()
-            created_by_id = self.user['id'] 
-            
+            # created_by is the member who submitted the request
             self.db.cursor.execute(query, (
-                member_id, project_id, ot_date, hours, reason, 
-                'Pending', current_time, created_by_id
+                member_id, project_id, ot_date, hours, reason, 'Pending', member_id
             ))
+
+            # --- Trigger Notification Badge for Leader Button (sec_notifications) ---
+            notif_msg = f"overtime request submitted by {self.user['full_name']}."
+            notif_sql = "INSERT INTO sec_notifications (user_id, message, is_read, created_at) VALUES (%s, %s, 0, NOW())"
+            self.db.cursor.execute(notif_sql, (leader_id, notif_msg))
+
+            # --- Trigger Notification Badge for Leader Sidebar (notifications) ---
+            notif_sql_sidebar = "INSERT INTO notifications (user_id, message, is_read, created_at) VALUES (%s, %s, 0, NOW())"
+            self.db.cursor.execute(notif_sql_sidebar, (leader_id, notif_msg))
+
             self.db.conn.commit()
-            
+
+            # Clear any inline errors / reset visual state
+            try:
+                self._set_error_state(self.add_leader_combo, False)
+                self._set_error_state(self.add_project_combo, False)
+                self._set_error_state(self.add_date_picker.btn, False)
+                self._set_error_state(self.add_hours_entry, False)
+                self._set_error_state(self.add_reason_text, False)
+            except Exception:
+                pass
+            try:
+                self.leader_error_label.configure(text="")
+                self.project_error_label.configure(text="")
+                self.date_error_label.configure(text="")
+                self.hours_error_label.configure(text="")
+                self.reason_error_label.configure(text="")
+            except Exception:
+                pass
+
             self._show_message("Overtime request submitted successfully!", "success")
             self.reset_add_form()
             self.show_page("main")
 
         except Exception as e:
-            self._show_message(f"An error occurred: {e}", "error")
-            self.db.conn.rollback()
-            
-            self._show_message("Overtime request submitted successfully!", "success")
-            self.reset_add_form()
-            self.show_page("main") # Switch back to the main page
-            
-        except Exception as e:
-            self.db.conn.rollback()
-            self._show_message(f"Database error: {e}", "error")
+            # Print and show the actual error, rollback, and do not claim success
             print(f"Error submitting OT request: {e}")
+            self.db.conn.rollback()
+            self._show_message(f"An error occurred: {e}", "error")
 
     def on_tab_change(self, value):
         """Handle tab/segmented button change"""
@@ -648,6 +830,7 @@ class MemberOvertime(ctk.CTkFrame):
             self.show_pending_tab()
         elif value == "📜 History":
             self.show_history_tab()
+            self.mark_history_as_read()
 
     def show_pending_tab(self):
         """Show pending requests tab"""
@@ -667,6 +850,44 @@ class MemberOvertime(ctk.CTkFrame):
         """Refresh both tabs"""
         self.refresh_pending_requests()
         self.refresh_history()
+        self.refresh_history_badge()
+
+    def refresh_history_badge(self):
+        """Check for unread leader responses in sec_notifications"""
+        try:
+            self.db.cursor.execute(
+                "SELECT COUNT(*) as cnt FROM sec_notifications "
+                "WHERE user_id = %s AND is_read = 0 "
+                "AND (message LIKE '%%Accepted%%' OR message LIKE '%%Rejected%%')", 
+                (self.user['id'],)
+            )
+            count = self.db.cursor.fetchone()['cnt']
+            
+            if count > 0:
+                self.history_badge.configure(text=str(count))
+                # Position near the "History" segment (right side of button)
+                self.history_badge.place(relx=0.93, rely=0.15, anchor="center")
+            else:
+                self.history_badge.place_forget()
+        except: pass
+
+    def mark_history_as_read(self):
+        """Mark leader response notifications as read"""
+        try:
+            self.db.cursor.execute(
+                "UPDATE sec_notifications SET is_read = 1 "
+                "WHERE user_id = %s AND (message LIKE '%%Accepted%%' OR message LIKE '%%Rejected%%')",
+                (self.user['id'],)
+            )
+            self.db.conn.commit()
+            self.refresh_history_badge()
+        except: pass
+
+    def auto_refresh(self):
+        """Background polling loop"""
+        if self._is_destroyed: return
+        self.refresh_history_badge()
+        self._after_id = self.after(10000, self.auto_refresh) # Every 10 seconds
 
     def refresh_pending_requests(self):
         """Show pending OT requests from leader"""
@@ -674,9 +895,10 @@ class MemberOvertime(ctk.CTkFrame):
             w.destroy()
         
         query = """
-            SELECT o.*, p.project_name 
-            FROM overtime_requests o 
-            JOIN projects p ON o.project_id = p.id 
+            SELECT o.*, p.project_name, c.full_name AS creator_name, c.role AS creator_role
+            FROM overtime_requests o
+            JOIN projects p ON o.project_id = p.id
+            JOIN users c ON o.created_by = c.id
             WHERE o.member_id = %s AND o.status = 'Pending'
             ORDER BY o.created_at DESC
         """
@@ -786,13 +1008,24 @@ class MemberOvertime(ctk.CTkFrame):
                         command=cmd
                     )
 
-                _btn("✓ Accept", "#27AE60", "#1E8449", 
-                    lambda id=r['id']: self.update_status(id, 'Accepted')
-                ).pack(side="left", padx=(0, 10))
+                if r['created_by'] == self.user['id']:
+                    # Member created this request - show Edit/Delete
+                    _btn("✏ Edit", "#F39C12", "#D68910", 
+                        lambda row=r: self.edit_request(row)
+                    ).pack(side="left", padx=(0, 10))
 
-                _btn("✗ Reject", "#E74C3C", "#C0392B", 
-                    lambda id=r['id']: self.handle_reject(id)
-                ).pack(side="left")
+                    _btn("🗑 Delete", "#E74C3C", "#C0392B", 
+                        lambda id=r['id']: self.delete_request(id)
+                    ).pack(side="left")
+                else:
+                    # Leader created this request - show Accept/Reject
+                    _btn("✓ Accept", "#27AE60", "#1E8449", 
+                        lambda id=r['id']: self.update_status(id, 'Accepted')
+                    ).pack(side="left", padx=(0, 10))
+
+                    _btn("✗ Reject", "#E74C3C", "#C0392B", 
+                        lambda id=r['id']: self.handle_reject(id)
+                    ).pack(side="left")
 
 
         except Exception as e:
@@ -988,20 +1221,16 @@ class MemberOvertime(ctk.CTkFrame):
             else:
                 sql = "UPDATE overtime_requests SET status = %s WHERE id = %s"
                 self.db.cursor.execute(sql, (new_status, ot_id))
-                msg = f"overtime request accepted by {self.user['full_name']}"
+                msg = f"Overtime request accepted by {self.user['full_name']}"
             
-            # 2. Add to notification table (Matching your Leave Request logic)
-            # This SQL finds the 'created_by' (Leader ID) from the projects table 
-            # linked to this overtime request.
-            req_id = self.db.cursor.lastrowid  # Get the ID of the OT request you just created
-            msg = f"{self.user['full_name']} submitted a new overtime request."
-
-            notif_sql = """
-                INSERT INTO notifications (user_id, message, is_read, created_at)
-                SELECT id, %s, 0, NOW() FROM users 
-                WHERE role = 'leader' AND team_id = %s
-            """
-            self.db.cursor.execute(notif_sql, (msg, self.user.get('team_id')))
+            # 2. Add to notification table
+            # FIX: Fetch the specific leader who created the request to target the notification
+            self.db.cursor.execute("SELECT created_by FROM overtime_requests WHERE id = %s", (ot_id,))
+            creator_row = self.db.cursor.fetchone()
+            
+            if creator_row and creator_row['created_by']:
+                notif_sql = "INSERT INTO notifications (user_id, message, is_read, created_at) VALUES (%s, %s, 0, NOW())"
+                self.db.cursor.execute(notif_sql, (creator_row['created_by'], msg))
             
             # 3. Commit changes to Database
             self.db.conn.commit()
@@ -1016,3 +1245,231 @@ class MemberOvertime(ctk.CTkFrame):
             if hasattr(self.db, 'conn'):
                 self.db.conn.rollback()
             self._show_message(f"System Error: {e}", "error")
+
+    def create_edit_page(self):
+        self.edit_page = ctk.CTkFrame(self.pages, fg_color="transparent")
+        self.edit_page.grid_rowconfigure(1, weight=1)
+        self.edit_page.grid_columnconfigure(0, weight=1)
+        
+        # Back button
+        back_btn = ctk.CTkButton(
+            self.edit_page,
+            text="Back",
+            text_color=("black", "white"),
+            width=100,
+            fg_color=("#DBDBDB", "#333333"), 
+            font=("Arial", 12),
+            height=35,
+            command=lambda: self.show_page("main")
+        )
+        back_btn.grid(row=0, column=0, sticky="nw", padx=60, pady=(10, 0))
+
+        # Create scrollable container for the form
+        self.edit_scrollable = ctk.CTkScrollableFrame(
+            self.edit_page,
+            fg_color="transparent"
+        )
+        self.edit_scrollable.grid(row=1, column=0, sticky="nsew", padx=60, pady=10)
+        self.edit_scrollable.grid_columnconfigure(0, weight=1)
+
+        # Form frame inside scrollable container
+        self.edit_form = ctk.CTkFrame(
+            self.edit_scrollable,
+            fg_color=self.COLOR_CONTAINER_BG,
+            corner_radius=15,
+            border_width=1,
+            border_color=self.COLOR_BORDER
+        )
+        self.edit_form.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
+        self.edit_form.grid_columnconfigure(0, weight=1)
+        self.edit_form.grid_columnconfigure(1, weight=1)
+        self.edit_form.grid_columnconfigure(2, weight=1)
+
+    def edit_request(self, row):
+        """Load the edit page with request data"""
+        self.load_edit_form(row)
+        self.show_page("edit")
+
+    def load_edit_form(self, row):
+        """Load edit form with request data"""
+        for widget in self.edit_form.winfo_children():
+            widget.destroy()
+
+        self.edit_form.grid_columnconfigure(0, weight=1)
+        self.edit_form.grid_columnconfigure(1, weight=1)
+        self.edit_form.grid_columnconfigure(2, weight=1)
+
+        # Title
+        title_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+        title_frame.grid(row=0, column=0, columnspan=3, sticky="ew", padx=30, pady=(25, 15))
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="✏️ Edit Overtime Request",
+            font=("Arial", 20, "bold"),
+            text_color="#4A90E2"
+        ).pack()
+
+        # Content frame
+        content_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+        content_frame.grid(row=1, column=1, sticky="nsew", padx=30, pady=10)
+
+        # Display read-only info
+        def create_info_row(label, value, row_num, icon=""):
+            frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+            frame.grid(row=row_num, column=0, sticky="ew", pady=8)
+            
+            ctk.CTkLabel(
+                frame,
+                text=f"{icon} {label}:",
+                font=("Arial", 13, "bold"),
+                text_color=self.COLOR_TEXT_SEC,
+                width=120,
+                anchor="w"
+            ).pack(side="left")
+            
+            ctk.CTkLabel(
+                frame,
+                text=value,
+                font=("Arial", 13),
+                anchor="w",
+                text_color=self.COLOR_TEXT_MAIN
+            ).pack(side="left", fill="x", expand=True, padx=(10, 0))
+
+        create_info_row("Project", row['project_name'], 0, "📁")
+        create_info_row("Date", str(row['ot_date']), 1, "📅")
+        
+        # Editable hours
+        hours_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        hours_frame.grid(row=2, column=0, sticky="ew", pady=(15, 0))
+        
+        ctk.CTkLabel(
+            hours_frame,
+            text="⏱️ Hours:",
+            font=("Arial", 13, "bold"),
+            text_color=self.COLOR_TEXT_SEC,
+            width=120,
+            anchor="w"
+        ).pack(side="left")
+        
+        self.edit_hours_entry = ctk.CTkEntry(hours_frame, width=120, height=40)
+        self.edit_hours_entry.pack(side="left", padx=(10, 0))
+        self.edit_hours_entry.insert(0, str(row['hours']))
+
+        # Editable reason
+        ctk.CTkLabel(
+            content_frame,
+            text="📝 Reason / Tasks:",
+            font=("Arial", 13, "bold"),
+            text_color=self.COLOR_TEXT_SEC
+        ).grid(row=3, column=0, sticky="w", pady=(15, 5))
+        
+        self.edit_reason_text = ctk.CTkTextbox(
+            content_frame,
+            height=100,
+            fg_color=self.COLOR_CARD_BG,
+            border_width=1,
+            border_color=self.COLOR_BORDER,
+            text_color=self.COLOR_TEXT_MAIN
+        )
+        self.edit_reason_text.grid(row=4, column=0, sticky="ew", pady=(0, 15))
+        self.edit_reason_text.insert("1.0", row['reason'] or "")
+
+        # Save button
+        btn_frame = ctk.CTkFrame(self.edit_form, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, columnspan=3, sticky="ew", padx=30, pady=(20, 25))
+        
+        button_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        button_container.pack()
+        
+        ctk.CTkButton(
+            button_container,
+            text="Cancel",
+            fg_color="#7F8C8D",
+            hover_color="#616A6B",
+            height=40,
+            width=120,
+            font=("Arial", 13),
+            command=lambda: self.show_page("main")
+        ).pack(side="left", padx=10)
+        
+        ctk.CTkButton(
+            button_container,
+            text="Save Changes",
+            fg_color="#2980B9",
+            hover_color="#1F618D",
+            height=40,
+            width=150,
+            font=("Arial", 13, "bold"),
+            command=lambda: self.update_overtime(row['id'])
+        ).pack(side="left", padx=10)
+
+    def update_overtime(self, ot_id):
+        """Update the overtime record"""
+        try:
+            hours_str = self.edit_hours_entry.get().strip()
+            if not hours_str:
+                self._show_message("Hours field cannot be empty.", "error")
+                return
+            hours = float(hours_str)
+            if not (1 <= hours <= 8):
+                self._show_message("Hours must be between 1 and 8.", "error")
+                return
+        except ValueError:
+            self._show_message("Please enter a valid number for hours.", "error")
+            return
+
+        reason = self.edit_reason_text.get("1.0", "end-1c").strip()
+        if not reason:
+            self._show_message("Reason field is required.", "error")
+            return
+
+        try:
+            # Check total hours for the day excluding current record
+            self.db.cursor.execute("""
+                SELECT SUM(hours) as total_hours FROM overtime_requests
+                WHERE member_id = %s 
+                AND DATE(ot_date) = (SELECT DATE(ot_date) FROM overtime_requests WHERE id = %s)
+                AND status IN ('Pending', 'Accepted')
+                AND id != %s
+            """, (self.user['id'], ot_id, ot_id))
+            
+            result = self.db.cursor.fetchone()
+            other_hours = float(result['total_hours'] or 0)
+            
+            if other_hours + hours > 8:
+                remaining = 8 - other_hours
+                self._show_message(f"Daily limit exceeded. Remaining: {remaining:g}h", "error")
+                return
+
+            self.db.cursor.execute("""
+                UPDATE overtime_requests
+                SET hours = %s, reason = %s
+                WHERE id = %s AND status = 'Pending'
+            """, (hours, reason, ot_id))
+            
+            self.db.conn.commit()
+            self._show_message("Overtime request updated successfully!", "success")
+            self.show_page("main")
+        except Exception as e:
+            self.db.conn.rollback()
+            self._show_message(f"System Error: {e}", "error")
+
+    def delete_request(self, ot_id):
+        """Delete an overtime request"""
+        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this pending request?"):
+            try:
+                self.db.cursor.execute("DELETE FROM overtime_requests WHERE id = %s AND status = 'Pending'", (ot_id,))
+                self.db.conn.commit()
+                self._show_message("Overtime request deleted successfully!", "success")
+                self.refresh_all_data()
+            except Exception as e:
+                self.db.conn.rollback()
+                self._show_message(f"System Error: {e}", "error")
+
+    def destroy(self):
+        """Clean up background tasks"""
+        self._is_destroyed = True
+        if self._after_id:
+            self.after_cancel(self._after_id)
+        super().destroy()

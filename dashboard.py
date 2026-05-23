@@ -26,7 +26,7 @@ class Dashboard(ctk.CTk):
         self.db = Database()
         self.user = user_data
         self.tracker = None
-        self.att_manager = AttendanceManager(self.db, self.user['id'], self.user['role'])
+        self.att_manager = AttendanceManager(self, self.db, self.user['id'], self.user['role'])
 
         # --- Top Header ---
         self.header_frame = ctk.CTkFrame(
@@ -265,3 +265,5 @@ class Dashboard(ctk.CTk):
                 selected_color=("#3498DB", "#2980B9"), 
                 selected_hover_color=("#2980B9", "#2471A3")
             )
+            
+    

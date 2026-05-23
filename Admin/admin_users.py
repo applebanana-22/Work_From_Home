@@ -33,7 +33,7 @@ class UserRegisterFrame(ctk.CTkFrame):
         self.nav_bar.pack(fill="x", padx=20, pady=10)
         
         self.back_btn = ctk.CTkButton(
-            self.nav_bar, text="← Back to Users", width=100,
+            self.nav_bar, text="← Back", width=100,
             fg_color="#4A4A4A", hover_color="#333333",
             command=self.back_callback
         )
@@ -717,7 +717,7 @@ class UserUpdateFrame(ctk.CTkFrame):
             self.db.cursor.execute(sql, val)
             self.db.conn.commit()
 
-            self.show_success_toast("Success", "User updated successfully!")
+            self.show_success_toast("User updated successfully!")
             self.back_callback()
 
         except Exception as e:
@@ -743,6 +743,7 @@ class AdminUsers(ctk.CTkFrame):
         header = ctk.CTkFrame(self.container, fg_color="transparent")
         header.pack(fill="x", padx=80, pady=20)
         
+
         ctk.CTkLabel(header, text="User Management", font=("Arial", 24, "bold")).pack(side="left")
         
         # --- FILTER BAR ---
@@ -832,9 +833,6 @@ class AdminUsers(ctk.CTkFrame):
             self.show_error_toast("Employee ID must contain only numbers.")
             self.search_id.focus()
             return
-        
-        for w in self.list_frame.winfo_children():
-            w.destroy()
 
         conditions = []
         params = []
@@ -844,13 +842,13 @@ class AdminUsers(ctk.CTkFrame):
             params.append(f"%{self.search_id.get()}%")
 
         if self.search_name.get():
-            if self.search_name.get().isdigit():
-                self.show_error_toast("Full Name filter cannot be numeric.")
+            full_name_input = self.search_name.get()
+            if any(ch.isdigit() for ch in full_name_input):
+                self.show_error_toast("Full Name filter cannot contain numbers.")
                 self.search_name.focus()
                 return
-            else:
-                conditions.append("u.full_name LIKE %s")
-                params.append(f"%{self.search_name.get()}%")
+            conditions.append("u.full_name LIKE %s")
+            params.append(f"%{full_name_input}%")
 
         if self.search_role.get() != "Roles":
             conditions.append("u.role = %s")
@@ -862,12 +860,14 @@ class AdminUsers(ctk.CTkFrame):
 
         if self.search_batch.get():
             if not self.search_batch.get().isalnum():
-                self.show_error_toast("Batch filter must contain only numbers.")
+                self.show_error_toast("Batch can only contain letters and numbers.")
                 self.search_batch.focus()
                 return
-            else:
-                conditions.append("u.batch LIKE %s")
-                params.append(f"%{self.search_batch.get()}%")
+            conditions.append("u.batch LIKE %s")
+            params.append(f"%{self.search_batch.get()}%")
+
+        for w in self.list_frame.winfo_children():
+            w.destroy()
 
         where_clause = " AND ".join(conditions)
         if where_clause:
@@ -883,14 +883,14 @@ class AdminUsers(ctk.CTkFrame):
 
         self.db.cursor.execute(sql, tuple(params))
         rows = self.db.cursor.fetchall()
-
+        self.COLOR_TEXT_TER = ("#777777", "#718096")
         # ✅ MUST BE INSIDE FUNCTION (same indentation level)
         if not rows:
             ctk.CTkLabel(
                 self.list_frame,
-                text="This member is not exist.",
-                font=("Arial", 16, "bold"),
-                text_color="red"
+                text="No records found.",
+                font=("Arial", 15, "bold"),
+                text_color=self.COLOR_TEXT_TER
             ).pack(pady=50)
             return  # ✅ NOW CORRECT
 
@@ -991,6 +991,19 @@ class AdminUsers(ctk.CTkFrame):
             sheet = workbook.active
             sheet.title = "Users"
 
+            # Title + Date Rows
+            sheet.merge_cells("A1:F1")
+            sheet.merge_cells("A2:F2")
+            title_cell = sheet.cell(row=1, column=1)
+            title_cell.value = "User Management Report"
+            title_cell.font = Font(bold=True, size=18)
+            title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            date_cell = sheet.cell(row=2, column=1)
+            date_cell.value = f"Date: {current_date}"
+            date_cell.font = Font(bold=False, size=12)
+            date_cell.alignment = Alignment(horizontal="left", vertical="center")
+
             # Header Columns
             headers = [
                 "Employee ID",
@@ -1057,7 +1070,7 @@ class AdminUsers(ctk.CTkFrame):
             # =========================
             for col_num in range(1, len(headers) + 1):
 
-                cell = sheet.cell(row=1, column=col_num)
+                cell = sheet.cell(row=3, column=col_num)
 
                 cell.fill = header_fill
                 cell.font = header_font
@@ -1068,7 +1081,7 @@ class AdminUsers(ctk.CTkFrame):
             # Body Style
             # =========================
             for row in sheet.iter_rows(
-                min_row=2,
+                min_row=4,
                 max_row=sheet.max_row,
                 min_col=1,
                 max_col=len(headers)
@@ -1114,76 +1127,41 @@ class AdminUsers(ctk.CTkFrame):
 
             self.show_error_toast("Error occurred while exporting Excel file.")
 
-    def show_error_toast(self, title_or_message, message=None):
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
 
-        text = title_or_message if message is None else f"{title_or_message}: {message}"
-
-        toast = ctk.CTkFrame(
-            self,
-            fg_color="#EF4444",
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
             corner_radius=8
         )
+        message_frame.place(relx=1.0, y=20, x=-20, anchor="ne")
 
-        toast.place(
-            relx=1.0,
-            y=20,
-            anchor="ne"
-        )
-
-        label = ctk.CTkLabel(
-            toast,
-            text=text,
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
             text_color="white",
             font=("Arial", 12, "bold"),
-            wraplength=320
-        )
+            wraplength=250
+        ).pack(padx=15, pady=10)
 
-        label.pack(
-            padx=25,
-            pady=12
-        )
+        self.after(duration, message_frame.destroy)
 
-        # Auto hide after 3 seconds
-        self.after(
-            3000,
-            toast.destroy
-        )
-    
-       
-    def show_success_toast(self, title_or_message, message=None):
-
+    def show_error_toast(self, title_or_message, message=None):
         text = title_or_message if message is None else f"{title_or_message}: {message}"
+        self._show_message(text, message_type="error")
 
-        toast = ctk.CTkFrame(
-            self,
-            fg_color="#22C55E",
-            corner_radius=8
-        )
+    def show_success_toast(self, title_or_message, message=None):
+        text = title_or_message if message is None else f"{title_or_message}: {message}"
+        self._show_message(text, message_type="success")
 
-        toast.place(
-            relx=1.0,
-            y=20,
-            anchor="ne"
-        )
-
-        label = ctk.CTkLabel(
-            toast,
-            text=text,
-            text_color="white",
-            font=("Arial", 12, "bold")
-        )
-
-        label.pack(
-            padx=20,
-            pady=10
-        )
-
-        # Auto hide after 3 seconds
-        self.after(
-            3000,
-            toast.destroy
-        )
-        
     def export_users(self):
         try:
             conditions = []
@@ -1294,7 +1272,7 @@ class AdminUsers(ctk.CTkFrame):
 
             # Date
             report_date = Paragraph(
-                f"Generated Date: {current_date}",
+                f"Date: {current_date}",
                 normal_style
             )
 
@@ -1400,13 +1378,13 @@ class AdminUsers(ctk.CTkFrame):
                 self.list_frame,
                 text=header,
                 font=("Arial", 15, "bold"),
-                anchor="center"
+                anchor="w"
             ).grid(
                 row=0,
                 column=col,
                 padx=10,
                 pady=(10, 15),
-                sticky="ew"
+                sticky="w"
             )
 
         # ===== TABLE ROWS =====
@@ -1426,13 +1404,13 @@ class AdminUsers(ctk.CTkFrame):
                     text=value,
                     font=("Arial", 13),
                     height=40,
-                    anchor="center"
+                    anchor="w"
                 ).grid(
                     row=i,
                     column=col,
                     padx=10,
                     pady=5,
-                    sticky="ew"
+                    sticky="w"
                 )
 
             # ===== ACTION BUTTONS =====
@@ -1446,10 +1424,10 @@ class AdminUsers(ctk.CTkFrame):
                 column=5,
                 padx=10,
                 pady=5,
-                
+                sticky="w"
             )
 
-            btn_frame.grid_columnconfigure((0, 1), weight=1)
+            btn_frame.grid_columnconfigure((0, 1), weight=0)
 
             ctk.CTkButton(
                 btn_frame,
@@ -1459,7 +1437,7 @@ class AdminUsers(ctk.CTkFrame):
                 fg_color="#F39C12",
                 hover_color="#D68910",
                 command=lambda uid=row['id']: self.handle_update(uid)
-            ).grid(row=0, column=0, padx=5)
+            ).grid(row=0, column=0, padx=(0, 5), sticky="w")
 
             ctk.CTkButton(
                 btn_frame,
@@ -1469,7 +1447,7 @@ class AdminUsers(ctk.CTkFrame):
                 fg_color="#E74C3C",
                 hover_color="#C0392B",
                 command=lambda uid=row['id']: self.handle_delete(uid)
-            ).grid(row=0, column=1, padx=5)
+            ).grid(row=0, column=1, sticky="w")
         
     def handle_update(self, uid):
         self.clear_container()

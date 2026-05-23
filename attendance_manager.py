@@ -1,8 +1,10 @@
 import datetime
 from tkinter import messagebox
+import customtkinter as ctk
 
 class AttendanceManager:
-    def __init__(self, db, user_id, user_role):
+    def __init__(self, parent, db, user_id, user_role):
+        self.parent = parent
         self.db = db
         self.user_id = user_id
         self.user_role = user_role.lower()
@@ -42,8 +44,7 @@ class AttendanceManager:
         if not self.is_checked_in:
             # Check if already completed for the CURRENT date
             if self.check_if_already_completed():
-                messagebox.showwarning("Limit for Today", 
-                    "You have already checked in/out for today and cannot do it again.")
+                self._show_message("Limit for Today,You have already checked in/out for today and cannot do it again.","warning")
                 return
 
             if messagebox.askyesno("Check-in", f"Confirm Check-in at {location}?"):
@@ -51,9 +52,9 @@ class AttendanceManager:
                     self.db.check_in_user(self.user_id, location)
                     self.is_checked_in = True
                     callback(True)
-                    messagebox.showinfo("Success", "Check-in Successful!")
+                    self._show_message("Check-in Successful!", "success")
                 except Exception as e:
-                    messagebox.showerror("Error", str(e))
+                    self._show_message("Check-in Failed!", "error")
         else:
             # Check-out logic stays same
             if messagebox.askyesno("Check-out", "Confirm Check-out?"):
@@ -61,9 +62,9 @@ class AttendanceManager:
                     self.db.check_out_user(self.user_id)
                     self.is_checked_in = False
                     callback(False)
-                    messagebox.showinfo("Success", "Check-out Successful!")
+                    self._show_message("Check-out Successful!", "success")
                 except Exception as e:
-                    messagebox.showerror("Error", str(e))
+                    self._show_message("Check-out Failed!", "error")
 
     def check_if_already_completed(self):
         today = datetime.date.today().strftime('%Y-%m-%d')
@@ -73,3 +74,31 @@ class AttendanceManager:
             return True if self.db.cursor.fetchone() else False
         except:
             return False
+
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
+ 
+        message_frame = ctk.CTkFrame(
+            self.parent.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=10
+        )
+        # Placed below the 65px header for better visibility
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+ 
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color="white",
+            font=("Segoe UI", 13, "bold"),
+            wraplength=280
+        ).pack(padx=20, pady=12)
+ 
+        self.parent.after(duration, message_frame.destroy)

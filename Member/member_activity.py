@@ -1,6 +1,7 @@
 from turtle import right
 from tkinter import messagebox
 import customtkinter as ctk
+from sqlalchemy import text
 from database import Database
 from datetime import datetime
 import tkinter as tk
@@ -140,19 +141,32 @@ class MemberActivity(ctk.CTkFrame):
             command=lambda: self.switch_view("admin")
         )
         self.admin_btn.pack(side="left", padx=5)
-        
+        # ROW 2: From | To | Search | Filter | Clear
+        filter_row = ctk.CTkFrame(header, fg_color="transparent")
+        filter_row.pack(fill="x", pady=(8, 0))
+
+        ctk.CTkLabel(filter_row, text="From:", text_color=("black", "white")).pack(side="left", padx=(0, 5))
+
+        self.from_date_entry = DatePickerButton(filter_row, initial_date=datetime.today().date())
+        self.from_date_entry.pack(side="left", padx=(0, 12))
+
+        ctk.CTkLabel(filter_row, text="To:", text_color=("black", "white")).pack(side="left", padx=(0, 5))
+
+        self.to_date_entry = DatePickerButton(filter_row, initial_date=datetime.today().date())
+        self.to_date_entry.pack(side="left", padx=(0, 12))
+
         self.search_var = ctk.StringVar()
 
         search_container = ctk.CTkFrame(
-            header,
-            width=220,
-            height=42,
-            corner_radius=14,
+            filter_row,
+            width=100,
+            height=36,
+            corner_radius=8,
             fg_color=("#F3F2F1", "#2A2A2A"),
             border_width=1,
             border_color="#555555"
         )
-        search_container.pack(side="right", padx=(10, 0))
+        search_container.pack(side="left", padx=(10, 12))
         search_container.pack_propagate(False)
 
         ctk.CTkLabel(
@@ -174,17 +188,6 @@ class MemberActivity(ctk.CTkFrame):
         )
         self.search_entry.pack(side="left", fill="both", expand=True, padx=(0, 18), pady=6)
         self.search_entry.bind("<KeyRelease>", lambda e: self.search_announcements())
-
-        filter_row = ctk.CTkFrame(header, fg_color="transparent")
-        filter_row.pack(side="right", padx=(10, 0))
-
-        ctk.CTkLabel(filter_row, text="From:", text_color=("black", "white")).pack(side="left", padx=(0, 5))
-        self.from_date_entry = DatePickerButton(filter_row, initial_date=datetime.today().date())
-        self.from_date_entry.pack(side="left", padx=(0, 12))
-
-        ctk.CTkLabel(filter_row, text="To:", text_color=("black", "white")).pack(side="left", padx=(0, 5))
-        self.to_date_entry = DatePickerButton(filter_row, initial_date=datetime.today().date())
-        self.to_date_entry.pack(side="left", padx=(0, 12))
 
         ctk.CTkButton(
             filter_row, text="🔍 Filter", width=80, height=36,
@@ -251,8 +254,38 @@ class MemberActivity(ctk.CTkFrame):
         
         
     def apply_date_filter(self):
-            self.date_filter_active = True
-            self.refresh_feeds()
+        from_date = self.from_date_entry.get_date()
+        to_date = self.to_date_entry.get_date()
+
+        if from_date > to_date:
+            self.show_warning_toast(
+                "Start date cannot be later than End date."
+            )
+            return
+
+        self.date_filter_active = True
+        self.refresh_feeds()
+        
+    def show_warning_toast(self, text="Warning!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#E74C3C",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
 
     def clear_date_filter(self):
             self.date_filter_active = False
@@ -270,6 +303,7 @@ class MemberActivity(ctk.CTkFrame):
             w.destroy()
         for w in self.admin_view.winfo_children():
             w.destroy()
+
         if self.current_view == "team":
             self.team_container.pack(fill="both", expand=True, padx=80, pady=5)
             self.admin_container.pack_forget()
@@ -280,14 +314,22 @@ class MemberActivity(ctk.CTkFrame):
             self.team_container.pack_forget()
             parent = self.admin_view
             sender_role = "admin"
+
         query = """
-            SELECT id, title, message, created_at, created_by,user_id
-            FROM announcements
-            WHERE sender_role=%s
+            SELECT a.id, a.title, a.message, a.created_at, a.created_by, a.user_id
+            FROM announcements a
+            JOIN users u ON a.user_id = u.id
+            WHERE a.sender_role = %s
         """
         params = [sender_role]
+
+        # Team Updates မှာ member နဲ့ team_id တူတဲ့ leader announcements ပဲပြမယ်
+        if self.current_view == "team":
+            query += " AND u.team_id = %s"
+            params.append(self.user["team_id"])
+
         if self.date_filter_active:
-            query += " AND DATE(created_at) >= %s AND DATE(created_at) <= %s"
+            query += " AND DATE(a.created_at) >= %s AND DATE(a.created_at) <= %s"
             params.extend([
                 str(self.from_date_entry.get_date()),
                 str(self.to_date_entry.get_date())
@@ -297,9 +339,9 @@ class MemberActivity(ctk.CTkFrame):
             keyword = f"%{self.current_search_keyword}%"
             query += """
                 AND (
-                    title LIKE %s
-                    OR message LIKE %s
-                    OR id IN (
+                    a.title LIKE %s
+                    OR a.message LIKE %s
+                    OR a.id IN (
                         SELECT announcement_id
                         FROM announcement_replies
                         WHERE message LIKE %s
@@ -308,7 +350,7 @@ class MemberActivity(ctk.CTkFrame):
             """
             params.extend([keyword, keyword, keyword])
 
-        query += " ORDER BY created_at DESC"
+        query += " ORDER BY a.created_at DESC"
 
         self.db.cursor.execute(query, tuple(params))
         rows = self.db.cursor.fetchall()
@@ -323,8 +365,7 @@ class MemberActivity(ctk.CTkFrame):
             return
 
         for row in rows:
-            self.create_card(parent, row, "#2E86C1")
-            
+            self.create_card(parent, row, "#2E86C1")    
     def show_post_menu(self, button, row):
         if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
             self.active_menu.destroy()
@@ -358,21 +399,33 @@ class MemberActivity(ctk.CTkFrame):
         )
 
         ctk.CTkButton(
-            menu_frame, text="✖ Delete", height=38,
-            fg_color="transparent", anchor="w",
+            menu_frame,
+            text="✖ Delete",
+            height=38,
+            fg_color="transparent",
+            anchor="w",
             command=lambda i=row["id"]: self.menu_delete(i)
         ).pack(fill="x", padx=6, pady=(0, 6))
-        
     
     def menu_edit(self, row):
         if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
             self.active_menu.destroy()
 
         self.winfo_toplevel().unbind("<Button-1>")
-        self.edit_post(row)
+
+        self.after(100, lambda r=row: self.edit_post(r))
+
+
+    def menu_delete(self, ann_id):
+        if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
+            self.active_menu.destroy()
+
+        self.winfo_toplevel().unbind("<Button-1>")
+        self.delete_post(ann_id)
 
 
     def edit_post(self, row):
+        print("EDIT POST:", row)
         self.pack_forget()
 
         self.master.member_edit_page = MemberEditPostPage(
@@ -382,6 +435,15 @@ class MemberActivity(ctk.CTkFrame):
             back_callback=self.back_from_edit_post
         )
         self.master.member_edit_page.pack(fill="both", expand=True)
+
+
+    def back_from_edit_post(self):
+        if hasattr(self.master, "member_edit_page") and self.master.member_edit_page.winfo_exists():
+            self.master.member_edit_page.destroy()
+
+        self.db = Database()
+        self.pack(fill="both", expand=True)
+        self.refresh_feeds()
     def show_reply_menu(self, button, reply):
         if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
             self.active_menu.destroy()
@@ -436,54 +498,66 @@ class MemberActivity(ctk.CTkFrame):
         if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
             self.active_menu.destroy()
 
-        print("Edit reply:", reply)
+        self.winfo_toplevel().unbind("<Button-1>")
+
+        self.pack_forget()
+
+        self.master.edit_reply_page = EditReplyPage(
+            self.master,
+            self.user,
+            reply_data=reply,
+            back_callback=self.back_from_reply_edit
+        )
+        self.master.edit_reply_page.pack(fill="both", expand=True)
+    def back_from_reply_edit(self):
+        if hasattr(self.master, "edit_reply_page") and self.master.edit_reply_page.winfo_exists():
+            self.master.edit_reply_page.destroy()
+
+        self.db = Database()
+        self.pack(fill="both", expand=True)
+        self.refresh_feeds()
         
     def delete_reply(self, reply):
         if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
             self.active_menu.destroy()
 
-        try:
-            self.db.cursor.execute(
-                "DELETE FROM announcement_replies WHERE id=%s AND user_id=%s",
-                (reply["id"], self.user["id"])
-            )
-            self.db.conn.commit()
-            self.refresh_feeds()
+        self.winfo_toplevel().unbind("<Button-1>")
 
-        except Exception as e:
-            print("Delete reply error:", e)
-    def delete_post(self, ann_id):
-       
+        if messagebox.askyesno("Confirm Delete", "Delete this reply?"):
+            try:
+                self.db.cursor.execute(
+                    "DELETE FROM announcement_replies WHERE id=%s AND user_id=%s",
+                    (reply["id"], self.user["id"])
+                )
+                self.db.conn.commit()
 
-        if messagebox.askyesno("Confirm Delete", "Delete this post?"):
-            self.db.cursor.execute(
-                "DELETE FROM announcements WHERE id=%s AND user_id=%s",
-                (ann_id, self.user["id"])
-            )
-            self.db.conn.commit()
-            self.refresh_feeds()
+                self.show_success_toast("Reply deleted successfully")
+                self.after(900, self.refresh_feeds)
 
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+    
+    def show_success_toast(self, text="Successful!"):
+        root = self.winfo_toplevel()
 
-    def edit_post(self, row):
-        if hasattr(self, "active_menu") and self.active_menu.winfo_exists():
-            self.active_menu.destroy()
-
-        self.pack_forget()
-
-        self.master.member_edit_page = MemberEditPostPage(
-            self.master,
-            self.user,
-            edit_data=row,
-            back_callback=self.back_from_edit_post
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
         )
-        self.master.member_edit_page.pack(fill="both", expand=True)
-    def back_from_edit_post(self):
-        if hasattr(self.master, "member_edit_page") and self.master.member_edit_page.winfo_exists():
-            self.master.member_edit_page.destroy()
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
 
-        self.db = Database()
-        self.pack(fill="both", expand=True)
-        self.refresh_feeds()
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
+            
     # ================= CARD =================
     def create_card(self, parent, data, theme_color):
         card = ctk.CTkFrame(
@@ -574,7 +648,7 @@ class MemberActivity(ctk.CTkFrame):
                 
         # ================= SHOW REPLIES =================
         self.db.cursor.execute(
-            "SELECT * FROM announcement_replies WHERE announcement_id=%s ORDER BY created_at ASC",
+            "SELECT * FROM announcement_replies WHERE announcement_id=%s ORDER BY created_at DESC",
             (data['id'],)
         )
 
@@ -816,7 +890,7 @@ class MemberActivity(ctk.CTkFrame):
         preview_length = 80
 
         container = ctk.CTkFrame(parent, fg_color="transparent")
-        container.pack(fill="x", padx=padx, pady=(2,5))
+        container.pack(fill="x", padx=padx, pady=(2, 5))
 
         is_expanded = False
 
@@ -835,11 +909,12 @@ class MemberActivity(ctk.CTkFrame):
         )
         msg_text.pack(fill="x", anchor="w")
 
-        def apply_text(text_to_show):
+        def set_text(text_to_show):
             msg_text.configure(state="normal")
             msg_text.delete("1.0", "end")
             msg_text.insert("1.0", text_to_show)
 
+            # ✅ message highlight
             if keyword:
                 lower_text = text_to_show.lower()
                 lower_keyword = keyword.lower()
@@ -853,10 +928,11 @@ class MemberActivity(ctk.CTkFrame):
                 msg_text.tag_config(
                     "highlight",
                     background="#FFD54F",
-                    foreground="black",
-                    font=("Arial", 12, "bold")
+                    foreground="black"
                 )
 
+            line_count = int(msg_text.index("end-1c").split(".")[0])
+            msg_text.configure(height=max(2, line_count))
             msg_text.configure(state="disabled")
 
         def toggle():
@@ -864,14 +940,14 @@ class MemberActivity(ctk.CTkFrame):
             is_expanded = not is_expanded
 
             if is_expanded:
-                apply_text(full_text)
+                set_text(full_text)
                 toggle_btn.configure(text="see less")
             else:
-                apply_text(full_text[:preview_length] + "...")
+                set_text(full_text[:preview_length] + ("..." if len(full_text) > preview_length else ""))
                 toggle_btn.configure(text="see more...")
 
         display_text = full_text[:preview_length] + ("..." if len(full_text) > preview_length else "")
-        apply_text(display_text)
+        set_text(display_text)
 
         if len(full_text) > preview_length:
             toggle_btn = ctk.CTkLabel(
@@ -883,6 +959,8 @@ class MemberActivity(ctk.CTkFrame):
             )
             toggle_btn.pack(anchor="w", padx=0, pady=(0, 2))
             toggle_btn.bind("<Button-1>", lambda e: toggle())
+
+        return container
 
 class MemberEditPostPage(ctk.CTkFrame):
     def __init__(self, master, user_data, edit_data, back_callback):
@@ -939,7 +1017,7 @@ class MemberEditPostPage(ctk.CTkFrame):
 
         update_btn = ctk.CTkButton(
             container,
-            text="Update Now",
+            text="Update",
             width=100,
             height=35,
             corner_radius=10,
@@ -949,28 +1027,142 @@ class MemberEditPostPage(ctk.CTkFrame):
             command=self.update_post
         )
         update_btn.pack(pady=20)
+            
+class EditReplyPage(ctk.CTkFrame):
+    def __init__(self, master, user_data, reply_data, back_callback):
+        super().__init__(master, fg_color=("white", "#0E0E0E"))
 
-    def update_post(self):
-        title = self.title_ent.get().strip()
-        message = self.msg_ent.get("1.0", "end-1c").strip()
+        self.db = Database()
+        self.user = user_data
+        self.reply_data = reply_data
+        self.back_callback = back_callback
 
-        if not title or not message:
-            messagebox.showwarning("Error", "Fill all fields")
+        container = ctk.CTkFrame(
+            self,
+            fg_color=("#FFFFFF", "#1A1A1A"),
+            corner_radius=15
+        )
+        container.pack(fill="both", expand=True, padx=80, pady=30)
+
+        ctk.CTkButton(
+            container,
+            text="← Back",
+            width=80,
+            fg_color=("#DBDBDB", "#333333"),
+            text_color=("black", "white"),
+            hover_color=("#CFCFCF", "#444444"),
+            corner_radius=8,
+            command=self.back_callback
+        ).pack(anchor="w", padx=30, pady=(20, 10))
+
+        self.reply_txt = ctk.CTkTextbox(
+            container,
+            height=300,
+            corner_radius=10,
+            fg_color="#DADADA",
+            text_color="#000000",
+            border_width=0,
+            font=("Arial", 14)
+        )
+        self.reply_txt.pack(fill="both", expand=True, padx=30, pady=10)
+        self.reply_txt.insert("1.0", self.reply_data.get("message", ""))
+
+        ctk.CTkButton(
+            container,
+            text="Update",
+            width=100,
+            height=35,
+            corner_radius=10,
+            fg_color="#F1C40F",
+            hover_color="#D4AC0D",
+            text_color="black",
+            command=self.update_reply
+        ).pack(pady=20)
+
+    def update_reply(self):
+        new_msg = self.reply_txt.get("1.0", "end-1c").strip()
+
+        if not new_msg:
+            self.show_warning_toast("Reply cannot be empty")
             return
 
         try:
             self.db.cursor.execute(
                 """
-                UPDATE announcements
-                SET title=%s, message=%s
+                UPDATE announcement_replies
+                SET message=%s
                 WHERE id=%s AND user_id=%s
                 """,
-                (title, message, self.edit_data["id"], self.user["id"])
+                (new_msg, self.reply_data["id"], self.user["id"])
             )
             self.db.conn.commit()
 
-            messagebox.showinfo("Success", "Updated successfully")
-            self.back_callback()
+            self.show_success_toast("Reply updated successfully!")
+            self.after(1400, self.back_callback)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
+    def show_warning_toast(self, text="Warning!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#F39C12",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
+            
+    def show_success_toast(self, text="Reply updated successfully!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250                     
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
+        
+    def show_success_message(self, text="Reply updated successfully!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+
+        # right side, top bar area
+        toast.place(relx=1.0,rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),  
+            wraplength=250                     
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)

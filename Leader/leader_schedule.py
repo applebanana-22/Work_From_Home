@@ -3,13 +3,14 @@ from database import Database
 from tkinter import messagebox, filedialog, ttk
 from tkcalendar import Calendar
 import tkinter as tk
+import os
+import re
 import random
 from datetime import datetime, timedelta
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-import csv
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import calendar
 
 
@@ -216,6 +217,7 @@ class LeaderSchedule(ctk.CTkFrame):
         self.status_filter.pack(side="left", padx=(0, 24))
 
         # ── Action buttons ────────────────────────────────────────────────────
+        self.action_buttons = []
         def _btn(parent, text, color, hover, cmd, width=60):
             b = ctk.CTkButton(
                 parent, text=text, width=width, height=36,
@@ -226,12 +228,14 @@ class LeaderSchedule(ctk.CTkFrame):
                 command=cmd
             )
             b.pack(side="left", padx=4)
+            self.action_buttons.append(b)
             return b
 
         _btn(inner, "🔍  Filter",  "#2471A3", "#1A5276", self.refresh_view)
         _btn(inner, "✖  Clear",   "#566573", "#424949", self.clear_filters)
-        _btn(inner, "📥  CSV", "#16A085", "#117A65", self.export_to_xlsx)
         _btn(inner, "📄  PDF", "#C0392B", "#922B21", self.export_to_pdf)
+        _btn(inner, "📥  Excel", "#16A085", "#117A65", self.export_to_xlsx)
+        
 
         # ── List header ───────────────────────────────────────────────────────
         list_header = ctk.CTkFrame(self.wrapper, fg_color="transparent")
@@ -340,12 +344,38 @@ class LeaderSchedule(ctk.CTkFrame):
                 messagebox.showerror("Invalid date", "End date cannot be earlier than Start date")
             return
 
+        member_text = self.name_filter.get().strip()
+        if member_text:
+            try:
+                self.db.cursor.execute(
+                    "SELECT COUNT(*) AS cnt FROM users WHERE team_id=%s AND full_name LIKE %s",
+                    (leader_team_id, f"%{member_text}%")
+                )
+                found = self.db.cursor.fetchone()
+                if not found or found.get('cnt', 0) == 0:
+                    for w in self.scroll.winfo_children():
+                        w.destroy()
+                    ctk.CTkLabel(
+                        self.scroll,
+                        text=f"No records found for member '{member_text}'.",
+                        text_color=("#7B7D7D", "#AABBCD")
+                    ).pack(pady=20)
+                    self.count_lbl.configure(text="(0 records)")
+                    try:
+                        self._show_message(f"No records found for member '{member_text}'", "info")
+                    except Exception:
+                        pass
+                    self._set_loading(False)
+                    return
+            except Exception:
+                pass
+
         query = """SELECT s.*, u.full_name
                    FROM wfh_schedules s
                    JOIN users u ON s.user_id = u.id
                    WHERE u.team_id=%s
                      AND s.schedule_date BETWEEN %s AND %s
-                     AND u.full_name LIKE %s"""
+                      AND u.full_name LIKE %s"""
         params = [leader_team_id, start, end, name_search]
         if status_search != "All":
             query += " AND s.status=%s"
@@ -357,138 +387,191 @@ class LeaderSchedule(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             self.count_lbl.configure(text=f"({len(rows)} records)")
+            self._last_record_count = len(rows)
 
             if not rows:
-                # If member filter is present, check whether any member matches the filter
-                member_text = self.name_filter.get().strip()
                 if member_text:
+                    ctk.CTkLabel(
+                        self.scroll,
+                        text=f"No records found for member '{member_text}'.",
+                        text_color=("#7B7D7D", "#AABBCD")
+                    ).pack(pady=20)
                     try:
-                        self.db.cursor.execute(
-                            "SELECT COUNT(*) AS cnt FROM users WHERE team_id=%s AND full_name LIKE %s",
-                            (leader_team_id, f"%{member_text}%")
-                        )
-                        found = self.db.cursor.fetchone()
-                        if found and found.get('cnt', 0) == 0:
-                            # No member matches the entered name
-                            ctk.CTkLabel(self.scroll, text=f"No members found matching '{member_text}'.", text_color=("#7B7D7D", "#AABBCD")).pack(pady=20)
-                            try:
-                                self._show_message(f"No members match '{member_text}'", "info")
-                            except Exception:
-                                pass
-                            return
+                        self._show_message(f"No records found for member '{member_text}'", "info")
                     except Exception:
-                        # Fallback to generic message on error
                         pass
-
-                # Generic no-results message when members exist but no schedules
-                ctk.CTkLabel(self.scroll, text="No schedule assigned for this period.", text_color=("#7B7D7D", "#AABBCD")).pack(pady=20)
-                try:
-                    self._show_message("No record found for selected period", "info")
-                except Exception:
-                    pass
+                else:
+                    # Generic no-results message when no member search is provided
+                    ctk.CTkLabel(self.scroll, text="No schedule assigned for this period.", text_color=("#7B7D7D", "#AABBCD")).pack(pady=20)
+                    try:
+                        self._show_message("No record found for selected period", "info")
+                    except Exception:
+                        pass
+                self._set_loading(False)
                 return
 
-            # Group by date
-            from itertools import groupby
-            for date_val, group in groupby(rows, key=lambda r: r['schedule_date']):
-                group = list(group)
-                is_today = date_val == today_date
+            # Small results render immediately with no async callbacks (avoids UI jitter)
+            if len(rows) <= 40:
+                self._render_rows_sync(rows, today_date)
+                return
 
-                # ── Date separator row ─────────────────────────────────────
-                date_sep = ctk.CTkFrame(self.scroll, fg_color="transparent")
-                date_sep.pack(fill="x", padx=8, pady=(8, 1))
-
-                day_str  = date_val.strftime("%A")
-                date_str = date_val.strftime("%d %b %Y")
-                badge_color = ("#FDEBD0", "#E67E22") if is_today else ("#D6DBDF", "#2C3E50")
-                badge_text  = f"  {date_str}  ·  {day_str}{'  ← TODAY' if is_today else ''}  "
-
-                ctk.CTkLabel(
-                    date_sep,
-                    text=badge_text,
-                    font=("Arial", 11, "bold"),
-                    text_color=("#7E5109", "#FFFFFF") if is_today else ("#1A1A1A", "#FFFFFF"),
-                    fg_color=badge_color,
-                    corner_radius=6,
-                    padx=6, pady=2
-                ).pack(side="left")
-
-                # ── Member cards under that date ───────────────────────────
-                for r in group:
-                    is_wfh = r['status'] == 'WFH'
-                    accent = "#F39C12" if is_today else ("#3498DB" if is_wfh else "#27AE60")
-
-                    # Card — compact, with colored left border
-                    card = ctk.CTkFrame(
-                        self.scroll,
-                        corner_radius=8,
-                        fg_color=("#FFFFFF", "#151C28"),
-                        border_width=1,
-                        border_color=accent
-                    )
-                    card.pack(fill="x", pady=1, padx=10)
-
-                    # ── Left: Avatar ──────────────────────────────────────
-                    name       = r['full_name']
-                    initials   = "".join([n[0] for n in name.split()[:2]]).upper()
-                    avatar_clr = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
-
-                    avatar = ctk.CTkFrame(card, width=34, height=34,
-                                          corner_radius=17, fg_color=avatar_clr,
-                                          border_width=2, border_color=accent)
-                    avatar.pack(side="left", padx=(10, 0), pady=6)
-                    avatar.pack_propagate(False)
-                    ctk.CTkLabel(avatar, text=initials,
-                                 font=("Arial", 11, "bold"),
-                                 text_color=("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")).pack(expand=True)
-
-                    # ── Middle: Name + sub info ───────────────────────────
-                    info = ctk.CTkFrame(card, fg_color="transparent")
-                    info.pack(side="left", fill="both", expand=True, padx=10, pady=6)
-
-                    ctk.CTkLabel(info, text=name,
-                                 font=("Arial", 12, "bold"),
-                                 text_color=("#1A1A1A", "#E8EDF2")).pack(anchor="w")
-
-                    emp_id = r.get('employee_id', '')
-                    sub_text = f"ID: {emp_id}" if emp_id else "Team Member"
-                    ctk.CTkLabel(info, text=sub_text,
-                                 font=("Arial", 9),
-                                 text_color=("#5F6D7A", "#4A5568")).pack(anchor="w")
-
-                    # ── Right: Status pill + edit icon ────────────────────
-                    right = ctk.CTkFrame(card, fg_color="transparent")
-                    right.pack(side="right", padx=(0, 10), pady=6)
-
-                    pill_bg   = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
-                    pill_text = ("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")
-                    status_icon = "🏠" if is_wfh else "🏢"
-
-                    ctk.CTkLabel(
-                        right,
-                        text=f" {status_icon} {r['status']} ",
-                        font=("Arial", 11, "bold"),
-                        text_color=pill_text,
-                        fg_color=pill_bg,
-                        corner_radius=6,
-                        padx=6, pady=2
-                    ).pack(side="left", padx=(0, 6))
-
-                    ctk.CTkButton(
-                        right,
-                        text="Edit",
-                        width=60, height=30,
-                        corner_radius=8,
-                        font=("Arial", 12, "bold"),
-                        fg_color=("#F39C12", "#F39C12"),
-                        hover_color=("#E08E00", "#E08E00"),
-                        text_color=("#1A1A1A", "#FFFFFF"),
-                        border_width=0,
-                        command=lambda row=r: self.open_edit_popup(row)
-                    ).pack(side="left", padx=(8,0))
+            # Large results: use loading + chunked rendering to keep UI responsive
+            self._set_loading(True, "Loading schedules...")
+            self._schedule_rows = rows
+            self._schedule_today = today_date
+            self._schedule_index = 0
+            self.after(1, self._render_rows_chunk)
 
         except Exception as e:
+            self._set_loading(False)
             messagebox.showerror("Error", str(e))
+
+    def _render_rows_chunk(self, chunk_size=25):
+        rows = getattr(self, "_schedule_rows", [])
+        idx = getattr(self, "_schedule_index", 0)
+        today_date = getattr(self, "_schedule_today", datetime.today().date())
+        if idx >= len(rows):
+            self._set_loading(False)
+            return
+
+        end_idx = min(idx + chunk_size, len(rows))
+        while idx < end_idx:
+            r = rows[idx]
+            date_val = r['schedule_date']
+            is_today = date_val == today_date
+            is_wfh = r['status'] == 'WFH'
+            accent = "#F39C12" if is_today else ("#3498DB" if is_wfh else "#27AE60")
+
+            if idx == 0 or rows[idx - 1]['schedule_date'] != date_val:
+                date_sep = ctk.CTkFrame(self.scroll, fg_color="transparent")
+                date_sep.pack(fill="x", padx=8, pady=(8, 1))
+                day_str = date_val.strftime("%A")
+                date_str = date_val.strftime("%d %b %Y")
+                badge_color = ("#FDEBD0", "#E67E22") if is_today else ("#D6DBDF", "#2C3E50")
+                badge_text = f"  {date_str}  ·  {day_str}{'  ← TODAY' if is_today else ''}  "
+                ctk.CTkLabel(
+                    date_sep, text=badge_text, font=("Arial", 11, "bold"),
+                    text_color=("#7E5109", "#FFFFFF") if is_today else ("#1A1A1A", "#FFFFFF"),
+                    fg_color=badge_color, corner_radius=6, padx=6, pady=2
+                ).pack(side="left")
+
+            card = ctk.CTkFrame(
+                self.scroll, corner_radius=8, fg_color=("#FFFFFF", "#151C28"),
+                border_width=1, border_color=accent
+            )
+            card.pack(fill="x", pady=1, padx=10)
+
+            name = r['full_name']
+            initials = "".join([n[0] for n in name.split()[:2]]).upper()
+            avatar_clr = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
+            avatar = ctk.CTkFrame(card, width=34, height=34, corner_radius=17, fg_color=avatar_clr, border_width=2, border_color=accent)
+            avatar.pack(side="left", padx=(10, 0), pady=6)
+            avatar.pack_propagate(False)
+            ctk.CTkLabel(avatar, text=initials, font=("Arial", 11, "bold"),
+                         text_color=("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")).pack(expand=True)
+
+            info = ctk.CTkFrame(card, fg_color="transparent")
+            info.pack(side="left", fill="both", expand=True, padx=10, pady=6)
+            ctk.CTkLabel(info, text=name, font=("Arial", 12, "bold"), text_color=("#1A1A1A", "#E8EDF2")).pack(anchor="w")
+            emp_id = r.get('employee_id', '')
+            sub_text = f"ID: {emp_id}" if emp_id else "Team Member"
+            ctk.CTkLabel(info, text=sub_text, font=("Arial", 9), text_color=("#5F6D7A", "#4A5568")).pack(anchor="w")
+
+            right = ctk.CTkFrame(card, fg_color="transparent")
+            right.pack(side="right", padx=(0, 10), pady=6)
+            pill_bg = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
+            pill_text = ("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")
+            status_icon = "🏠" if is_wfh else "🏢"
+            ctk.CTkLabel(right, text=f" {status_icon} {r['status']} ", font=("Arial", 11, "bold"),
+                         text_color=pill_text, fg_color=pill_bg, corner_radius=6, padx=6, pady=2).pack(side="left", padx=(0, 6))
+            ctk.CTkButton(
+                right, text="Edit", width=60, height=30, corner_radius=8,
+                font=("Arial", 12, "bold"), fg_color=("#F39C12", "#F39C12"),
+                hover_color=("#E08E00", "#E08E00"), text_color=("#1A1A1A", "#FFFFFF"),
+                border_width=0, command=lambda row=r: self.open_edit_popup(row)
+            ).pack(side="left", padx=(8, 0))
+            idx += 1
+
+        self._schedule_index = idx
+        if self._schedule_index >= len(rows):
+            self._set_loading(False)
+            return
+        self.after(1, self._render_rows_chunk)
+
+    def _render_rows_sync(self, rows, today_date):
+        for idx, r in enumerate(rows):
+            date_val = r['schedule_date']
+            is_today = date_val == today_date
+            is_wfh = r['status'] == 'WFH'
+            accent = "#F39C12" if is_today else ("#3498DB" if is_wfh else "#27AE60")
+
+            if idx == 0 or rows[idx - 1]['schedule_date'] != date_val:
+                date_sep = ctk.CTkFrame(self.scroll, fg_color="transparent")
+                date_sep.pack(fill="x", padx=8, pady=(8, 1))
+                day_str = date_val.strftime("%A")
+                date_str = date_val.strftime("%d %b %Y")
+                badge_color = ("#FDEBD0", "#E67E22") if is_today else ("#D6DBDF", "#2C3E50")
+                badge_text = f"  {date_str}  ·  {day_str}{'  ← TODAY' if is_today else ''}  "
+                ctk.CTkLabel(
+                    date_sep, text=badge_text, font=("Arial", 11, "bold"),
+                    text_color=("#7E5109", "#FFFFFF") if is_today else ("#1A1A1A", "#FFFFFF"),
+                    fg_color=badge_color, corner_radius=6, padx=6, pady=2
+                ).pack(side="left")
+
+            card = ctk.CTkFrame(
+                self.scroll, corner_radius=8, fg_color=("#FFFFFF", "#151C28"),
+                border_width=1, border_color=accent
+            )
+            card.pack(fill="x", pady=1, padx=10)
+
+            name = r['full_name']
+            initials = "".join([n[0] for n in name.split()[:2]]).upper()
+            avatar_clr = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
+            avatar = ctk.CTkFrame(card, width=34, height=34, corner_radius=17, fg_color=avatar_clr, border_width=2, border_color=accent)
+            avatar.pack(side="left", padx=(10, 0), pady=6)
+            avatar.pack_propagate(False)
+            ctk.CTkLabel(avatar, text=initials, font=("Arial", 11, "bold"),
+                         text_color=("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")).pack(expand=True)
+
+            info = ctk.CTkFrame(card, fg_color="transparent")
+            info.pack(side="left", fill="both", expand=True, padx=10, pady=6)
+            ctk.CTkLabel(info, text=name, font=("Arial", 12, "bold"), text_color=("#1A1A1A", "#E8EDF2")).pack(anchor="w")
+            emp_id = r.get('employee_id', '')
+            sub_text = f"ID: {emp_id}" if emp_id else "Team Member"
+            ctk.CTkLabel(info, text=sub_text, font=("Arial", 9), text_color=("#5F6D7A", "#4A5568")).pack(anchor="w")
+
+            right = ctk.CTkFrame(card, fg_color="transparent")
+            right.pack(side="right", padx=(0, 10), pady=6)
+            pill_bg = ("#D6EAF8", "#1A3A5C") if is_wfh else ("#D5F5E3", "#1A4032")
+            pill_text = ("#1B4F72", "#5DADE2") if is_wfh else ("#145A32", "#58D68D")
+            status_icon = "🏠" if is_wfh else "🏢"
+            ctk.CTkLabel(right, text=f" {status_icon} {r['status']} ", font=("Arial", 11, "bold"),
+                         text_color=pill_text, fg_color=pill_bg, corner_radius=6, padx=6, pady=2).pack(side="left", padx=(0, 6))
+            ctk.CTkButton(
+                right, text="Edit", width=60, height=30, corner_radius=8,
+                font=("Arial", 12, "bold"), fg_color=("#F39C12", "#F39C12"),
+                hover_color=("#E08E00", "#E08E00"), text_color=("#1A1A1A", "#FFFFFF"),
+                border_width=0, command=lambda row=r: self.open_edit_popup(row)
+            ).pack(side="left", padx=(8, 0))
+
+    def _set_loading(self, is_loading, message="Loading..."):
+        try:
+            for btn in getattr(self, "action_buttons", []):
+                btn.configure(state="disabled" if is_loading else "normal")
+            self.name_filter.configure(state="disabled" if is_loading else "normal")
+            self.status_filter.configure(state="disabled" if is_loading else "normal")
+        except Exception:
+            pass
+
+        if is_loading:
+            self.count_lbl.configure(text=message)
+            self.update_idletasks()
+        else:
+            try:
+                if hasattr(self, "_last_record_count"):
+                    self.count_lbl.configure(text=f"({self._last_record_count} records)")
+            except Exception:
+                pass
 
     # ── Overview rendering and view switching ─────────────────────────────────
     def switch_view(self, _=None):
@@ -765,6 +848,7 @@ class LeaderSchedule(ctk.CTkFrame):
                 self.db.conn.commit()
                 popup.destroy()
                 self.refresh_view()
+                self._show_message("Schedule updated successfully!", "success", duration=3000)
             except Exception as e:
                 messagebox.showerror("Update Fail", str(e))
 
@@ -775,6 +859,41 @@ class LeaderSchedule(ctk.CTkFrame):
                       command=save_change).pack(pady=(12, 0), padx=30, fill="x")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+    def _timestamped_export_path(self, file_path, default_ext):
+        """
+        Return a unique export path by appending a timestamp before the extension.
+        This avoids overwrite and permission errors when files already exist.
+        """
+        directory, filename = os.path.split(file_path)
+        stem, ext = os.path.splitext(filename)
+        if not ext:
+            ext = default_ext
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(directory, f"{stem}_{timestamp}{ext}")
+
+    def _timestamped_export_name(self, base_name, default_ext):
+        """
+        Return a timestamped filename for display in the save dialog.
+        """
+        stem, ext = os.path.splitext(base_name)
+        if not ext:
+            ext = default_ext
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{stem}_{timestamp}{ext}"
+
+    def _ensure_unique_export_path(self, file_path, default_ext):
+        """
+        Keep an already timestamped filename as-is; otherwise add a timestamp.
+        """
+        directory, filename = os.path.split(file_path)
+        stem, ext = os.path.splitext(filename)
+        if not ext:
+            ext = default_ext
+        if re.search(r'_\d{8}_\d{6}$', stem):
+            return file_path
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(directory, f"{stem}_{timestamp}{ext}")
+
     def _show_message(self, message, message_type="info", duration=3000):
         """
         Displays a transient message in the top-right corner of the master window.
@@ -794,25 +913,43 @@ class LeaderSchedule(ctk.CTkFrame):
             bg_color = "#3498DB"  # Blue
             text_color = "white"
 
-        # Create a frame for the message
-        message_frame = ctk.CTkFrame(
-            self.winfo_toplevel(),
-            fg_color=bg_color,
-            corner_radius=8
-        )
-        # Position in the top right corner, with some padding
-        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne") 
+        toplevel = self.winfo_toplevel()
+        try:
+            if hasattr(self, "_toast_after_id") and self._toast_after_id:
+                toplevel.after_cancel(self._toast_after_id)
+                self._toast_after_id = None
+        except Exception:
+            self._toast_after_id = None
 
-        ctk.CTkLabel(
-            message_frame,
-            text=message,
-            text_color=text_color,
-            font=("Arial", 12, "bold"),
-            wraplength=250 # Wrap text if too long
-        ).pack(padx=15, pady=10)
+        # Reuse one persistent toast widget to prevent ghost rectangle artifacts.
+        if not hasattr(self, "_toast_frame") or not self._toast_frame.winfo_exists():
+            self._toast_frame = ctk.CTkFrame(
+                toplevel,
+                fg_color=bg_color,
+                corner_radius=8
+            )
+            self._toast_label = ctk.CTkLabel(
+                self._toast_frame,
+                text="",
+                text_color=text_color,
+                font=("Arial", 12, "bold"),
+                wraplength=250
+            )
+            self._toast_label.pack(padx=15, pady=10)
 
-        # Destroy the message after 'duration' milliseconds
-        self.winfo_toplevel().after(duration, message_frame.destroy)
+        self._toast_frame.configure(fg_color=bg_color)
+        self._toast_label.configure(text=message, text_color=text_color)
+        self._toast_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        def _hide_toast():
+            try:
+                if hasattr(self, "_toast_frame") and self._toast_frame.winfo_exists():
+                    self._toast_frame.place_forget()
+            except Exception:
+                pass
+            self._toast_after_id = None
+
+        self._toast_after_id = toplevel.after(duration, _hide_toast)
 
     def clear_filters(self, refresh=True):
         self.start_cal.set_date(self.current_date)
@@ -824,7 +961,7 @@ class LeaderSchedule(ctk.CTkFrame):
 
     # ── PDF Export ────────────────────────────────────────────────────────────
 
-    # ── XLSX/CSV Export helper (styled XLSX when possible) ─────────────────────
+    # ── XLSX Export helper ─────────────────────────────────────────────────────
     def export_to_pdf(self):
         leader_team_id = self.user.get('team_id')
         start = self.start_cal.get_date()
@@ -832,11 +969,12 @@ class LeaderSchedule(ctk.CTkFrame):
 
         file_path = filedialog.asksaveasfilename(
             defaultextension=".pdf",
-            initialfile=f"Team_{leader_team_id}_Schedule.pdf"
+            initialfile=self._timestamped_export_name(f"Team_{leader_team_id}_Schedule.pdf", ".pdf")
         )
         if not file_path:
             return
         try:
+            file_path = self._ensure_unique_export_path(file_path, ".pdf")
             self.db.cursor.execute(
                 """SELECT s.schedule_date, u.full_name, s.status
                    FROM wfh_schedules s JOIN users u ON s.user_id=u.id
@@ -847,9 +985,15 @@ class LeaderSchedule(ctk.CTkFrame):
 
             doc      = SimpleDocTemplate(file_path, pagesize=letter)
             styles   = getSampleStyleSheet()
+            date_style = ParagraphStyle(
+                "DateLine",
+                parent=styles['Normal'],
+                leftIndent=0
+            )
             elements = [
                 Paragraph(f"Team {leader_team_id} Work Schedule", styles['Title']),
-                Paragraph(f"Period: {start} to {end}", styles['Normal']),
+                Spacer(1, 8),
+                Paragraph(f"Date: {start} ~ {end}", date_style),
                 Spacer(1, 15)
             ]
             table_data = [["Date", "Member Name", "Status"]]
@@ -858,6 +1002,7 @@ class LeaderSchedule(ctk.CTkFrame):
                 table_data.append([f"{r['schedule_date']} ({day})", r['full_name'], r['status']])
 
             t = Table(table_data, colWidths=[130, 200, 100])
+            t.hAlign = "LEFT"
             t.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
                 ('TEXTCOLOR',  (0, 0), (-1, 0), colors.whitesmoke),
@@ -870,21 +1015,21 @@ class LeaderSchedule(ctk.CTkFrame):
             self._show_message(f"PDF Error: {e}", "error", duration=3000)
 
     def export_to_xlsx(self):
-        """Export as .xlsx with borders and auto-fit widths when possible; fallback to CSV.
-        This function is wired to the CSV button (shows 📥) so users get a formatted spreadsheet by default.
-        """
+        """Export as .xlsx with borders and auto-fit widths."""
         leader_team_id = self.user.get('team_id')
         start = self.start_cal.get_date()
         end   = self.end_cal.get_date()
 
         file_path = filedialog.asksaveasfilename(
             defaultextension=".xlsx",
-            initialfile=f"Team_{leader_team_id}_Schedule.xlsx"
+            initialfile=self._timestamped_export_name(f"Team_{leader_team_id}_Schedule.xlsx", ".xlsx")
         )
         if not file_path:
             return
 
         try:
+            selected_path = file_path
+            file_path = self._ensure_unique_export_path(selected_path, ".xlsx")
             self.db.cursor.execute(
                 """SELECT s.schedule_date, u.full_name, s.status
                    FROM wfh_schedules s JOIN users u ON s.user_id=u.id
@@ -903,6 +1048,9 @@ class LeaderSchedule(ctk.CTkFrame):
                 ws = wb.active
                 ws.title = "Schedule"
 
+                ws.append([f"Team {leader_team_id} Work Schedule"])
+                ws.append([f"Date: {start} ~ {end}"])
+                ws.append([])
                 headers = ["Date", "Member Name", "Status"]
                 ws.append(headers)
                 for r in data:
@@ -915,15 +1063,27 @@ class LeaderSchedule(ctk.CTkFrame):
                 col_widths = [0] * ws.max_column
                 for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=ws.max_row, values_only=False), start=1):
                     for col_idx, cell in enumerate(row, start=1):
-                        cell.border = border
-                        if row_idx == 1:
+                        if row_idx >= 4:
+                            cell.border = border
+                        if row_idx == 4:
                             cell.font = Font(bold=True)
                             cell.fill = PatternFill(fill_type="solid", fgColor="DDDDDD")
                             cell.alignment = Alignment(horizontal="center", vertical="center")
+                        elif row_idx == 1:
+                            cell.font = Font(bold=True, size=16)
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
+                        elif row_idx == 2:
+                            cell.font = Font(bold=False, size=11)
+                            cell.alignment = Alignment(horizontal="left", vertical="center")
                         else:
                             cell.alignment = Alignment(horizontal="left", vertical="center")
                         val = str(cell.value) if cell.value is not None else ""
                         col_widths[col_idx-1] = max(col_widths[col_idx-1], len(val))
+
+                ws.merge_cells("A1:C1")
+                ws.merge_cells("A2:C2")
+                ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+                ws["A2"].alignment = Alignment(horizontal="left", vertical="center")
 
                 for i, wth in enumerate(col_widths, start=1):
                     col = get_column_letter(i)
@@ -933,47 +1093,8 @@ class LeaderSchedule(ctk.CTkFrame):
                 wb.save(save_path)
                 self._show_message("Excel exported successfully!", "success", duration=3000)
                 return
-            except Exception:
-                # openpyxl not available or failed — fall back to CSV
-                pass
-
-            # Fallback CSV
-            csv_path = file_path if file_path.lower().endswith('.csv') else file_path.rsplit('.',1)[0] + '.csv'
-            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(["Date", "Member Name", "Status"])
-                for r in data:
-                    dstr = r['schedule_date'].strftime('%Y-%m-%d') if hasattr(r['schedule_date'], 'strftime') else str(r['schedule_date'])
-                    writer.writerow([dstr, r['full_name'], r['status']])
-            self._show_message("Excel export failed, saved as CSV instead!", "warning", duration=3000)
+            except Exception as e:
+                self._show_message(f"Excel Error: {e}", "error", duration=3000)
+                return
         except Exception as e:
             self._show_message(f"Export Error: {e}", "error", duration=3000)
-
-    def export_to_csv(self):
-        leader_team_id = self.user.get('team_id')
-        start = self.start_cal.get_date()
-        end   = self.end_cal.get_date()
-
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            initialfile=f"Team_{leader_team_id}_Schedule.csv"
-        )
-        if not file_path:
-            return
-        try:
-            self.db.cursor.execute(
-                """SELECT s.schedule_date, u.full_name, s.status
-                   FROM wfh_schedules s JOIN users u ON s.user_id=u.id
-                   WHERE u.team_id=%s AND s.schedule_date BETWEEN %s AND %s
-                   ORDER BY s.schedule_date ASC""",
-                (leader_team_id, start, end))
-            data = self.db.cursor.fetchall()
-            with open(file_path, 'w', newline='', encoding='utf-8') as f:
-                writer = csv.writer(f)
-                writer.writerow(["Date", "Member Name", "Status"])
-                for r in data:
-                    dstr = r['schedule_date'].strftime('%Y-%m-%d') if hasattr(r['schedule_date'], 'strftime') else str(r['schedule_date'])
-                    writer.writerow([dstr, r['full_name'], r['status']])
-            self._show_message("CSV exported successfully!", "success", duration=3000)
-        except Exception as e:
-            self._show_message(f"CSV Error: {e}", "error", duration=3000)

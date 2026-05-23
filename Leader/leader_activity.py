@@ -1,3 +1,5 @@
+from pydoc import text
+
 import customtkinter as ctk
 from Admin.admin_activity import EditReplyPage
 from database import Database
@@ -130,78 +132,95 @@ class LeaderActivity(ctk.CTkFrame):
         self.current_view = "company"
         self.date_filter_active = False
         self.current_search_keyword = ""
+        self.search_var = tk.StringVar()
+        self.badge_count = 0
+        self.badge_label = ctk.CTkLabel(
+            self,
+            text="0",
+            width=20,
+            height=20,
+            fg_color="red",
+            text_color="white",
+            corner_radius=10
+        )
 
-        # ROW 1: tabs + filter + search
+        # ROW 1: Company | Your Announcements | Create New
         top_row = ctk.CTkFrame(header, fg_color="transparent")
-        top_row.pack(fill="x")
-
-        # LEFT TABS
-        left_tabs = ctk.CTkFrame(top_row, fg_color="transparent")
-        left_tabs.pack(side="left")
+        top_row.pack(fill="x", pady=(0, 10))
 
         self.company_btn = ctk.CTkButton(
-            left_tabs,
+            top_row,
             text="📢 Company",
             fg_color="#2E86C1",
             command=lambda: self.switch_view("company")
         )
         self.company_btn.pack(side="left", padx=5)
 
-        self.badge_count = 0
-        self.badge_label = ctk.CTkLabel(
-            self.company_btn,
-            text="0",
-            width=18,
-            height=18,
-            corner_radius=9,
-            fg_color="#E74C3C",
-            text_color="white",
-            font=("Arial", 10, "bold")
-        )
-
         self.team_btn = ctk.CTkButton(
-            left_tabs,
-            text="👥 Your Announcements",
+            top_row,
+            text="👥 Team Announcements",
             fg_color="gray30",
             command=lambda: self.switch_view("team")
         )
         self.team_btn.pack(side="left", padx=5)
 
-        # CREATE BUTTON ROW - under Company tab
-        self.create_row = ctk.CTkFrame(header, fg_color="transparent")
-
         self.create_btn = ctk.CTkButton(
-            self.create_row,
+            top_row,
             text="+ Create New",
             width=140,
-            height=34,
+            height=36,
             fg_color="#27AE60",
             hover_color="#1E8449",
-            corner_radius=20,
+            corner_radius=8,
             command=self.go_to_create_page
         )
+        self.create_btn.pack(side="right", padx=5)
 
-        # Company tab အောက်တည့်တည့်
-        self.create_btn.pack(anchor="w", padx=5)
+        # Date filter FIRST
+        
+        filter_row = ctk.CTkFrame(header, fg_color="transparent")
+        filter_row.pack(fill="x", pady=(0, 10))
 
-        # initially hide
-        self.create_row.pack_forget()
-        # ================= SEARCH =================
-        self.search_var = ctk.StringVar()
+        # ================= FILTER ROW =================
+       
 
+        ctk.CTkLabel(
+            filter_row,
+            text="From:",
+            font=("Arial", 12),
+            text_color=("black", "white")
+        ).pack(side="left", padx=(0, 5))
+
+        self.from_date_entry = DatePickerButton(
+            filter_row,
+            initial_date=datetime.today().date()
+        )
+        self.from_date_entry.pack(side="left", padx=(0, 12))
+
+        ctk.CTkLabel(
+            filter_row,
+            text="To:",
+            font=("Arial", 12),
+            text_color=("black", "white")
+        ).pack(side="left", padx=(0, 5))
+
+        self.to_date_entry = DatePickerButton(
+            filter_row,
+            initial_date=datetime.today().date()
+        )
+        self.to_date_entry.pack(side="left", padx=(0, 12))
+        
         search_container = ctk.CTkFrame(
-            top_row,
-            width=260,
-            height=42,
-            corner_radius=14,
+            filter_row,
+            width=100,
+            height=36,
+            corner_radius=8,
             fg_color=("#F3F2F1", "#2A2A2A"),
             border_width=1,
             border_color="#555555"
         )
-
-        search_container.pack(side="right", padx=(10, 0))
+        search_container.pack(side="left", padx=5)
         search_container.pack_propagate(False)
-
         search_icon = ctk.CTkLabel(
             search_container,
             text="⌕",
@@ -234,44 +253,14 @@ class LeaderActivity(ctk.CTkFrame):
             lambda e: self.search_announcements()
         )
 
-        # ================= FILTER ROW =================
-        filter_row = ctk.CTkFrame(top_row, fg_color="transparent")
-        filter_row.pack(side="right", padx=(10, 0))
-
-        ctk.CTkLabel(
-            filter_row,
-            text="From:",
-            font=("Arial", 12),
-            text_color=("black", "white")
-        ).pack(side="left", padx=(0, 5))
-
-        self.from_date_entry = DatePickerButton(
-            filter_row,
-            initial_date=datetime.today().date()
-        )
-        self.from_date_entry.pack(side="left", padx=(0, 12))
-
-        ctk.CTkLabel(
-            filter_row,
-            text="To:",
-            font=("Arial", 12),
-            text_color=("black", "white")
-        ).pack(side="left", padx=(0, 5))
-
-        self.to_date_entry = DatePickerButton(
-            filter_row,
-            initial_date=datetime.today().date()
-        )
-        self.to_date_entry.pack(side="left", padx=(0, 12))
-
         def modern_btn(parent, text, color, hover, cmd):
 
             return ctk.CTkButton(
                 parent,
                 text=text,
-                width=80,
+                width=60,
                 height=36,
-                corner_radius=9,
+                corner_radius=8,
                 font=("Arial", 12, "bold"),
                 fg_color=color,
                 hover_color=hover,
@@ -304,7 +293,7 @@ class LeaderActivity(ctk.CTkFrame):
             corner_radius=12
         )
         self.container.pack(fill="both", expand=True, padx=80, pady=10)
-
+        self.create_btn.pack_forget()
         self.refresh_ui()
         self.after(2000, self.check_new_posts)
         
@@ -352,36 +341,55 @@ class LeaderActivity(ctk.CTkFrame):
             self.badge_count = 0
             self.badge_label.place_forget()
 
+            # show Create New
+            self.create_btn.pack(side="right", padx=5)
+
         if view == "company":
             self.company_btn.configure(fg_color="#2E86C1")
             self.team_btn.configure(fg_color="gray30")
-            self.create_row.pack_forget()
+
+            # hide Create New
+            self.create_btn.pack_forget()
 
         else:
             self.company_btn.configure(fg_color="gray30")
             self.team_btn.configure(fg_color="#2E86C1")
 
-            self.create_row.pack(fill="x", pady=(6, 0))
-            self.create_btn.pack(anchor="w", padx=5)
-
         self.refresh_ui()
             
     def apply_date_filter(self):
-            self.date_filter_active = True
+        from_date = self.from_date_entry.get_date()
+        to_date = self.to_date_entry.get_date()
 
-            from_date = str(self.from_date_entry.get_date())
-            to_date = str(self.to_date_entry.get_date())
-
-            if not from_date and not to_date:
-                self.date_filter_active = False
-                self.refresh_ui(
-                search_keyword=self.current_search_keyword
+        if from_date > to_date:
+            self.show_warning_message(
+                "Start date cannot be later than End date."
             )
-                return
+            return
 
-            self.refresh_ui()
+        self.date_filter_active = True
+        self.refresh_ui()
+        
+    def show_warning_message(self, text="Warning!"):
+        root = self.winfo_toplevel()
 
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#E74C3C",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
 
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
     def clear_date_filter(self):
 
         self.date_filter_active = False
@@ -566,11 +574,13 @@ class LeaderActivity(ctk.CTkFrame):
                     (reply["id"], self.user["id"])
                 )
                 self.db.conn.commit()
-                self.refresh_ui()
+
+                self.show_success_message("Reply deleted successfully")
+                self.after(900, self.refresh_ui)
 
             except Exception as e:
                 messagebox.showerror("Error", str(e))
-    # ================= UI =================
+        # ================= UI =================
     def refresh_ui(self):
         for w in self.container.winfo_children():
             w.destroy()
@@ -587,11 +597,13 @@ class LeaderActivity(ctk.CTkFrame):
                 params = []
             else:
                 query = """
-                    SELECT * FROM announcements
-                    WHERE sender_role='leader'
-                    AND created_by=%s
+                    SELECT a.*
+                    FROM announcements a
+                    JOIN users u ON a.created_by = u.full_name
+                    WHERE a.sender_role='leader'
+                    AND u.team_id = %s
                 """
-                params = [self.user["full_name"]]
+                params = [self.user["team_id"]]
 
             if self.date_filter_active:
                 query += " AND DATE(created_at) >= %s AND DATE(created_at) <= %s"
@@ -695,8 +707,11 @@ class LeaderActivity(ctk.CTkFrame):
                 ).pack(side="left", padx=10)
 
 
-                # ================= RIGHT SIDE BUTTONS (YOUR CODE STYLE) =================
-                if self.current_view == "team":
+                # ================= RIGHT SIDE BUTTONS (YOUR CODE STYLE) ==============
+                if (
+                    self.current_view == "team"
+                    and str(row.get("user_id")) == str(self.user.get("id"))
+                ):
                     ann_menu_btn = ctk.CTkButton(
                         top,
                         text="⋯",
@@ -727,7 +742,7 @@ class LeaderActivity(ctk.CTkFrame):
                     font=("Arial", 15, "bold")
                 )
 
-                # title_text.pack(anchor="w", padx=CONTENT_PADX, pady=(5, 2), fill="x")
+                title_text.pack(anchor="w", padx=CONTENT_PADX, pady=(5, 2), fill="x")
 
                 title = row['title']
 
@@ -761,8 +776,9 @@ class LeaderActivity(ctk.CTkFrame):
                     )
 
                 title_text.configure(state="disabled")
+                
                 self.create_expandable_message(
-                    content_frame  ,
+                    content_frame,
                     row['message'],
                     padx=CONTENT_PADX,
                     keyword=self.current_search_keyword
@@ -772,7 +788,7 @@ class LeaderActivity(ctk.CTkFrame):
                 # ================= ACTION AREA =================
                 # ================= SHOW REPLIES =================
                 self.db.cursor.execute(
-                    "SELECT * FROM announcement_replies WHERE announcement_id=%s ORDER BY created_at ASC",
+                    "SELECT * FROM announcement_replies WHERE announcement_id=%s ORDER BY created_at DESC",
                     (row['id'],)
                 )
 
@@ -986,10 +1002,8 @@ class LeaderActivity(ctk.CTkFrame):
             messagebox.showerror("Error", str(e))
     
     def handle_delete(self, announcement_id):
-        print("DELETE CLICKED")
-
         confirm = messagebox.askyesno(
-            "Confirm",
+            "Confirm Delete",
             "Are you sure to delete?"
         )
 
@@ -998,26 +1012,65 @@ class LeaderActivity(ctk.CTkFrame):
 
         try:
             self.db.cursor.execute(
-                "DELETE FROM announcements WHERE id=%s AND created_by=%s",
-                (announcement_id, self.user['full_name'])
-            )
+                "DELETE FROM announcements WHERE id=%s AND user_id=%s",
+                    (announcement_id, self.user["id"])
+                )
             self.db.conn.commit()
 
-            messagebox.showinfo("Deleted", "Deleted successfully")  # optional
-
-            self.refresh_ui()
+            self.show_success_message("Announcement deleted successfully")
+            self.after(900, self.refresh_ui)
 
         except Exception as e:
-            # self.conn.rollback()
-            print("ERROR:", e)
             messagebox.showerror("Error", str(e))
-    
+            
+    def show_success_message(self, text="Successful!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
+    def highlight_keyword(self, text_widget, keyword):
+        if not keyword:
+            return
+
+        text_widget.tag_remove("highlight", "1.0", "end")
+
+        start = "1.0"
+        while True:
+            pos = text_widget.search(keyword, start, stopindex="end", nocase=True)
+            if not pos:
+                break
+
+            end = f"{pos}+{len(keyword)}c"
+            text_widget.tag_add("highlight", pos, end)
+            start = end
+
+        text_widget.tag_config(
+            "highlight",
+            background="#FFD54F",
+            foreground="black"
+        )
+        
     def create_expandable_message(self, parent, full_text, padx=20, keyword=""):
         is_dark = ctk.get_appearance_mode() == "Dark"
         preview_length = 80
 
         container = ctk.CTkFrame(parent, fg_color="transparent")
-        container.pack(fill="x", padx=padx, pady=(6, 8))
+        container.pack(fill="x", padx=padx, pady=(2, 5))
 
         is_expanded = False
 
@@ -1036,28 +1089,16 @@ class LeaderActivity(ctk.CTkFrame):
         )
         msg_text.pack(fill="x", anchor="w")
 
-        def apply_text(text_to_show):
+        
+        def set_text(text_to_show):
             msg_text.configure(state="normal")
             msg_text.delete("1.0", "end")
             msg_text.insert("1.0", text_to_show)
 
-            if keyword:
-                lower_text = text_to_show.lower()
-                lower_keyword = keyword.lower()
-                start_index = lower_text.find(lower_keyword)
+            self.highlight_keyword(msg_text, keyword)  # ✅ message highlight
 
-                while start_index != -1:
-                    end_index = start_index + len(keyword)
-                    msg_text.tag_add("highlight", f"1.{start_index}", f"1.{end_index}")
-                    start_index = lower_text.find(lower_keyword, end_index)
-
-                msg_text.tag_config(
-                    "highlight",
-                    background="#FFD54F",
-                    foreground="black",
-                    font=("Arial", 12, "bold")
-                )
-
+            line_count = int(msg_text.index("end-1c").split(".")[0])
+            msg_text.configure(height=max(2, line_count))
             msg_text.configure(state="disabled")
 
         def toggle():
@@ -1065,14 +1106,14 @@ class LeaderActivity(ctk.CTkFrame):
             is_expanded = not is_expanded
 
             if is_expanded:
-                apply_text(full_text)
+                set_text(full_text)
                 toggle_btn.configure(text="see less")
             else:
-                apply_text(full_text[:preview_length] + "...")
+                set_text(full_text[:preview_length] + ("..." if len(full_text) > preview_length else ""))
                 toggle_btn.configure(text="see more...")
 
         display_text = full_text[:preview_length] + ("..." if len(full_text) > preview_length else "")
-        apply_text(display_text)
+        set_text(display_text)
 
         if len(full_text) > preview_length:
             toggle_btn = ctk.CTkLabel(
@@ -1122,6 +1163,7 @@ class EditReplyPage(ctk.CTkFrame):
             form_frame,
             text="← Back",
             width=80,
+            height=36,
             fg_color=("#DBDBDB", "#333333"),
             text_color=("black", "white"),
             hover_color=("#CFCFCF", "#444444"),
@@ -1134,8 +1176,8 @@ class EditReplyPage(ctk.CTkFrame):
             form_frame,
             height=300,
             corner_radius=10,
-            fg_color=("#EEEEEE", "#2A2A2A"),
-            text_color=("black", "white"),
+            fg_color="#DADADA",
+            text_color="black",
             border_width=0,
             font=("Arial", 14)
         )
@@ -1145,7 +1187,7 @@ class EditReplyPage(ctk.CTkFrame):
 
         update_btn = ctk.CTkButton(
             form_frame,
-            text="Update Reply",
+            text="Update",
             width=120,
             height=35,
             corner_radius=10,
@@ -1159,7 +1201,7 @@ class EditReplyPage(ctk.CTkFrame):
         new_msg = self.reply_box.get("1.0", "end-1c").strip()
 
         if not new_msg:
-            messagebox.showwarning("Warning", "Reply cannot be empty")
+            self.show_warning_message("Reply cannot be empty")
             return
 
         try:
@@ -1172,11 +1214,53 @@ class EditReplyPage(ctk.CTkFrame):
                 (new_msg, self.reply_data["id"], self.user["id"])
             )
             self.db.conn.commit()
-            messagebox.showinfo("Success", "Reply updated successfully")
-            self.back_callback()
+
+            self.show_success_message("Reply updated successfully")
+            self.after(900, self.back_callback)
 
         except Exception as e:
-            messagebox.showerror("Error", str(e))      
+            messagebox.showerror("Error", str(e)) 
+            
+    def show_warning_message(self, text="Warning!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#F39C12",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy) 
+    def show_success_message(self, text="Successful!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)  
 class CreateTeamPostPage(ctk.CTkFrame):
     def __init__(self, master, user_data, back_callback ,edit_data=None):
         super().__init__(master, fg_color=("white", "#0E0E0E"))
@@ -1213,8 +1297,8 @@ class CreateTeamPostPage(ctk.CTkFrame):
             placeholder_text="Add a subject",
             height=45,
             corner_radius=10,
-            fg_color=("#EEEEEE", "#2A2A2A"),
-            text_color=("black", "white"),
+            fg_color="#DADADA",
+            text_color="#000000",
             border_width=0,
             font=("Arial", 14)
         )
@@ -1225,8 +1309,8 @@ class CreateTeamPostPage(ctk.CTkFrame):
             form_frame,
             height=300,
             corner_radius=10,
-            fg_color=("#EEEEEE", "#2A2A2A"),
-            text_color=("black", "white"),
+            fg_color="#DADADA",
+            text_color="#000000",
             border_width=0,
             font=("Arial", 14)
         )
@@ -1238,7 +1322,7 @@ class CreateTeamPostPage(ctk.CTkFrame):
         # ================= POST BUTTON =================
         post_btn = ctk.CTkButton(
             form_frame,
-            text="Update Now" if self.edit_data else "Post",
+            text="Update" if self.edit_data else "Post",
             width=60,
             height=35,
             corner_radius=10,
@@ -1253,20 +1337,24 @@ class CreateTeamPostPage(ctk.CTkFrame):
         message = self.msg_ent.get("1.0", "end-1c").strip()
 
         if not title or not message:
-            messagebox.showwarning("Warning", "Please fill all fields.")
+            self.show_warning_message("Please fill all fields.")
             return
 
         try:
             if self.edit_data:
                 self.db.cursor.execute(
-                    "UPDATE announcements SET title=%s, message=%s WHERE id=%s AND created_by=%s",
-                    (title, message, self.edit_data['id'], self.user['full_name'])
+                    "UPDATE announcements SET title=%s, message=%s WHERE id=%s AND user_id=%s",
+                    (title, message, self.edit_data['id'], self.user['id'])
                 )
             else:
                 # 1. Insert the announcement (Existing code)
                 self.db.cursor.execute(
-                    "INSERT INTO announcements (title, message, sender_role, created_by, created_at) VALUES (%s, %s, %s, %s, NOW())",
-                    (title, message, "leader", self.user['full_name'])
+                    """
+                    INSERT INTO announcements
+                    (title, message, sender_role, created_by, user_id, created_at)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    """,
+                    (title, message, "leader", self.user["full_name"], self.user["id"])
                 )
 
                 # 2. ADD THIS: Create notifications for all Members
@@ -1281,8 +1369,57 @@ class CreateTeamPostPage(ctk.CTkFrame):
                 )
 
             self.db.conn.commit()
-            messagebox.showinfo("Success", "Saved successfully")
-            self.back_callback()
+            if self.edit_data:
+                self.show_success_message("Announcement updated successfully")
+            else:
+                self.show_success_message("Announcement posted successfully")
+
+            self.after(900, self.back_callback)
 
         except Exception as e:
             messagebox.showerror("Error", str(e))
+            
+    def show_warning_message(self, text="Warning!"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#F39C12",
+            corner_radius=8
+        )
+
+        toast.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)
+            
+    def show_success_message(self, text="Announcement posted successfully"):
+        root = self.winfo_toplevel()
+
+        toast = ctk.CTkFrame(
+            root,
+            fg_color="#22C55E",
+            corner_radius=8
+        )
+
+        # right side, top bar area
+        toast.place(relx=1.0,rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            toast,
+            text=text,
+            text_color="white",
+            font=("Arial", 12, "bold"),  
+            wraplength=250,                     
+        ).pack(padx=15, pady=10)
+
+        toast.lift()
+        root.after(3000, toast.destroy)

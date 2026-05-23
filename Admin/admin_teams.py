@@ -448,6 +448,9 @@ class AdminTeams(ctk.CTkFrame):
                     team_desc
                 )
 
+                if updated:
+                    self.show_success_toast(f"{team_name} updated successfully!")
+
             # CREATE TEAM
 
             else:
@@ -474,8 +477,7 @@ class AdminTeams(ctk.CTkFrame):
                 ):
 
                     self.show_success_toast(
-                        "Success",
-                        f"Team '{team_name}' created!"
+                        f"{team_name} created successfully!"
                     )
 
             self.reset_form()
@@ -485,73 +487,40 @@ class AdminTeams(ctk.CTkFrame):
 
             self.show_error_toast("Error", str(e))
 
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
+
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+
+        self.after(duration, message_frame.destroy)
+
     def show_error_toast(self, title_or_message, message=None):
-
         text = title_or_message if message is None else f"{title_or_message}: {message}"
+        self._show_message(text, message_type="error")
 
-        toast = ctk.CTkFrame(
-            self,
-            fg_color="#EF4444",
-            corner_radius=8
-        )
-
-        toast.place(
-            relx=1.0,
-            y=20,
-            anchor="ne"
-        )
-
-        label = ctk.CTkLabel(
-            toast,
-            text=text,
-            text_color="white",
-            font=("Arial", 12, "bold")
-        )
-
-        label.pack(
-            padx=20,
-            pady=10
-        )
-
-        # Auto hide after 3 seconds
-        self.after(
-            3000,
-            toast.destroy
-        )
-        
     def show_success_toast(self, title_or_message, message=None):
-
         text = title_or_message if message is None else f"{title_or_message}: {message}"
-
-        toast = ctk.CTkFrame(
-            self,
-            fg_color="#22C55E",
-            corner_radius=8
-        )
-
-        toast.place(
-            relx=1.0,
-            y=20,
-            anchor="ne"
-        )
-
-        label = ctk.CTkLabel(
-            toast,
-            text=text,
-            text_color="white",
-            font=("Arial", 12, "bold")
-        )
-
-        label.pack(
-            padx=20,
-            pady=10
-        )
-
-        # Auto hide after 3 seconds
-        self.after(
-            3000,
-            toast.destroy
-        )
+        self._show_message(text, message_type="success")
     
     
     
@@ -748,23 +717,19 @@ class AdminTeams(ctk.CTkFrame):
             return
 
         try:
+            # fetch name before deleting so we can include it in the toast
+            team_name = self.db.get_team_name(team_id)
 
             if self.db.delete_team(team_id):
-
-                self.show_success_toast(
-                    "Success",
-                    "Team deleted successfully."
-                )
+                msg = f"{team_name} deleted successfully."
+                self.show_success_toast(msg)
 
                 self.load_teams()
 
             else:
-
                 self.show_error_toast(
-                    "Error",
                     "Delete failed."
                 )
 
         except Exception as e:
-
             self.show_error_toast("Error", str(e))

@@ -109,6 +109,7 @@ class LeaderMenu:
                 msg = note['message'].lower()
                 if "leave" in msg:
                     leave_count += 1
+                # Count all overtime notifications for the sidebar badge
                 elif "overtime" in msg:
                     ot_count += 1
                 elif "announcement" in msg: # Add this check
@@ -245,7 +246,7 @@ class LeaderMenu:
         """Displays Overtime view and clears only overtime notifications"""
         self.clear_content()
         try:
-            # Mark ONLY overtime notifications as read for this leader
+            # Mark all overtime notifications as read for this leader
             self.db.cursor.execute(
                 "UPDATE notifications SET is_read = 1 WHERE user_id = %s AND message LIKE '%%overtime%%'", 
                 (self.user['id'],)
@@ -273,4 +274,5 @@ class LeaderMenu:
         try:
             from Leader.leader_attendance import LeaderAttendance
             LeaderAttendance(self.content, self.user).pack(fill="both", expand=True)
-        except Exception as e: self.show_error("Attendance", e)
+        except Exception as e: 
+            self.show_error("Attendance", e)
