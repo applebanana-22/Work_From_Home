@@ -43,7 +43,7 @@ class LeaderMenu:
             ("activity", "📰 Activity", self.show_activity),
             ("reports", "📝 Daily Report", self.show_reports_list),
             ("project", "📁 Project", self.show_project),
-            ("schedule", "🏠 WFH Schedule", self.show_schedule),
+            ("schedule", "🏠 WFH / Office Schedule", self.show_schedule),
             ("attendance", "📅 Attendance", self.show_attendance),
             ("overtime", "⏰ Overtime Requests", self.show_overtime),
             ("leave", "📅 Leave Requests", self.show_leave_request)

@@ -355,7 +355,7 @@ class MemberOvertime(ctk.CTkFrame):
 
     def create_main_page(self):
         self.main_page = ctk.CTkFrame(self.pages, fg_color="transparent")
-        self.main_page.grid_rowconfigure(2, weight=1) # Content frame
+        self.main_page.grid_rowconfigure(2, weight=1) # Main content area
         self.main_page.grid_columnconfigure(0, weight=1)
 
         # --- Header ---
@@ -867,7 +867,7 @@ class MemberOvertime(ctk.CTkFrame):
             if count > 0:
                 self.history_badge.configure(text=str(count))
                 # Position near the "History" segment (right side of button)
-                self.history_badge.place(relx=0.93, rely=0.15, anchor="center")
+                self.history_badge.place(relx=0.95, rely=0.5, anchor="center")
             else:
                 self.history_badge.place_forget()
         except: pass

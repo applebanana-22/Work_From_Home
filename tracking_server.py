@@ -13,7 +13,7 @@ def register(sid, data):
     user_id = data.get('user_id')
     if user_id:
         connected_users[sid] = user_id
-        db.update_live_status(user_id, 'active') # Server က DB ကို လှမ်းပြင်သည်
+        db.update_live_status(user_id, 'active') # Server fix database status
         sio.emit('status_update', {'user_id': user_id, 'status': 'active'})
         print(f"👤 User {user_id} registered.")
 

@@ -2,12 +2,12 @@ import mysql.connector
 from datetime import datetime
 
 class Database:
-    def __init__(self, host="192.168.100.83"):
+    def __init__(self, host="192.168.100.109"):
         self.host = host
         self.connect()
 
     def connect(self):
-        """Database ချိတ်ဆက်မှုကို စတင်ပြုလုပ်ခြင်း"""
+        """Starting database connection"""
         try:
             self.conn = mysql.connector.connect(
                 host=self.host, 
@@ -24,10 +24,10 @@ class Database:
             self.conn = None
 
     def ensure_connection(self):
-        """Connection ရှိမရှိ စစ်ဆေးပြီး ပြတ်နေပါက ပြန်ချိတ်ပေးမည် (အရေးကြီးဆုံးအပိုင်း)"""
+        """Check whether the connection is present and if it is disconnected, reconnect it (the most important part)"""
         try:
             if self.conn and self.conn.is_connected():
-                # reconnect=True ကို mysql-connector တွင် ဤသို့သုံးပါသည်
+                # reconnect=True is used like this in mysql-connector
                 self.conn.ping(reconnect=True, attempts=3, delay=1)
             else:
                 print("🔄 Connection lost. Reconnecting...")
@@ -37,7 +37,7 @@ class Database:
 
     # --- Authentication ---
     def authenticate(self, username, password):
-        self.ensure_connection() # Query မတိုင်ခင် အမြဲစစ်ပါ
+        self.ensure_connection() # Check connection before executing query
         if not self.conn: return None
         try:
             query = "SELECT * FROM users WHERE username = %s AND password = %s"
@@ -95,7 +95,7 @@ class Database:
             return False
         
     def get_all_teams(self):
-        """Team အားလုံးကို database ထဲမှ ဆွဲထုတ်ရန်"""
+        """To extract all teams from the database"""
         try:
             self.cursor.execute("SELECT * FROM teams")
             return self.cursor.fetchall()
@@ -142,12 +142,11 @@ class Database:
             return 0, 0
         
     def check_out_user(self, user_id):
-        """Attendance table တွင် check_out အချိန်ကို update လုပ်ပြီး 
-           users table တွင် live status ကို offline ပြောင်းရန်"""
+        """Update the attendance table with the check-out time and update the user's live status to offline"""
         try:
             self.ensure_connection()
             
-            # ၁။ Attendance Table ကို Update လုပ်ခြင်း (ယနေ့အတွက်)
+            # 1. Updating the Attendance Table (for today)
             query_attendance = """
                 UPDATE attendance 
                 SET check_out = CURTIME() 
@@ -156,7 +155,7 @@ class Database:
             """
             self.cursor.execute(query_attendance, (user_id,))
             
-            # ၂။ Users Table ရှိ live status ကို offline ပြောင်းခြင်း
+            # 2. Updating the Users Table (to set live status to offline)
             query_user = "UPDATE users SET status = 'offline' WHERE id = %s"
             self.cursor.execute(query_user, (user_id,))
             
@@ -172,7 +171,7 @@ class Database:
     # --- Live Tracking Update ---
     def update_live_status(self, user_id, status):
         """tracking_server မှ လှမ်းခေါ်သော function"""
-        self.ensure_connection() # အမြဲစစ်ပေးခြင်းဖြင့် connection timeout ကို ကာကွယ်သည်
+        self.ensure_connection() # Prevent connection timeout by always checking
         if not self.conn: return
         try:
             query = "UPDATE users SET status = %s WHERE id = %s OR employee_id = %s"

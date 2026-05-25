@@ -41,7 +41,7 @@ class MemberMenu:
             ("report", "📝   Daily Report", self.show_report),
             ("overtime", "⏰   Overtime", self.show_overtime),
             ("leave", "📅   Leave Request", self.show_leave_request),
-            ("schedule", "🏠   WFH Schedule", self.show_schedule),
+            ("schedule", "🏠   WFH / Office Schedule", self.show_schedule),
             ("attendance", "🚪   Attendance", self.show_attendance)
         ]
 

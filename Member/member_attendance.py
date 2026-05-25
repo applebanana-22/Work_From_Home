@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from database import Database
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from datetime import time as dt_time
 from tkinter import filedialog, messagebox, ttk
 from xml.sax.saxutils import escape
@@ -126,6 +126,8 @@ class MemberAttendance(ctk.CTkFrame):
             "leave": "#3498DB",
             "late": "#E67E22",
             "ot": "#8B5CF6",
+            "break": "black",
+    
         }
         self.default_from_date, self.default_to_date = self._default_payroll_range()
 
@@ -166,11 +168,11 @@ class MemberAttendance(ctk.CTkFrame):
         ctk.CTkButton(
             filter_frame,
             text="🔍 Filter",
-            width=65,
+            width=60,
             height=36,
-            fg_color=("#2563EB", "#1D4ED8"),
-            hover_color=("#1D4ED8", "#1E40AF"),
-            text_color=("#1A1A1A", "#FFFFFF"),
+            fg_color=("#2471A3"),
+            hover_color="#1A5276",
+            text_color=( "#FFFFFF"),
             corner_radius=8,
             command=self.load_data
         ).grid(row=0, column=4, padx=6, pady=8)
@@ -178,34 +180,35 @@ class MemberAttendance(ctk.CTkFrame):
         ctk.CTkButton(
             filter_frame,
             text="✖ Clear",
-            width=65,
+            width=60,
             height=36,
-            fg_color=("#BABDC1", "#6B7280"),
-            hover_color=("#AEB3B8", "#4B5563"),
-            text_color=("#1A1A1A", "#FFFFFF"),
             corner_radius=8,
+            fg_color="#566573",
+            hover_color="#424949",
+            font=("Arial", 11, "bold"),
             command=self.reset_filters
         ).grid(row=0, column=5, padx=6, pady=8)
 
         ctk.CTkButton(
             filter_frame,
-            text="📄 Export",
-            width=65,
+            text="📄 PDF",
+            width=60,
             height=36,
-            fg_color="#DC2626",
-            hover_color="#B91C1C",
-            text_color=("#1A1A1A", "#FFFFFF"),
             corner_radius=8,
+            fg_color="#C0392B",
+            hover_color= "#922B21",
+            text_color="#FFFFFF",
             command=self.export_pdf
         ).grid(row=0, column=6, padx=6, pady=8)
 
         ctk.CTkButton(
             filter_frame,
-            text="CSV",
-            width=65,
+            text="📥 Excel",
+            width=60,
             height=36,
-            fg_color="#26DCB5",
-            text_color=("#1A1A1A", "#FFFFFF"),
+            fg_color="#16A085",
+            hover_color="#117A65",
+            text_color= "#FFFFFF",
             corner_radius=8,
             command=self.export_excel_file
         ).grid(row=0, column=7, padx=6, pady=8)
@@ -216,12 +219,11 @@ class MemberAttendance(ctk.CTkFrame):
 
         self.month_work_lbl = self.create_stat_card("Month Work", "0", self.metric_colors["work"])
         self.month_hours_lbl = self.create_stat_card("Monthly Hours", "0", self.metric_colors["work"])
-        self.actual_hours_lbl = self.create_stat_card("Actual Hours", "0", self.metric_colors["work"])
+        self.actual_hours_lbl = self.create_stat_card("Working Hours", "0", self.metric_colors["work"])
         self.working_lbl = self.create_stat_card("Working Days", "0", self.metric_colors["work"])
         self.leave_lbl = self.create_stat_card("Leave Days", "0", self.metric_colors["leave"])
         self.late_lbl = self.create_stat_card("Late Days", "0", self.metric_colors["late"])
         self.ot_lbl = self.create_stat_card("OT Hours", "0", self.metric_colors["ot"])
-
         # ---------------- TABLE ----------------
         self.table_card = ctk.CTkFrame(
             self,
@@ -242,10 +244,11 @@ class MemberAttendance(ctk.CTkFrame):
         h("Date", 170).grid(row=0, column=0, padx=(20, 0), pady=8, sticky="w")
         h("Check-In", 140).grid(row=0, column=1, padx=0, pady=8, sticky="w")
         h("Check-Out", 140).grid(row=0, column=2, padx=0, pady=8, sticky="w")
-        h("Total Hours", 120).grid(row=0, column=3, padx=0, pady=8, sticky="w")
+        h("Working Hours", 120).grid(row=0, column=3, padx=0, pady=8, sticky="w")
         h("Stacked Hours", 130).grid(row=0, column=4, padx=0, pady=8, sticky="w")
         h("OT Hours", 120).grid(row=0, column=5, padx=10, pady=8, sticky="w")
-        h("Remark", 120).grid(row=0, column=6, padx=(10, 0), pady=8, sticky="w")
+        h("Break Time", 120).grid(row=0, column=6, padx=10, pady=8, sticky="w")
+        h("Remark", 120).grid(row=0, column=7, padx=(10, 0), pady=8, sticky="w")
         header_row.grid_columnconfigure(7, weight=1)
 
         self.scroll = ctk.CTkScrollableFrame(self.table_card, fg_color="transparent")
@@ -357,24 +360,264 @@ class MemberAttendance(ctk.CTkFrame):
         end_dt = datetime.combine(datetime.today(), work_end)
         return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
 
+    # def _effective_checkout_time(self, row):
+    #     check_out = self._to_time(row.get("check_out"))
+    #     try:
+    #         has_accepted_ot_request = float(row.get("ot_hours") or 0) > 0
+    #     except (TypeError, ValueError):
+    #         has_accepted_ot_request = False
+    #     if has_accepted_ot_request and check_out is not None:
+    #         return check_out
+    #     return dt_time(16, 30)
+    
     def _effective_checkout_time(self, row):
         check_out = self._to_time(row.get("check_out"))
-        try:
-            has_accepted_ot_request = float(row.get("ot_hours") or 0) > 0
-        except (TypeError, ValueError):
-            has_accepted_ot_request = False
-        if has_accepted_ot_request and check_out is not None:
+
+        # real checkout exists
+        if check_out is not None:
             return check_out
+
+        # forgot checkout
         return dt_time(16, 30)
+
+    # def _effective_checkout_time(self, row):
+    #     check_out = self._to_time(row.get("check_out"))
+
+    #     try:
+    #         ot_hours = float(row.get("ot_hours") or 0)
+    #     except (TypeError, ValueError):
+    #         ot_hours = 0.0
+
+    #     has_accepted_ot_request = ot_hours > 0
+
+    #     # 🔥 real checkout exists
+    #     if has_accepted_ot_request and check_out is not None:
+    #         return check_out
+
+    #     # 🔥 forgot checkout but OT exists
+    #     if has_accepted_ot_request and check_out is None:
+
+    #         base_dt = datetime.combine(datetime.today(), dt_time(16, 30))
+
+    #         effective_dt = base_dt + timedelta(hours=ot_hours)
+
+    #         return effective_dt.time()
+
+    #     # 🔥 normal fallback
+    #     return dt_time(16, 30)
+
+    # def _total_hours_between_checkin_checkout(self, row):
+    #     check_in = self._to_time(row.get("check_in"))
+    #     check_out = self._effective_checkout_time(row)
+    #     if check_in is None:
+    #         return 0.0
+    #     start_dt = datetime.combine(datetime.today(), check_in)
+    #     end_dt = datetime.combine(datetime.today(), check_out)
+    #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
 
     def _total_hours_between_checkin_checkout(self, row):
         check_in = self._to_time(row.get("check_in"))
-        check_out = self._effective_checkout_time(row)
+
+        # no checkin
         if check_in is None:
             return 0.0
-        start_dt = datetime.combine(datetime.today(), check_in)
-        end_dt = datetime.combine(datetime.today(), check_out)
+
+        row_date = row.get("attendance_date")
+
+        # mysql date convert
+        if isinstance(row_date, str):
+            row_date = datetime.strptime(row_date, "%Y-%m-%d").date()
+        elif hasattr(row_date, "date"):
+            row_date = row_date.date()
+
+        today = datetime.today().date()
+
+        # ==================================
+        # TODAY SPECIAL LOGIC
+        # ==================================
+        if row_date == today:
+
+            # actual checkout from DB
+            actual_checkout = self._to_time(row.get("check_out"))
+
+            # employee already checked out
+            if actual_checkout is not None:
+                check_out = actual_checkout
+
+            else:
+                cutoff_dt = datetime.combine(today, dt_time(16, 30))
+
+                # before 4:30 PM
+                if datetime.now() < cutoff_dt:
+                    return 0.0
+
+                # after 4:30 PM use effective checkout
+                check_out = self._effective_checkout_time(row)
+
+        else:
+            # old dates
+            check_out = self._effective_checkout_time(row)
+
+        start_dt = datetime.combine(row_date, check_in)
+        end_dt = datetime.combine(row_date, check_out)
+
         return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+    
+    # def _total_hours_between_checkin_checkout(self, row):
+    #     check_in = self._to_time(row.get("check_in"))
+
+    #     if check_in is None:
+    #         return 0.0
+
+    #     row_date = row.get("attendance_date")
+
+    #     # mysql date convert
+    #     if isinstance(row_date, str):
+    #         row_date = datetime.strptime(row_date, "%Y-%m-%d").date()
+    #     elif hasattr(row_date, "date"):
+    #         row_date = row_date.date()
+
+    #     today = datetime.today().date()
+
+    #     # =========================
+    #     # TODAY ONLY
+    #     # =========================
+    #     if row_date == today:
+
+    #         cutoff_dt = datetime.combine(today, dt_time(16, 30))
+
+    #         # before 4:30 PM
+    #         if datetime.now() < cutoff_dt:
+    #             return 0.0
+
+    #     check_out = self._effective_checkout_time(row)
+
+    #     start_dt = datetime.combine(row_date, check_in)
+    #     end_dt = datetime.combine(row_date, check_out)
+
+    #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+
+
+    # def _total_hours_between_checkin_checkout(self, row):
+    #     check_in = self._to_time(row.get("check_in"))
+    #     check_out = self._to_time(row.get("check_out"))
+
+    #     if check_in is None:
+    #         return 0.0
+
+    #     row_date = row.get("attendance_date")
+
+    #     if hasattr(row_date, "date"):
+    #         row_date = row_date.date()
+
+    #     today = datetime.today().date()
+
+    #     base_date = datetime.combine(row_date, datetime.min.time())
+
+    #     start_dt = datetime.combine(base_date, check_in)
+
+    #     # =========================
+    #     # 🟡 ONLY CURRENT DAY RULE
+    #     # =========================
+    #     if row_date == today:
+
+    #         cutoff_time = time(16, 30)
+    #         cutoff_dt = datetime.combine(base_date, cutoff_time)
+
+    #         # before 16:30 → show 0
+    #         if datetime.now() < cutoff_dt :
+    #             return 0.0
+
+    #         # missing checkout → use 16:30
+    #         if check_out is None:
+    #             end_dt = cutoff_dt
+    #         else:
+    #             end_dt = datetime.combine(base_date, check_out)
+
+    #     else:
+    #         # =========================
+    #         # 🟢 PREVIOUS DAYS (NO CHANGE)
+    #         # =========================
+    #         if check_out is None:
+    #             check_out = time(16, 30)
+
+    #         end_dt = datetime.combine(base_date, check_out)
+
+    #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+    # def _total_hours_between_checkin_checkout(self, row):
+    #     check_in = self._to_time(row.get("check_in"))
+    #     check_out = self._to_time(row.get("check_out"))
+
+    #     if check_in is None:
+    #         return 0.0
+
+    #     # -------------------------
+    #     # ROW DATE (IMPORTANT FIX)
+    #     # -------------------------
+    #     row_date = row.get("attendance_date")
+
+    #     if hasattr(row_date, "date"):
+    #         row_date = row_date.date()
+
+    #     today = datetime.today().date()
+
+    #     # use ROW DATE, NOT today()
+    #     base_date = datetime.combine(row_date, datetime.min.time())
+
+    #     start_dt = datetime.combine(base_date, check_in)
+
+    #     # -------------------------
+    #     # TODAY ONLY RULE
+    #     # -------------------------
+    #     if row_date == today:
+
+    #         cutoff_dt = datetime.combine(base_date, time(16, 30))
+
+    #         # before 16:30 → no hours yet
+    #         if datetime.now() < cutoff_dt:
+    #             return 0.0
+
+    #         # missing checkout → 16:30
+    #         if check_out is None:
+    #             end_dt = cutoff_dt
+    #         else:
+    #             end_dt = datetime.combine(base_date, check_out)
+
+    #     else:
+    #         # -------------------------
+    #         # PAST DAYS (NORMAL)
+    #         # -------------------------
+    #         if check_out is None:
+    #             return 0.0
+
+    #         end_dt = datetime.combine(base_date, check_out)
+
+    #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+    
+    # def _total_hours_between_checkin_checkout(self, row):
+    #     check_in = self._to_time(row.get("check_in"))
+    #     check_out = self._to_time(row.get("check_out"))
+
+    #     if check_in is None:
+    #         return 0.0
+
+    #     base_date = datetime.today()
+
+    #     start_dt = datetime.combine(base_date, check_in)
+
+    #     cutoff_dt = datetime.combine(base_date, time(16, 30))
+
+    #     # 🚫 before 16:30 → no calculation
+    #     if datetime.now() < cutoff_dt:
+    #         return 0.0
+
+    #     # default checkout handling
+    #     if check_out is None:
+    #         end_dt = cutoff_dt
+    #     else:
+    #         end_dt = datetime.combine(base_date, check_out)
+
+    #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
 
     @staticmethod
     def _fmt_hours(value):
@@ -385,22 +628,39 @@ class MemberAttendance(ctk.CTkFrame):
 
     def _stacked_hours_from_row(self, row):
         total_hours = self._total_hours_between_checkin_checkout(row)
-        return max(total_hours - 8.0, 0.0)
+        return max(total_hours - 8.75, 0.00)
 
     def _ot_hours_from_row(self, row):
-        work_date = row.get("attendance_date")
         try:
-            work_date_obj = datetime.strptime(str(work_date), "%Y-%m-%d").date() if work_date else None
+            approved_ot = float(row.get("ot_hours") or 0)
+        except (TypeError, ValueError):
+            approved_ot = 0.0
+
+        check_out = self._to_time(row.get("check_out"))
+
+        # forgot checkout + OT approved
+        if check_out is None and approved_ot > 0:
+            return approved_ot
+
+        work_date = row.get("attendance_date")
+
+        try:
+            work_date_obj = (
+                datetime.strptime(str(work_date), "%Y-%m-%d").date()
+                if work_date else None
+            )
         except Exception:
             work_date_obj = None
+
         is_weekend = bool(work_date_obj and work_date_obj.weekday() >= 5)
-        has_accepted_ot_request = float(row.get("ot_hours") or 0) > 0
-        if is_weekend and has_accepted_ot_request:
+
+        # weekend OT
+        if is_weekend and approved_ot > 0:
             return self._total_hours_between_checkin_checkout(row)
 
         stacked_hours = self._stacked_hours_from_row(row)
-        return max(stacked_hours - 1.0, 0.0)
 
+        return max(stacked_hours - 1.0, 0.0)
     def _late_remark_text(self, row):
         check_in = self._to_time(row.get("check_in"))
         late_cutoff = self._to_time("07:45:00")
@@ -426,8 +686,9 @@ class MemberAttendance(ctk.CTkFrame):
         user_id = self.user["id"]
         from_date = self.date_picker.get_date()
         to_date = self.to_date_picker.get_date()
-        if from_date > to_date:
-            from_date, to_date = to_date, from_date
+        if from_date and to_date and from_date > to_date:
+            self._show_message("Start date cannot be later than End date.", "error")
+            return
         self.month_total_workdays = str(sum(1 for i in range((to_date - from_date).days + 1) if (from_date + timedelta(days=i)).weekday() < 5))
         self.month_work_lbl.configure(text=self.month_total_workdays)
         self.month_hours_lbl.configure(text=self._month_hours_from_workdays(self.month_total_workdays))
@@ -546,6 +807,7 @@ class MemberAttendance(ctk.CTkFrame):
         ot_total = 0.0
         self._export_leave_days = leave_days
         self._export_ot_hours = 0.0
+        
 
         for r in month_rows:
             if r["check_in"] and str(r["check_in"]) > self.LATE_TIME:
@@ -558,11 +820,12 @@ class MemberAttendance(ctk.CTkFrame):
         working_days = sum(int(r.get("has_attendance", 0) or 0) for r in month_rows)
         actual_hours = sum(self._actual_hours_from_row(r) for r in month_rows)
         actual_hours_with_ot = actual_hours + ot_total
-        self.actual_hours_lbl.configure(text=f"{actual_hours_with_ot:g}")
+        self.actual_hours_lbl.configure(text=self._fmt_hours(actual_hours_with_ot))
         self.working_lbl.configure(text=f"{working_days:g}")
         self.leave_lbl.configure(text=f"{leave_days:g}")
         self.late_lbl.configure(text=str(late))
         self.ot_lbl.configure(text=self._fmt_hours(ot_total))
+        
 
         display = []
 
@@ -611,6 +874,19 @@ class MemberAttendance(ctk.CTkFrame):
             total_hours = self._total_hours_between_checkin_checkout(r)
             stacked_hours = self._stacked_hours_from_row(r)
             derived_ot = self._ot_hours_from_row(r)
+            ot_hours = self._ot_hours_from_row(r)
+            ot_accepted = ot_hours > 0
+
+            date = r.get("attendance_date")
+
+            is_weekend = False
+            if hasattr(date, "weekday"):
+                is_weekend = date.weekday() >= 5
+
+            if is_weekend:
+                break_time = 0
+            else:
+                break_time = 1 if ot_accepted else 0
 
             ctk.CTkLabel(row, text=self._dash(r["attendance_date"]), width=170, anchor="w").grid(row=0, column=0, padx=(10, 0), pady=8, sticky="w")
             ctk.CTkLabel(row, text=self._dash(r["check_in"]), width=140, anchor="w").grid(row=0, column=1, padx=0, pady=8, sticky="w")
@@ -624,10 +900,10 @@ class MemberAttendance(ctk.CTkFrame):
                 text_color=self.metric_colors["work"],
             ).grid(row=0, column=4, padx=0, pady=8, sticky="w")
             ctk.CTkLabel(row, text=self._fmt_hours(derived_ot), width=120, text_color=self.metric_colors["ot"]).grid(row=0, column=5, padx=0, pady=8, sticky="w")
-
+            ctk.CTkLabel(row, text=self._fmt_hours(break_time), width=120, text_color=self.metric_colors["break"]).grid(row=0, column=6, padx=0, pady=8, sticky="w")
             remark, color = self._late_remark_text(r)
 
-            ctk.CTkLabel(row, text=remark, text_color=color, width=120).grid(row=0, column=6, padx=(0, 0), pady=8, sticky="w")
+            ctk.CTkLabel(row, text=remark, text_color=color, width=120).grid(row=0, column=7, padx=(0, 0), pady=8, sticky="w")
             row.grid_columnconfigure(7, weight=1)
 
     # ---------------- RESET ----------------
@@ -653,7 +929,12 @@ class MemberAttendance(ctk.CTkFrame):
             messagebox.showwarning("No Data", "No records to export.")
             return
 
-        selected_month = f"{self.date_picker.get_date()}_{self.to_date_picker.get_date()}"
+        from_date = self.date_picker.get_date()
+        to_date = self.to_date_picker.get_date()
+        if from_date and to_date and from_date > to_date:
+            self._show_message("From date cannot be later than To date.", "error")
+            return
+        selected_month = f"{from_date}_{to_date}"
         selected_member = str(self.user.get("full_name", "Member")).replace(" ", "_")
         file_name = f"Attendance_{selected_member}_{selected_month}.xlsx"
 
@@ -672,10 +953,16 @@ class MemberAttendance(ctk.CTkFrame):
     # ---------------- PDF ----------------
     def export_pdf(self):
         if not self.current_rows:
-            messagebox.showwarning("No Data", "No records to export.")
+            self._show_message("No records to export.", "warning")
+            # messagebox.showwarning("No Data", "No records to export.")
             return
 
-        selected_month = f"{self.date_picker.get_date()}_{self.to_date_picker.get_date()}"
+        from_date = self.date_picker.get_date()
+        to_date = self.to_date_picker.get_date()
+        if from_date and to_date and from_date > to_date:
+            self._show_message("From date cannot be later than To date.", "error")
+            return
+        selected_month = f"{from_date}_{to_date}"
         selected_member = str(self.user.get("full_name", "Member")).replace(" ", "_")
         file_name = f"Attendance_{selected_member}_{selected_month}.pdf"
 
@@ -734,18 +1021,19 @@ class MemberAttendance(ctk.CTkFrame):
             parent=styles["Normal"],
             fontName="Helvetica",
             fontSize=10,
-            leading=13,
+            leading=15,
+            leftIndent=10,
             textColor=colors.HexColor("#334155"),
         )
+        
 
         elements.append(Paragraph("Employee Attendance Report", title_style))
-        elements.append(Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", meta_style))
+        elements.append(Paragraph(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", meta_style))
         elements.append(Spacer(1, 10))
 
         info_table = Table(
             [[
                 Paragraph(
-                    f"<b><font color='#1D4ED8'>Month:</font></b> {safe_month}<br/>"
                     f"<b><font color='#1D4ED8'>Team:</font></b> {safe_team}<br/>"
                     f"<b><font color='#1D4ED8'>Employee:</font></b> {safe_member}<br/>"
                     f"<b><font color='#1D4ED8'>Employee ID:</font></b> {safe_member_id}",
@@ -753,13 +1041,13 @@ class MemberAttendance(ctk.CTkFrame):
                 ),
                 Paragraph(
                     f"<b><font color='#1D4ED8'>Month Work:</font></b> {safe_month_work}<br/>"
-                    f"<b><font color='#1D4ED8'>Actual Work:</font></b> {safe_actual_work}<br/>"
+                    f"<b><font color='#1D4ED8'>Working Days:</font></b> {safe_actual_work}<br/>"
                     f"<b><font color='#1D4ED8'>Leave:</font></b> {safe_leave}",
                     meta_style
                 ),
                 Paragraph(
                     f"<b><font color='#1D4ED8'>Month Hours:</font></b> {safe_month_hours}<br/>"
-                    f"<b><font color='#1D4ED8'>Actual Hours:</font></b> {safe_actual_hours}<br/>"
+                    f"<b><font color='#1D4ED8'>Working Hours:</font></b> {self._fmt_hours(actual_hours)}<br/>"
                     f"<b><font color='#1D4ED8'>OT Hours:</font></b> {safe_ot_hours}",
                     meta_style
                 ),
@@ -811,16 +1099,14 @@ class MemberAttendance(ctk.CTkFrame):
 
         elements.append(table)
         doc.build(elements)
-        messagebox.showinfo("Export Successful", "Attendance PDF exported successfully.")
+        self._show_message("Attendance PDF exported successfully.", "success")
+        # messagebox.showinfo("Export Successful", "Attendance PDF exported successfully.")
 
     def _export_excel(self, file_path):
         rows = self.current_rows or []
 
         if not rows:
-            messagebox.showwarning(
-                "No Data",
-                "No records to export."
-            )
+            self._show_message("No records to export.", "warning")
             return
         ot_hours = sum(self._ot_hours_from_row(r) for r in rows)
         working_days = sum(int(r.get("workdays", 0) or 0) for r in rows)
@@ -830,7 +1116,7 @@ class MemberAttendance(ctk.CTkFrame):
             from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
             from openpyxl.utils import get_column_letter
         except Exception as e:
-            messagebox.showerror("Missing Dependency", f"Cannot export Excel: {e}")
+            self._show_message(f"Missing dependency: {e}", "error")
             return
 
         try:
@@ -839,29 +1125,56 @@ class MemberAttendance(ctk.CTkFrame):
             ws = wb.active
             ws.title = "Attendance Report"
 
+            # =========================================================
+            # TITLE
+            # =========================================================
+            ws.merge_cells("A1:E1")
+
+            title_cell = ws["A1"]
+            title_cell.value = "Employee Attendance Report"
+            title_cell.font = Font(size=18, bold=True)
+            title_cell.alignment = Alignment(horizontal="center", vertical="center")
+            title_cell.fill = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+            # Border style
+            thin_border = Border(
+                left=Side(style="thin", color="000000"),
+                right=Side(style="thin", color="000000"),
+                top=Side(style="thin", color="000000"),
+                bottom=Side(style="thin", color="000000")
+            )
+
+            for row in ws["A1:E1"]:
+                for cell in row:
+                    cell.border = thin_border
+
+            ws.row_dimensions[1].height = 35
+
             # ================= EMPLOYEE INFO =================
-            ws["A1"] = "Team"
-            ws["B1"] = self.user.get("team_name") or f"Team-{self.user.get('team_id', '-') }"
-            ws["A2"] = "Employee ID"
-            ws["B2"] = str(self.user.get("employee_id") or self.user.get("id") or "-")
-            ws["A3"] = "Employee Name"
-            ws["B3"] = str(self.user.get("full_name", "Member"))
+            ws["A2"] = "Team"
+            ws["B2"] = self.user.get("team_name") or f"Team-{self.user.get('team_id', '-')}"
 
-            ws["D1"] = "Working Days"
-            ws["E1"] = working_days
-            ws["D2"] = "Working Hours"
-            ws["E2"] = working_hours
-            ws["D3"] = "OT Hours"
-            ws["E3"] = ot_hours
+            ws["A3"] = "Employee ID"
+            ws["B3"] = str(self.user.get("employee_id") or self.user.get("id") or "-")
 
+            ws["A4"] = "Employee Name"
+            ws["B4"] = str(self.user.get("full_name", "Member"))
+
+            ws["D2"] = "Working Days"
+            ws["E2"] = working_days
+
+            ws["D3"] = "Working Hours"
+            ws["E3"] =self._fmt_hours(working_hours)
+
+            ws["D4"] = "OT Hours"
+            ws["E4"] = ot_hours
             # ================= TABLE HEADER =================
-            header_row = 5
+            header_row = 6
             headers = ["Date", "Check-In", "Check-Out", "OT Hours", "Remark"]
             for col_num, header in enumerate(headers, 1):
                 cell = ws.cell(row=header_row, column=col_num)
                 cell.value = header
-                cell.font = Font(bold=True, color="FFFFFF")
-                cell.fill = PatternFill(start_color="0F172A", end_color="0F172A", fill_type="solid")
+                cell.font = Font(bold=True, color="000000")
+                cell.fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
                 cell.alignment = Alignment(horizontal="center", vertical="center")
 
             # ================= DATA ROWS =================
@@ -893,8 +1206,34 @@ class MemberAttendance(ctk.CTkFrame):
             ws.row_dimensions[1].height = 30
 
             wb.save(file_path)
-            messagebox.showinfo("Export Successful", "Attendance Excel exported successfully.")
+            self._show_message("Attendance Excel exported successfully.", "success")
         except Exception as e:
-            messagebox.showerror("Export Error", f"Excel export failed: {e}")
+            self._show_message(f"Excel export failed: {e}", "error")
+            # messagebox.showerror("Export Error", f"Excel export failed: {e}")
 
-
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
+ 
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        message_frame.place(relx=1.0, rely=0, x=-20, y=20, anchor="ne")
+ 
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+ 
+        self.after(duration, message_frame.destroy)

@@ -153,7 +153,7 @@ class LeaderSchedule(ctk.CTkFrame):
         team_id = self.user.get('team_id', '—')
         ctk.CTkLabel(
             title_row,
-            text=f"🗓  Team {team_id}  ·  WFH Schedule Manager",
+            text=f"🗓  Team {team_id}  ·  WFH / Office Schedule Manager",
             font=("Arial", 20, "bold"),
             text_color=("#1A1A1A", "#FFFFFF")
         ).pack(side="left")
