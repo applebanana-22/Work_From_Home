@@ -3,7 +3,7 @@ from database import Database
 from tkinter import messagebox
 from tkcalendar import DateEntry  # Required for calendar selector
 from tkinter import ttk # for calendar styling
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 from tkcalendar import Calendar
 import calendar
 
@@ -18,10 +18,9 @@ class DatePickerButton(ctk.CTkFrame):
         else:
             self._date = tomorrow
 
-        # self._date = initial_date or datetime.today().date()
         self._open = False
 
-        # -------- STYLE (THIS FIXES YOUR DESIGN) --------
+        # -------- STYLE --------
         style = ttk.Style()
         style.theme_use("clam")
 
@@ -58,7 +57,7 @@ class DatePickerButton(ctk.CTkFrame):
             self,
             text=self._fmt(),
             width=170,
-            height=36,
+            height=34, # Perfectly aligned baseline height
             corner_radius=10,
             fg_color=("#EAECEE", "#1E2A3A"),
             hover_color=("#D5D8DC", "#2C3E50"),
@@ -96,10 +95,8 @@ class DatePickerButton(ctk.CTkFrame):
         )
         self.cal.pack(padx=8, pady=8)
 
-        # 🔥 SELECT IMMEDIATELY (no button)
         self.cal.bind("<<CalendarSelected>>", self._select)
 
-    # -------- FUNCTIONS --------
     def toggle(self):
         if self._open:
             self.panel.place_forget()
@@ -134,9 +131,10 @@ class DatePickerButton(ctk.CTkFrame):
         self.cal.selection_set(d)
         self.btn.configure(text=self._fmt())
 
+
 class TaskManager(ctk.CTkFrame):
     def __init__(self, master, project_id, project_name, user, back_callback):
-        super().__init__(master,fg_color="transparent")
+        super().__init__(master, fg_color="transparent")
         self.db = Database()
         self.project_id = project_id
         self.project_name = project_name
@@ -153,7 +151,7 @@ class TaskManager(ctk.CTkFrame):
         self.header_f.pack(fill="x", padx=80, pady=15)
 
         ctk.CTkButton(self.header_f, text="← Back", width=80, fg_color=("#DBDBDB", "#333333"),
-         text_color=("black", "white"),corner_radius=8,
+         text_color=("black", "white"), corner_radius=8,
          command=self.back_callback).pack(side="left", padx=10)
 
         ctk.CTkLabel(self.header_f, text=f"Project: {project_name}", 
@@ -163,13 +161,12 @@ class TaskManager(ctk.CTkFrame):
                                         font=("Arial", 18, "bold"), text_color="#10B981")
         self.overall_lbl.pack(side="right", padx=10)
 
-        #test projects's %
+        # Fetch layout status restriction details
         sql = "SELECT * FROM projects WHERE id = %s ORDER BY id DESC"
         self.db.cursor.execute(sql, (self.project_id,))
         projects = self.db.cursor.fetchone()
 
         is_complete = 1 if "100" in projects['status'] else 0
-
 
         # =========================================================
         # CONTROL WRAPPER (SEARCH + BUTTON + FORM)
@@ -199,77 +196,44 @@ class TaskManager(ctk.CTkFrame):
         self.toggle_form_btn.pack(side="left", padx=10)
 
         # =========================================================
-        # FORM (HIDDEN INITIALLY)
+        # COMBINED SHARED INLINE FORM (ADD & EDIT IN ONE PLACE)
         # =========================================================
-        self.control_f = ctk.CTkFrame(self.control_wrapper, fg_color=("#EAEAEA", "#1E1E1E"), corner_radius=12)
+        self.control_f = ctk.CTkFrame(self, fg_color=("#EAEAEA", "#1E1E1E"), corner_radius=12)
 
-        # ---------------- MAIN ROW ----------------
+        # Single Flat Row Container (Ensures layout alignment)
         form_row = ctk.CTkFrame(self.control_f, fg_color="transparent")
-        form_row.pack(fill="x", padx=15, pady=10)
+        form_row.pack(fill="x", padx=20, pady=(20, 5))
 
-        # =========================================================
-        # TASK FIELD
-        # =========================================================
-        task_container = ctk.CTkFrame(form_row, fg_color="transparent")
-        task_container.pack(side="left", padx=10, anchor="n")
-
-        task_label_row = ctk.CTkFrame(task_container, fg_color="transparent")
-        task_label_row.pack(anchor="w")
-
-        ctk.CTkLabel(task_label_row, text="Task Name", font=("Arial", 12, "bold")).pack(side="left")
-        ctk.CTkLabel(task_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
+        # --- Input 1: Task Entry Box ---
+        ctk.CTkLabel(form_row, text="Task Name", font=("Arial", 12, "bold")).pack(side="left", anchor="center")
+        ctk.CTkLabel(form_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 5), anchor="center")
         
-        # Task name
-        self.task_entry = ctk.CTkEntry(task_container, placeholder_text="Task Name", width=180)
-        self.task_entry.pack(pady=(4, 0))
+        self.task_entry = ctk.CTkEntry(form_row, placeholder_text="Task Name", width=160, height=34)
+        self.task_entry.pack(side="left", padx=(0, 15), fill="x", anchor="center")
 
-        self.task_error = ctk.CTkLabel(task_container, text="", text_color="red", font=("Arial", 12))
-        self.task_error.pack(anchor="w", pady=(2, 0))
-
-        # =========================================================
-        # DEADLINE FIELD
-        # =========================================================
-        deadline_container = ctk.CTkFrame(form_row, fg_color="transparent")
-        deadline_container.pack(side="left", padx=10, anchor="n")
-
-        ctk.CTkLabel(deadline_container, text="Deadline", font=("Arial", 12, "bold")).pack(anchor="w")
-
+        # --- Input 2: Deadline Dropdown Picker ---
+        ctk.CTkLabel(form_row, text="Deadline: ", font=("Arial", 12, "bold")).pack(side="left", padx=(0, 5), anchor="center")
         self.deadline_picker = DatePickerButton(
-            deadline_container,
+            form_row,
             initial_date=datetime.today().date() + timedelta(days=1)
         )
-        self.deadline_picker.pack(pady=(4, 0))
+        self.deadline_picker.pack(side="left", padx=(0, 15), anchor="center")
 
-        # fake spacing for alignment
-        ctk.CTkLabel(deadline_container, text="", font=("Arial", 11)).pack()
-
-        #=========================================================
-        # MEMBER FIELD
-        # =========================================================
-        member_container = ctk.CTkFrame(form_row, fg_color="transparent")
-        member_container.pack(side="left", padx=10, anchor="n")
-
-        member_label_row = ctk.CTkFrame(member_container, fg_color="transparent")
-        member_label_row.pack(anchor="w")
-
-        ctk.CTkLabel(member_label_row, text="Member", font=("Arial", 12, "bold")).pack(side="left")
-        ctk.CTkLabel(member_label_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left")
+        # --- Input 3: Team Dropdown Menu ---
+        ctk.CTkLabel(form_row, text="Member", font=("Arial", 12, "bold")).pack(side="left", anchor="center")
+        ctk.CTkLabel(form_row, text="*", text_color="red", font=("Arial", 16, "bold")).pack(side="left", padx=(0, 5), anchor="center")
 
         members = self.get_team_members()
         self.member_dropdown = ctk.CTkOptionMenu(
-            member_container,
+            form_row,
             values=members if members else ["No Member"],
-            width=180
+            width=150,
+            height=34
         )
         self.member_dropdown.set("Select Member")
-        self.member_dropdown.pack(pady=(4, 0))
+        self.member_dropdown.pack(side="left", padx=(0, 15), anchor="center")
 
-        self.member_error = ctk.CTkLabel(member_container, text="", text_color="#EF4444", font=("Arial", 11))
-        self.member_error.pack(anchor="w", pady=(2, 0))
-
-        # =========================================================
-        # ACTION BUTTON
-        # =========================================================
+        # --- Form Row Interactive Submission Button ---
         self.action_btn = ctk.CTkButton(
             form_row,
             text="Add",
@@ -281,10 +245,20 @@ class TaskManager(ctk.CTkFrame):
             text_color=("#2D3436", "#ECF0F1"),
             command=self.add_task_with_confirm
         )
-        self.action_btn.pack(pady=(24, 0))
+        self.action_btn.pack(side="left", anchor="center")
+
+        # --- Inline Error Diagnostic Outputs ---
+        error_row = ctk.CTkFrame(self.control_f, fg_color="transparent")
+        error_row.pack(fill="x", padx=20, pady=(0, 15))
+
+        self.task_error = ctk.CTkLabel(error_row, text="", text_color="red", font=("Arial", 11))
+        self.task_error.pack(side="left", padx=(80, 0))
+
+        self.member_error = ctk.CTkLabel(error_row, text="", text_color="#EF4444", font=("Arial", 11))
+        self.member_error.pack(side="left", padx=(360, 0))
 
         # =========================================================
-        # TASK LIST
+        # TASK CARDS SCROLL LIST FRAME
         # =========================================================
         self.list_frame = ctk.CTkScrollableFrame(
             self,
@@ -293,22 +267,49 @@ class TaskManager(ctk.CTkFrame):
         )
         self.list_frame.pack(fill="both", expand=True, padx=80, pady=10)
 
-        # =========================================================
-        # INITIAL LOAD
-        # =========================================================
         self.refresh_tasks()
 
 
-    # Toggle Form
+    # --- Toast Message Box Logic ---
+    def _show_message(self, message, message_type="info", duration=3000):
+        if message_type == "error":
+            bg_color = "#E74C3C"
+        elif message_type == "warning":
+            bg_color = "#F39C12"
+        elif message_type == "success":
+            bg_color = "#27AE60"
+        else:
+            bg_color = "#3498DB"
+         
+        message_frame = ctk.CTkFrame(
+            self.winfo_toplevel(),
+            fg_color=bg_color,
+            corner_radius=8
+        )
+        message_frame.place(relx=1.0, rely=0, x=-20, y=70, anchor="ne")
+         
+        ctk.CTkLabel(
+            message_frame,
+            text=message,
+            text_color="white",
+            font=("Arial", 12, "bold"),
+            wraplength=250
+        ).pack(padx=15, pady=10)
+         
+        self.after(duration, message_frame.destroy)
+
+
     def toggle_form(self):
         if self.form_visible:
             self.reset_form()
             self.control_f.pack_forget()
             self.form_visible = False
             self.toggle_form_btn.configure(text="+ Add Task")
-
         else:
-            self.control_f.pack(fill="x", padx=20, pady=5)
+            self.list_frame.pack_forget()
+            self.control_f.pack(fill="x", padx=80, pady=5)
+            self.list_frame.pack(fill="both", expand=True, padx=80, pady=10)
+            
             self.form_visible = True
             self.toggle_form_btn.configure(text="✖ Close")
             self.set_mode("add")
@@ -326,7 +327,6 @@ class TaskManager(ctk.CTkFrame):
                 hover_color="#059669",
                 command=self.add_task_with_confirm
             )
-
         elif mode == "edit":
             self.action_btn.configure(
                 text="Update",
@@ -336,22 +336,14 @@ class TaskManager(ctk.CTkFrame):
             )
 
     def reset_form(self):
-
-        # reset mode
         self.mode = "add"
         self.editing_task_id = None
         self.task_error.configure(text="")
         self.member_error.configure(text="")
-
-        # clear fields
         self.task_entry.delete(0, "end")
-
         self.member_dropdown.set("Select Member")
-
         tomorrow = datetime.today().date() + timedelta(days=1)
         self.deadline_picker.set_date(tomorrow)
-
-
 
     def get_team_members(self):
         try:
@@ -398,115 +390,39 @@ class TaskManager(ctk.CTkFrame):
 
                 is_complete = 1 if row['progress'] == 100 else 0
 
-                # Edit Button (Orange Style)
+                # Edit Button (Triggers your original inline loading sequence!)
                 ctk.CTkButton(actions_f, text="Edit", state = "disabled" if is_complete else "normal", width=60, height=30,
-                              fg_color="#F39C12" if not is_complete else "grey", hover_color="#D35400", font=("Arial", 12),text_color=("#2D3436", "#ECF0F1"),
+                              fg_color="#F39C12" if not is_complete else "grey", hover_color="#D35400", font=("Arial", 12), text_color=("#2D3436", "#ECF0F1"),
                               command=lambda r=row: self.start_edit_task(r)).pack(side="left", padx=5)
 
-                # Delete Button (Red Style)
+                # Delete Button
                 ctk.CTkButton(actions_f, text="Delete", state = "disabled" if is_complete else "normal", width=60, height=30,
-                              fg_color="#C0392B" if not is_complete else "grey", hover_color="#A93226",text_color=("#2D3436", "#ECF0F1"),
+                              fg_color="#C0392B" if not is_complete else "grey", hover_color="#A93226", text_color=("#2D3436", "#ECF0F1"),
                               command=lambda tid=row['id']: self.delete_task_with_confirm(tid)).pack(side="left", padx=5)
                 
-                
+                # History Button
                 ctk.CTkButton(actions_f, text="History", width=60, height=30,
-                                fg_color="#2980B9",text_color=("#2D3436", "#ECF0F1"),
+                                fg_color="#2980B9", text_color=("#2D3436", "#ECF0F1"),
                                 command=lambda tid=row['id']: self.view_history(tid)).pack(side="left", padx=5)
                 
-            
             self.calculate_project_progress()
-        except Exception as e: print(f"Refresh Error: {e}")
-
-    def open_edit_dialog(self, task_row):
-        """Fixed: Popup window to edit Name, Deadline, and Member (Progress removed)"""
-        edit_win = ctk.CTkToplevel(self)
-        edit_win.title("Edit Task")
-        edit_win.geometry("350x480") # Adjusted height
-        edit_win.attributes("-topmost", True)
-        edit_win.grab_set()
-
-        ctk.CTkLabel(edit_win, text="Update Task Details", font=("Arial", 16, "bold")).pack(pady=15)
-
-        # 1. Edit Task Name
-        task_name_row = ctk.CTkFrame(edit_win, fg_color="transparent")
-        task_name_row.pack(fill="x", padx=40, pady=(15, 10))
-
-        ctk.CTkLabel(task_name_row, text="Task Name:").pack(side="left")
-        name_ent = ctk.CTkEntry(task_name_row, placeholder_text="Task Name", width=170, height=30)
-        name_ent.insert(0, task_row['task_name'])
-        name_ent.pack(side="right")
-
-        # 2. Reassign Member
-        assign_row = ctk.CTkFrame(edit_win, fg_color="transparent")
-        assign_row.pack(fill="x", padx=40, pady=(15, 10))
-
-        ctk.CTkLabel(assign_row, text="Assign To:").pack(side="left")
-        members = self.get_team_members()
-        member_var = ctk.StringVar(value=task_row['assigned_to'])
-        member_dropdown = ctk.CTkOptionMenu(assign_row, values=members, variable=member_var, width=170)
-        member_dropdown.pack(side="right", padx=40)
-
-        # 3. Edit Deadline
-        deadline_row = ctk.CTkFrame(edit_win, fg_color="transparent")
-        deadline_row.pack(fill="x", padx=40, pady=(15, 10))
-
-        ctk.CTkLabel(deadline_row, text="Deadline").pack(side="left")
-
-        try:
-            initial_deadline = datetime.strptime(str(task_row['deadline']), "%Y-%m-%d").date()
-        except:
-            initial_deadline = datetime.today().date() 
-
-        self.deadline_picker = DatePickerButton(deadline_row, initial_date=initial_deadline)
-        self.deadline_picker.pack(side="right")
-
-        def save_changes():
-            try:
-                new_name = name_ent.get().strip() or task_row['task_name']
-                new_member = member_var.get()
-                #new_date = new_cal.get_date().strftime('%Y-%m-%d')
-                new_date = self.deadline_picker.get_date().strftime('%Y-%m-%d')
-                
-                # SQL UPDATE: Progress (%s) removed from here
-                sql = """
-                    UPDATE tasks 
-                    SET task_name=%s, deadline=%s, assigned_to=%s 
-                    WHERE id=%s
-                """
-                self.db.cursor.execute(sql, (
-                    new_name, 
-                    new_date, 
-                    new_member, 
-                    task_row['id']
-                ))
-                
-                self.db.conn.commit()
-                
-                # Refresh main task screen
-                self.refresh_tasks() 
-                edit_win.destroy()
-                messagebox.showinfo("Success", "Task updated successfully!")
-                
-            except Exception as e:
-                messagebox.showerror("Update Error", str(e))
-        ctk.CTkButton(edit_win, text="Save Changes", command=save_changes, 
-                      fg_color="#10B981", hover_color="#059669").pack(pady=25)
+        except Exception as e: 
+            self._show_message(f"Refresh Error: {e}", "error")
 
     def start_edit_task(self, row):
+        """SUCCESSFULLY RESTORED INLINE LOGIC MODE CHANGING CODE ✅"""
         self.task_error.configure(text="")
         self.member_error.configure(text="")
 
         if not self.form_visible:
             self.toggle_form()
 
+        # Switches button function mappings over to update queries instead
         self.set_mode("edit", row["id"])
 
-        # self.mode = "edit"
-        # self.editing_task_id = row["id"]
-
+        # Inject existing database variables clean back into your inline view inputs
         self.task_entry.delete(0, "end")
         self.task_entry.insert(0, row["task_name"])
-
         self.member_dropdown.set(row["assigned_to"])
 
         try:
@@ -516,11 +432,9 @@ class TaskManager(ctk.CTkFrame):
         
         self.deadline_picker.set_date(d)
 
-
     def save_edit_task(self):
         self.task_error.configure(text="")
         self.member_error.configure(text="")
-
         try:
             name = self.task_entry.get().strip()
             member = self.member_dropdown.get()
@@ -531,38 +445,22 @@ class TaskManager(ctk.CTkFrame):
                 self.task_error.configure(text="Please enter task name")
                 has_error = True
             
-            if member == "Select Member" or member == "No Member":
-                self.member_error.configure(text = "Please select a member")
+            if member in ["Select Member", "No Member"]:
+                self.member_error.configure(text="Please select a member")
                 has_error = True
 
-            if has_error:
-                return
+            if has_error: return
 
-            sql = """
-                UPDATE tasks
-                SET task_name=%s,
-                    assigned_to=%s,
-                    deadline=%s
-                WHERE id=%s
-            """
-
-            self.db.cursor.execute(sql, (
-                name,
-                member,
-                deadline,
-                self.editing_task_id
-            ))
-
+            sql = "UPDATE tasks SET task_name=%s, assigned_to=%s, deadline=%s WHERE id=%s"
+            self.db.cursor.execute(sql, (name, member, deadline, self.editing_task_id))
             self.db.conn.commit()
+            
             self.refresh_tasks()
             self.reset_form()
             self.toggle_form()
-
-            messagebox.showinfo("Success", "Task updated successfully!")
-
+            self._show_message("Task updated successfully!", "success")
         except Exception as e:
-            messagebox.showerror("Update Error", str(e))
-            
+            self._show_message(f"Update Error: {str(e)}", "error")
 
     def calculate_project_progress(self):
         try:
@@ -584,39 +482,28 @@ class TaskManager(ctk.CTkFrame):
         member = self.member_dropdown.get()
         deadline = self.deadline_picker.get_date().strftime('%Y-%m-%d')
         
-        # if not name or member in ["Select Member", "No Member"]:
-        #     messagebox.showwarning("Missing Info", "Enter task name and select a member.")
-        #     return
-        
         has_error = False
-
         if not name:
             self.task_error.configure(text="Task name is required")
             has_error = True
 
-        if member == "Select Member" or member == "No Member":
+        if member in ["Select Member", "No Member"]:
             self.member_error.configure(text="Please select member")
             has_error = True
 
-        # If there are errors, show all at once
-        if has_error:
-            # messagebox.showwarning(
-            #     "Missing Fields",
-            #     "\n".join(errors),
-            #     parent=self
-            # )
-            return
+        if has_error: return
 
         if messagebox.askyesno("Confirm", f"Do you want to assign task '{name}' to {member} with a deadline of {deadline}?", parent=self):
             try:
                 sql = "INSERT INTO tasks (project_id, task_name, assigned_to, deadline, progress) VALUES (%s, %s, %s, %s, 0)"
                 self.db.cursor.execute(sql, (self.project_id, name, member, deadline))
                 self.db.conn.commit()
-                self.task_entry.delete(0, 'end')
                 self.refresh_tasks()
                 self.reset_form()
                 self.toggle_form()
-            except Exception as e: messagebox.showerror("Database Error", str(e), parent=self)
+                self._show_message("Task added successfully!", "success")
+            except Exception as e: 
+                self._show_message(f"Database Error: {e}", "error")
 
     def delete_task_with_confirm(self, task_id):
         if messagebox.askyesno("Confirm Delete", "Permanently delete this task?", parent=self): 
@@ -624,91 +511,63 @@ class TaskManager(ctk.CTkFrame):
                 self.db.cursor.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
                 self.db.conn.commit()
                 self.refresh_tasks()
-            except Exception as e: messagebox.showerror("Error", str(e), parent=self)
+                self._show_message("Task deleted completely.", "success")
+            except Exception as e: 
+                self._show_message(f"Error: {e}", "error")
         
     def view_history(self, task_id):
         win = ctk.CTkToplevel(self)
         win.title("Progress History")
-        width = 500
-        height = 400
+        width, height = 500, 400
 
         screen_width = win.winfo_screenwidth()
         screen_height = win.winfo_screenheight()
-
         x = int((screen_width / 2) - (width / 2))
         y = int((screen_height / 2) - (height / 2))
-
         win.geometry(f"{width}x{height}+{x}+{y}")
         
-        # ✅ IMPORTANT FIX
         win.transient(self)
         win.lift()
         win.attributes("-topmost", True)
         win.grab_set()
         
-        ctk.CTkLabel(win, text="📊 Progress History", 
-                    font=("Arial", 18, "bold")).pack(pady=10)
+        ctk.CTkLabel(win, text="📊 Progress History", font=("Arial", 18, "bold")).pack(pady=10)
 
         try:
             self.db.cursor.execute("""
-            SELECT *
-            FROM progress_history 
-            WHERE task_id = %s
-            ORDER BY update_date DESC
+                SELECT * FROM progress_history 
+                WHERE task_id = %s ORDER BY update_date DESC
             """, (task_id,))   
-
             rows = self.db.cursor.fetchall()
 
             frame = ctk.CTkScrollableFrame(win)
             frame.pack(fill="both", expand=True, padx=10, pady=10)      
 
-            # NAME (MOVE HERE)
             if rows:
                 member_name = rows[0]["member_name"]
                 if member_name:
-                    ctk.CTkLabel(win, text=f"👤 {member_name}",
-                        font=("Arial", 14, "bold")).pack(pady=(0,10))
-
+                    ctk.CTkLabel(win, text=f"👤 {member_name}", font=("Arial", 14, "bold")).pack(pady=(0,10))
           
-            # Header
             header = ctk.CTkFrame(frame, fg_color="transparent")
             header.pack(fill="x", padx=15, pady=(5,5))
 
-            ctk.CTkLabel(header, text="Date", width=120,
-                        font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(header, text="Date", width=120, font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(header, text="Progress", width=80, font=("Arial", 13, "bold")).pack(side="left")
+            ctk.CTkLabel(header, text="Note", font=("Arial", 13, "bold")).pack(side="left")
 
-            ctk.CTkLabel(header, text="Progress", width=80,
-                        font=("Arial", 13, "bold")).pack(side="left")
-
-            ctk.CTkLabel(header, text="Note",
-                        font=("Arial", 13, "bold")).pack(side="left")
-
-
-            # Divider
             ctk.CTkFrame(frame, height=2, fg_color="gray").pack(fill="x", padx=15, pady=5)
 
-
-            # Rows
             if not rows:
                 ctk.CTkLabel(frame, text="No history yet", font=("Arial", 18, "bold")).pack(pady=20)
             else:
                 for i, record in enumerate(rows):
                     bg = "#2b2b2b" if i % 2 == 0 else "transparent"
-
                     row = ctk.CTkFrame(frame, fg_color=bg)
                     row.pack(fill="x", padx=15, pady=2)
 
-                    # Date
-                    ctk.CTkLabel(row, text=str(record["update_date"]), width=120,
-                                anchor="w").pack(side="left")
-
-                    # Progress
-                    ctk.CTkLabel(row, text=f'{record["progress"]}%', width=80,
-                                anchor="w").pack(side="left")
-
-                    # Note
+                    ctk.CTkLabel(row, text=str(record["update_date"]), width=120, anchor="w").pack(side="left")
+                    ctk.CTkLabel(row, text=f'{record["progress"]}%', width=80, anchor="w").pack(side="left")
                     note_text = record["note"] if record["note"] else "-"
-                    ctk.CTkLabel(row, text=note_text,
-                                anchor="w").pack(side="left")               
+                    ctk.CTkLabel(row, text=note_text, anchor="w").pack(side="left")               
         except Exception as e:
-            print("History Error:", e)
+            self._show_message(f"History tracking failure: {e}", "error")

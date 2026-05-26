@@ -201,28 +201,6 @@ class MemberDashboard(ctk.CTkFrame):
         self.load_team_data()
         # Frequency increased to 5 seconds to ensure Location changes (WFH/Office) feel real-time
         self._after_id = self.after(5000, self.auto_refresh)
-
-    # def refresh_stats(self):
-    #     try:
-    #         self.db.cursor.execute(
-    #             "SELECT COUNT(*) as total, SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active "
-    #             "FROM users WHERE team_id = %s AND role != 'leader'", (self.user['team_id'],)
-    #         )
-    #         stats_res = self.db.cursor.fetchone()
-    #         team_size, active_count = stats_res['total'] or 0, stats_res['active'] or 0
-
-    #         for w in self.stats_container.winfo_children(): w.destroy()
-            
-    #         card_data = [
-    #             {"title": "Team Size", "value": str(team_size), "color": "#3498DB"},
-    #             {"title": "Active Tasks", "value": "0", "color": "#10B981"},
-    #             {"title": "Urgent OT", "value": "0", "color": "#E74C3C"},
-    #             {"title": "On Duty", "value": f"{active_count}/{team_size}", "color": "#F39C12"}
-    #         ]
-    #         for item in card_data:
-    #             card = self.create_card(self.stats_container, item['title'], item['value'], item['color'])
-    #             card.pack(side="left", padx=(0, 20), expand=True, fill="both")
-    #     except Exception as e: print(f"Stats Refresh Error: {e}")
     
     def refresh_stats(self):
         try:

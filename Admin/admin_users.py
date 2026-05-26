@@ -108,6 +108,9 @@ class UserRegisterFrame(ctk.CTkFrame):
         self.pwd_err = ctk.CTkLabel(self.f, text="", text_color="#D32F2F", font=("Arial", 10))
         self.pwd_err.grid(row=3, column=3, padx=self._entry_padx, pady=(0, 10), sticky="w")
 
+    
+        
+        
         # 5. Role Selection
         role_label_frame = ctk.CTkFrame(self.f, fg_color="transparent")
         role_label_frame.grid(row=4, column=0, padx=15, pady=10, sticky="e")
@@ -208,167 +211,155 @@ class UserRegisterFrame(ctk.CTkFrame):
             self.batch_err.grid(row=7, column=1, padx=self._entry_padx, pady=(0, 10), sticky="w")
         # 'admin' remains with them hidden
 
-    def validate_inputs(self):
+    
+
+    def save_user(self):
+        # 1. Gather all inputs
         full_name = self.name.get().strip()
         username = self.uname.get().strip()
         password = self.pwd.get().strip()
         role_val = self.role.get()
         batch_val = self.batch.get().strip()
+        team_val = self.team_dropdown.get()
 
-        if not all([full_name, username, password]): 
-            return False, "All core fields are required!"
-        if full_name.isdigit():
-            return False, "Full Name cannot be numeric."
-        if len(full_name) < 2:
-            return False, "Full Name is too short."
-        if username.isdigit():
-            return False, "User Name cannot be numeric."
-        if " " in username:
-            return False, "Username cannot contain spaces."
-        if len(username) < 4:
-            return False, "Username must be at least 4 characters."
-        if len(password) < 6:
-            return False, "Password must be at least 6 characters long."
-        if not re.search(r"[A-Z]", password) or not re.search(r"[a-z]", password) or not re.search(r"\d", password):
-            return False, "Password must contain uppercase, lowercase, and a number."
-        if len(password) > 20:
-            return False, "Password is too long."
-        if role_val == "Choose Role":
-            return False, "Please select a valid User Role."
-        if role_val != "admin":
-            if self.team_dropdown.get() == "Choose Team":
-                return False, "Please select a valid Team."
-       
-        batch_val = self.batch.get().strip()
- 
-        # 1. Basic empty check for core fields
-        if not all([full_name, username, password]):          
-            return False, "All fields are required!"
- 
-        # ... (other validations)
- 
-        # 2. Batch format validation
-        if batch_val and not batch_val.isalnum():
-            return False, "Batch can only contain letters and numbers."
-
-        # 3. Required check for members
-        if role_val == "member" and not batch_val:
-            return False, "Batch Number is required for members."
-        return True, "Success"
-
-    def save_user(self):
-        is_valid, msg = self.validate_inputs()
-
-        # reset any previous error visuals
+        # 2. Reset previous validation visuals
         self.clear_error()
 
-        default_border = ["#979DA2", "#565B5E"]
+        # 3. Check for validations simultaneously
+        has_errors = False
 
-        if not is_valid:
-            # Handle generic required-fields case by showing per-field inline errors
-            low = msg.lower()
-            full_name = self.name.get().strip()
-            username = self.uname.get().strip()
-            password = self.pwd.get().strip()
-            role_val = self.role.get()
+        # --- Full Name Validation ---
+        if not full_name:
+            self.name_err.configure(text="Full Name is required.")
+            try: self.name.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif full_name.isdigit():
+            self.name_err.configure(text="Full Name cannot be numeric.")
+            try: self.name.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif len(full_name) < 2:
+            self.name_err.configure(text="Full Name is too short.")
+            try: self.name.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
 
-            if "all fields" in low or "core fields" in low or "required" in low:
-                if not full_name:
-                    self.name_err.configure(text="Full Name is required.")
-                    try: self.name.configure(border_color="red")
-                    except Exception: pass
-                if not username:
-                    self.uname_err.configure(text="Username is required.")
-                    try: self.uname.configure(border_color="red")
-                    except Exception: pass
-                if not password:
-                    self.pwd_err.configure(text="Password is required.")
-                    try: self.pwd.configure(border_color="red")
-                    except Exception: pass
-                if role_val == "Choose Role":
-                    self.role_err.configure(text="Please select a valid User Role.")
-                    try: self.role.configure(border_color="red")
-                    except Exception: pass
-                if role_val != "admin" and self.team_dropdown.get() == "Choose Team":
-                    self.team_err.configure(text="Please select a valid Team.")
-                    try: self.team_dropdown.configure(border_color="red")
-                    except Exception: pass
-                if role_val == "member" and not self.batch.get().strip():
-                    self.batch_err.configure(text="Batch Number is required for members.")
-                    try: self.batch.configure(border_color="red")
-                    except Exception: pass
-                return
+        # --- Username Validation ---
+        if not username:
+            self.uname_err.configure(text="Username is required.")
+            try: self.uname.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif username.isdigit():
+            self.uname_err.configure(text="Username cannot be numeric.")
+            try: self.uname.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif " " in username:
+            self.uname_err.configure(text="Username cannot contain spaces.")
+            try: self.uname.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif len(username) < 4:
+            self.uname_err.configure(text="Username must be at least 4 characters.")
+            try: self.uname.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
 
-            # Specific validation messages -> attach to appropriate field
-            if "full name" in low:
-                self.name_err.configure(text=msg)
-                try: self.name.configure(border_color="red")
-                except Exception: pass
-                return
-            if "user name" in low or "username" in low:
-                self.uname_err.configure(text=msg)
-                try: self.uname.configure(border_color="red")
-                except Exception: pass
-                return
-            if "password" in low:
-                self.pwd_err.configure(text=msg)
+        # --- Password Validation ---
+        if not password:
+            self.pwd_err.configure(text="Password is required.")
+            try: self.pwd.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        else:
+            pwd_errors = []
+            
+            if not re.search(r"[A-Z]", password) or not re.search(r"[a-z]", password) or not re.search(r"\d", password):
+                pwd_errors.append("Password must contain uppercase, lowercase, and a number.")
+            else:
+                if len(password) > 20:
+                    pwd_errors.append("Password is too long.")
+                else:
+                    if len(password) < 6:
+                        pwd_errors.append("Password must be at least 6 characters long.")
+                
+            
+            if pwd_errors:
+                self.pwd_err.configure(text="\n".join(pwd_errors))
                 try: self.pwd.configure(border_color="red")
                 except Exception: pass
-                return
-            if "team" in low:
-                self.team_err.configure(text=msg)
-                try: self.team_dropdown.configure(border_color="red")
-                except Exception: pass
-                return
-            if "batch" in low:
-                self.batch_err.configure(text=msg)
-                try: self.batch.configure(border_color="red")
-                except Exception: pass
-                return
+                has_errors = True
 
-            # fallback to global message
-            self.error_label.configure(text=msg)
+        # --- Role Validation ---
+        if role_val == "Choose Role":
+            self.role_err.configure(text="Please select a valid User Role.")
+            try: self.role.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+
+        # --- Team Validation ---
+        if role_val != "admin" and team_val == "Choose Team":
+            self.team_err.configure(text="Please select a valid Team.")
+            try: self.team_dropdown.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+
+        # --- Batch Validation ---
+        if role_val == "member" and not batch_val:
+            self.batch_err.configure(text="Batch Number is required for members.")
+            try: self.batch.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+        elif batch_val and not batch_val.isalnum():
+            self.batch_err.configure(text="Batch can only contain letters and numbers.")
+            try: self.batch.configure(border_color="red")
+            except Exception: pass
+            has_errors = True
+
+        # If any input validations failed, stop execution here and show errors simultaneously
+        if has_errors:
             return
 
-        role_val = self.role.get()
-        # Admin gets no team, others get selected team
-        team_id = self.team_map.get(self.team_dropdown.get()) if role_val != "admin" else None
+        # 4. Process safe inputs into Database Checks
+        team_id = self.team_map.get(team_val) if role_val != "admin" else None
         
-        # Batch formatting: numeric values get Batch prefix, non-numeric values stored raw
-        batch_input = self.batch.get().strip()
-        if role_val == "member" and batch_input:
-            formatted_batch = f"Batch {batch_input}" if batch_input.isdigit() else batch_input
+        if role_val == "member" and batch_val:
+            formatted_batch = f"Batch {batch_val}" if batch_val.isdigit() else batch_val
         else:
             formatted_batch = "N/A"
 
-        # Ensure username and employee ID uniqueness only
-        self.db.cursor.execute("SELECT id FROM users WHERE username = %s", (self.uname.get().strip(),))
+        # Unique Username Check
+        self.db.cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
         if self.db.cursor.fetchone():
             self.uname_err.configure(text="Username already exists.")
             try: self.uname.configure(border_color="red")
             except Exception: pass
             return
 
+        # Unique Employee ID Check
         self.db.cursor.execute("SELECT id FROM users WHERE employee_id = %s", (self.emp_id.get().strip(),))
         if self.db.cursor.fetchone():
             self.show_error_toast("Employee ID already exists.")
             return
 
+        # 5. Database Save Operation
         try:
             sql = """INSERT INTO users (employee_id, full_name, username, password, role, team_id, batch) 
                      VALUES (%s, %s, %s, %s, %s, %s, %s)"""
             data = (
-                self.emp_id.get(), 
-                self.name.get().strip(), 
-                self.uname.get().strip(), 
-                self.pwd.get(), 
+                self.emp_id.get().strip(), 
+                full_name, 
+                username, 
+                password, 
                 role_val, 
                 team_id, 
                 formatted_batch
             )
             self.db.cursor.execute(sql, data)
             self.db.conn.commit()
-            self.show_success_toast(f"User {self.name.get()} created successfully!")
+            self.show_success_toast(f"User {full_name} created successfully!")
             self.back_callback()
         except Exception as e:
             self.show_error_toast("Database Error", str(e))
@@ -623,70 +614,86 @@ class UserUpdateFrame(ctk.CTkFrame):
             full_name = self.name.get().strip()
             username = self.uname.get().strip()
 
+            # 1. Reset all previous validation visuals
             self.clear_error()
 
+            # 2. Variable to track if any validation fails
+            has_errors = False
+
+            # --- Full Name Validation ---
             if not full_name:
                 self.name_err.configure(text="Full Name is required.")
                 try: self.name.configure(border_color="red")
                 except Exception: pass
-                return
-            if full_name.isdigit():
+                has_errors = True
+            elif full_name.isdigit():
                 self.name_err.configure(text="Full Name cannot be numeric.")
-                try: self.name.configure(border_color="red" ,)
+                try: self.name.configure(border_color="red")
                 except Exception: pass
-                return
-            if len(full_name) < 2:
+                has_errors = True
+            elif len(full_name) < 2:
                 self.name_err.configure(text="Full Name is too short.")
                 try: self.name.configure(border_color="red")
                 except Exception: pass
-                return
+                has_errors = True
 
+            # --- Username Validation ---
             if not username:
                 self.uname_err.configure(text="Username is required.")
                 try: self.uname.configure(border_color="red")
                 except Exception: pass
-                return
-            if username.isdigit():
+                has_errors = True
+            elif username.isdigit():
                 self.uname_err.configure(text="Username cannot be numeric.")
                 try: self.uname.configure(border_color="red")
                 except Exception: pass
-                return
-            if " " in username:
+                has_errors = True
+            elif " " in username:
                 self.uname_err.configure(text="Username cannot contain spaces.")
                 try: self.uname.configure(border_color="red")
                 except Exception: pass
-                return
-            if len(username) < 4:
+                has_errors = True
+            elif len(username) < 4:
                 self.uname_err.configure(text="Username must be at least 4 characters.")
                 try: self.uname.configure(border_color="red")
                 except Exception: pass
-                return
+                has_errors = True
 
+            # --- Role Validation ---
             if role not in ["admin", "leader", "member"]:
                 self.role_err.configure(text="Please select a valid User Role.")
                 try: self.role.configure(border_color="red")
                 except Exception: pass
-                return
+                has_errors = True
 
+            # --- Team Validation ---
             if role != "admin":
                 if team_name == "Select Team" or team_name not in self.team_map:
                     self.team_err.configure(text="Please select a valid Team.")
                     try: self.team_dropdown.configure(border_color="red")
                     except Exception: pass
-                    return
+                    has_errors = True
 
+            # --- Batch Validation ---
             if role == "member":
                 if not batch_input:
                     self.batch_err.configure(text="Batch Number is required for members.")
                     try: self.batch.configure(border_color="red")
                     except Exception: pass
-                    return
+                    has_errors = True
+            
             if batch_input and not batch_input.isalnum():
                 self.batch_err.configure(text="Batch can only contain letters and numbers.")
                 try: self.batch.configure(border_color="red")
                 except Exception: pass
+                has_errors = True
+
+            # 3. STOP here if any input errors were found simultaneously
+            if has_errors:
                 return
 
+            # --- Database Uniqueness Check ---
+            # (Only runs if the text inputs themselves are fundamentally valid strings)
             self.db.cursor.execute("SELECT id FROM users WHERE username = %s AND id != %s", (username, self.user_id))
             if self.db.cursor.fetchone():
                 self.uname_err.configure(text="Username already exists.")
@@ -694,11 +701,13 @@ class UserUpdateFrame(ctk.CTkFrame):
                 except Exception: pass
                 return
 
+            # 4. Formulate values and update
             team_id = self.team_map.get(team_name) if role != "admin" else None
             if role == "member" and batch_input:
                 batch_val = f"Batch {batch_input}" if batch_input.isdigit() else batch_input
             else:
                 batch_val = "N/A"
+                
             sql = """
             UPDATE users 
             SET full_name=%s, username=%s, role=%s, team_id=%s, batch=%s 

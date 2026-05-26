@@ -259,7 +259,7 @@ class MemberSchedule(ctk.CTkFrame):
             border_color=("#D5D8DC", "#1E2A3A"),
         )
         self.scroll.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-        self.refresh_view()
+        self.refresh_view(show_toast=False)
 
     def _show_message(self, message, message_type="info", duration=3000):
         if message_type == "error":

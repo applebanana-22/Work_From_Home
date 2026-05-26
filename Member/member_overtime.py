@@ -977,7 +977,7 @@ class MemberOvertime(ctk.CTkFrame):
                     
                     ctk.CTkLabel(
                         reason_frame,
-                        text="💬 Leader's Request:",
+                        text=f"💬 Request Content :",
                         font=("Arial", 11, "bold"),
                         text_color=("#F39C12", "#F39C12")
                     ).pack(anchor="w", padx=10, pady=(5, 0))

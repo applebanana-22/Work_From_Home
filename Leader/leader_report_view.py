@@ -988,7 +988,7 @@ class LeaderReportView(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             if not rows:
-                self._show_message("No reports found.", "info")
+                self._show_message("No reports found.", "error")
                 return
 
             file_path = filedialog.asksaveasfilename(
@@ -1307,7 +1307,7 @@ class LeaderReportView(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             if not rows:
-                self._show_message("No reports found.", "info")
+                self._show_message("No reports found.", "error")
                 return
 
             file_path = filedialog.asksaveasfilename(

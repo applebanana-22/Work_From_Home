@@ -180,24 +180,6 @@ class Database:
         except Exception as e:
             print(f"DB Status Update Error: {e}")
             
-    # def insert_reply(self, announcement_id, user, message):
-    #     """
-    #     Insert a reply into the announcement_replies table.
-    #     """
-    #     try:
-    #         query = """
-    #             INSERT INTO announcement_replies
-    #             (announcement_id, message, created_by, created_at)
-    #             VALUES (%s, %s, %s, NOW())
-    #         """
-    #         self.cursor.execute(
-    #             query,
-    #             (announcement_id, message, user['full_name'])
-    #         )
-    #         self.conn.commit()
-    #     except Exception as e:
-    #         self.conn.rollback()
-    #         raise e
     
     def insert_reply(self, announcement_id, user, reply_text):
         self.cursor.execute("""

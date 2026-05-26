@@ -425,13 +425,11 @@ class AdminAttendance(ctk.CTkFrame):
         )
 
     def _open_checkin_editor(self, row, parent_card):
-        
         raw_value = row.get("check_in")
  
         # do not open editor if check_in is null
         if raw_value is None:
             return
-
         # destroy old editor widgets safely
         for widget in parent_card.grid_slaves(row=0, column=1):
             try:
@@ -670,43 +668,66 @@ class AdminAttendance(ctk.CTkFrame):
     #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
 
 
-    def _total_hours_between_checkin_checkout(self, row):
-        
+    def _total_hours_between_checkin_checkout(self, row, ot_accepted=True):
         check_in = self._to_time(row.get("check_in"))
-
         if check_in is None:
             return 0.0
 
         row_date = row.get("attendance_date")
-
-        # mysql date convert
         if isinstance(row_date, str):
             row_date = datetime.strptime(row_date, "%Y-%m-%d").date()
         elif hasattr(row_date, "date"):
             row_date = row_date.date()
 
+        if row_date.weekday() < 5:
+            if check_in < dt_time(7, 45):
+                check_in = dt_time(7, 45)
         today = datetime.today().date()
+
+        # ==================================
+        # TODAY SPECIAL LOGIC
+        # ==================================
+        if row_date == today:
+
+            # actual checkout from DB
+            actual_checkout = self._to_time(row.get("check_out"))
+
+            # employee already checked out
+            if actual_checkout is not None:
+                check_out = actual_checkout
+
+            else:
+                cutoff_dt = datetime.combine(today, dt_time(16, 30))
+
+                # before 4:30 PM
+                if datetime.now() < cutoff_dt:
+                    return 0.0
+
+                # after 4:30 PM use effective checkout
+                check_out = self._effective_checkout_time(row)
+
+        else:
+            # old dates
+            check_out = self._effective_checkout_time(row)
 
         check_out = self._to_time(row.get("check_out"))
 
-        # =========================
-        # TODAY ONLY
-        # =========================
-        if row_date == today:
+        # 1. Handle missing checkout fallback first
+        if check_out is None:
+            check_out = dt_time(16, 30)
 
-            cutoff_dt = datetime.combine(today, dt_time(16, 30))
-
-            # before 4:30 and NO checkout
-            if check_out is None and datetime.now() < cutoff_dt:
-                return 0.0
-
-        # final checkout logic
-        effective_checkout = self._effective_checkout_time(row)
+        # 2. If OT is NOT accepted, cap the checkout time at 16:30
+        if not ot_accepted:
+            # min() ensures:
+            # - if check_out is 17:30 -> drops to 16:30
+            # - if check_out is 15:00 -> stays 15:00
+            check_out = min(check_out, dt_time(16, 30))
 
         start_dt = datetime.combine(row_date, check_in)
-        end_dt = datetime.combine(row_date, effective_checkout)
+        end_dt = datetime.combine(row_date, check_out)
 
         return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
+    
     # def _total_hours_between_checkin_checkout(self, row):
         
     #     check_in = self._to_time(row.get("check_in"))
@@ -791,8 +812,23 @@ class AdminAttendance(ctk.CTkFrame):
     #     return max((end_dt - start_dt).total_seconds() / 3600.0, 0.0)
 
     def _stacked_hours_from_row(self, row):
-        total_hours = self._total_hours_between_checkin_checkout(row)
+        # 1. Check if OT is accepted for this specific row record
+        try:
+            db_ot_hours = float(row.get("ot_hours") or 0.0)
+        except (TypeError, ValueError):
+            db_ot_hours = 0.0
+            
+        ot_accepted = db_ot_hours > 0
+
+        # 2. If OT is NOT accepted, stacked hours MUST be 0.00
+        if not ot_accepted:
+            return 0.00
+
+        # 3. Otherwise, calculate stacked hours normally
+        # Make sure to pass ot_accepted here too so total_hours caps at 16:30!
+        total_hours = self._total_hours_between_checkin_checkout(row, ot_accepted)
         return max(total_hours - 8.75, 0.00)
+
 
     def _ot_hours_from_row(self, row):
         try:
@@ -1024,8 +1060,22 @@ class AdminAttendance(ctk.CTkFrame):
             int(r.get("workdays", 0) or 0)
             for r in rows
         )
-        total_ot_hours = sum(self._ot_hours_from_row(r) for r in rows)
-        actual_hours = sum(self._actual_hours_from_row(r) for r in rows)
+        total_ot_hours = 0.0
+        actual_hours = 0.0
+
+        # --- FIX: ACCURATE DYNAMIC RECALCULATION LOOP ---
+        for r in rows:
+            try:
+                db_ot_hours = float(r.get("ot_hours") or 0.0)
+            except (TypeError, ValueError):
+                db_ot_hours = 0.0
+
+            # Determine strict confirmation boolean
+            ot_accepted = db_ot_hours > 0
+            total_ot_hours += self._ot_hours_from_row(r)
+
+            # Calculate actual working hours using the verified status block
+            actual_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
         actual_hours_with_ot = actual_hours + total_ot_hours
         late_days = sum(int(r.get("is_late", 0) or 0) for r in rows)
         month_workdays = int(self.month_total_workdays or 0) if str(self.month_total_workdays).isdigit() else 0
@@ -1174,16 +1224,23 @@ class AdminAttendance(ctk.CTkFrame):
         for row in rows:
             card = ctk.CTkFrame(scroll, fg_color=("#EEF2F7", "#1F2933"), corner_radius=10)
             card.pack(fill="x", pady=4, padx=4)
+            # --- FIX: STRICT OT ACCEPTED CHECK ---
+            try:
+                db_ot_hours = float(row.get("ot_hours") or 0.0)
+            except (TypeError, ValueError):
+                db_ot_hours = 0.0
+
+            ot_accepted = db_ot_hours > 0
 
             date_value = self._dash(row["attendance_date"])
             check_in_value = self._dash(row["check_in"])
             check_out_value = self._dash(row["check_out"])
-            total_hours = self._total_hours_between_checkin_checkout(row)
+            total_hours = self._total_hours_between_checkin_checkout(row, ot_accepted)
             stacked_hours = self._stacked_hours_from_row(row)
-            ot_value = self._ot_hours_from_row(row)
+            ot_total = self._ot_hours_from_row(row)
             remark, remark_color = self._late_remark_text(row)
-            ot_hours = self._ot_hours_from_row(row)
-            ot_accepted = ot_hours > 0
+            # ot_hours = self._ot_hours_from_row(row)
+            # ot_accepted = ot_hours > 0
 
             date = row.get("attendance_date")
 
@@ -1209,7 +1266,7 @@ class AdminAttendance(ctk.CTkFrame):
             ctk.CTkLabel(card, text=self.decimal_to_hhmm(stacked_hours), width=130, anchor="w").grid(row=0, column=4, padx=0, pady=8, sticky="w")
             ctk.CTkLabel(
                 card,
-                text=self.decimal_to_hhmm(ot_value),
+                text=self.decimal_to_hhmm(ot_total),
                 width=120,
                 text_color=self.metric_colors["ot"]
             ).grid(row=0, column=5, padx=0, pady=8, sticky="w")
@@ -1243,7 +1300,7 @@ class AdminAttendance(ctk.CTkFrame):
         context = self._detail_export_context or {}
         rows = context.get("rows", [])
         if not rows:
-            self._show_message("No records to export.", "warning")
+            self._show_message("No records to export.", "error")
             return
 
         user_id = context.get("user_id")
@@ -1281,8 +1338,24 @@ class AdminAttendance(ctk.CTkFrame):
             meta_style = ParagraphStyle("DetailMeta", parent=styles["Normal"], fontName="Helvetica", fontSize=10, leading=13,leftIndent=10, textColor=colors.HexColor("#334155"))
 
             user_workdays = sum(int(r.get("workdays", 0) or 0) for r in rows)
+            
+            # =================================================================
+            # 🛠️ FIX: ALIGN PDF SUMMARY TOTAL HOURS LOGIC WITH DASHBOARD UI 🛠️
+            # =================================================================
+            actual_hours = 0.0
+            for r in rows:
+                try:
+                    row_ot_val = float(r.get("ot_hours") or 0.0)
+                except (TypeError, ValueError):
+                    row_ot_val = 0.0
+                
+                # Check if OT was accepted for this entry
+                ot_accepted = row_ot_val > 0
+                
+                # Apply your safe dashboard compliance capping rules row-by-row
+                actual_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
+
             total_ot_hours = sum(self._ot_hours_from_row(r) for r in rows)
-            actual_hours = sum(self._actual_hours_from_row(r) for r in rows)
             actual_hours_with_ot = actual_hours + total_ot_hours
             team_label = context.get("team_name") or self._saved_filters.get("team", "All Teams")
             safe_team_label = escape(str(team_label))
@@ -1298,7 +1371,6 @@ class AdminAttendance(ctk.CTkFrame):
             safe_actual_work = escape(f"{user_workdays:g}")
             safe_leave = escape(f"{leave_days:g}")
             safe_month_hours = escape(f"{self._month_hours_from_workdays(month_workdays)}")
-            safe_actual_hours = escape(f"{actual_hours_with_ot:g}")
             safe_ot_hours = escape(self._fmt_hours(total_ot_hours))
 
             elements.append(Paragraph("Employee Attendance Detail Report", title_style))
@@ -1321,7 +1393,7 @@ class AdminAttendance(ctk.CTkFrame):
                     ),
                     Paragraph(
                         f"<b><font color='#1D4ED8'>Month Hours:</font></b> {safe_month_hours}<br/>"
-                        f"<b><font color='#1D4ED8'>Working Hours:</font></b> {self._fmt_hours(safe_actual_hours)}<br/>"
+                        f"<b><font color='#1D4ED8'>Working Hours:</font></b> {self._fmt_hours(actual_hours_with_ot)}<br/> "
                         f"<b><font color='#1D4ED8'>OT Hours:</font></b> {safe_ot_hours}",
                         meta_style
                     ),
@@ -1341,18 +1413,32 @@ class AdminAttendance(ctk.CTkFrame):
             elements.append(info_table)
             elements.append(Spacer(1, 10))
 
-            table_data = [["Date", "Check-In", "Check-Out", "OT Hours", "Remark"]]
+            table_data = [["Date", "Check-In", "Check-Out","Working Hours", "OT Hours", "Remark"]]
             for row in rows:
                 is_late = bool(row["is_late"])
+                # Step A: Find the entry's individual base actual hours with dashboard capping rules
+                try:
+                    daily_ot_val = float(row.get("ot_hours") or 0.0)
+                except (TypeError, ValueError):
+                    daily_ot_val = 0.0
+                daily_ot_accepted = daily_ot_val > 0
+                
+                daily_actual_hours = self._total_hours_between_checkin_checkout(row, daily_ot_accepted)
+                daily_ot_hours = self._ot_hours_from_row(row)
+                
+                # Step B: Turn floats into matching HH:MM UI text strings
+                daily_actual_str = self.decimal_to_hhmm(daily_actual_hours)
+                daily_ot_str = self.decimal_to_hhmm(daily_ot_hours)
                 table_data.append([
                     self._dash(row["attendance_date"]),
                     self._dash(row["check_in"]),
                     self._dash(row["check_out"]),
-                    self._fmt_hours(self._ot_hours_from_row(row)),
+                    daily_actual_str,
+                    daily_ot_str,
                     "LATE" if is_late else "ON TIME",
                 ])
 
-            table = Table(table_data, repeatRows=1, colWidths=[1.7 * inch, 1.45 * inch, 1.45 * inch, 1.0 * inch, 1.6 * inch])
+            table = Table(table_data, repeatRows=1, colWidths=[1.6 * inch, 1.2 * inch, 1.2 * inch,1.2 * inch, 1.0 * inch, 1.2 * inch])
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.darkblue),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -1379,7 +1465,7 @@ class AdminAttendance(ctk.CTkFrame):
         rows = context.get("rows", [])
 
         if not rows:
-            self._show_message("No records to export.", "warning")
+            self._show_message("No records to export.", "error")
             return
 
         employee_id = context.get("employee_id", "-")
@@ -1387,10 +1473,21 @@ class AdminAttendance(ctk.CTkFrame):
         month_label = context.get("month_label", "Month")
         team_label = context.get("team_name") or self._saved_filters.get("team", "All Teams")
 
-        ot_hours = sum(self._ot_hours_from_row(r) for r in rows)
+        
         working_days = sum(int(r.get("workdays", 0) or 0) for r in rows)
-        working_hours = sum(self._actual_hours_from_row(r) for r in rows)
-
+        # ====================================================================
+        # 🛠️ FIX: ALIGN EXCEL SUMMARY TOTAL HOURS LOGIC WITH DASHBOARD UI 🛠️
+        # ====================================================================
+        working_hours = 0.0
+        for r in rows:
+            try:
+                row_ot_val = float(r.get("ot_hours") or 0.0)
+            except (TypeError, ValueError):
+                row_ot_val = 0.0
+                
+            ot_accepted = row_ot_val > 0
+            working_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
+        ot_hours = sum(self._ot_hours_from_row(r) for r in rows)
         safe_name = self._safe_filename(full_name, fallback="Employee")
         safe_month = self._safe_filename(month_label, fallback="Month")
 
@@ -1435,7 +1532,7 @@ class AdminAttendance(ctk.CTkFrame):
             # =========================================================
             # TITLE
             # =========================================================
-            ws.merge_cells("A1:E1")
+            ws.merge_cells("A1:F1")
 
             title_cell = ws["A1"]
             title_cell.value = "Employee Attendance Report"
@@ -1451,7 +1548,7 @@ class AdminAttendance(ctk.CTkFrame):
                 bottom=Side(style="thin", color="000000")
             )
 
-            for row in ws["A1:E1"]:
+            for row in ws["A1:F1"]:
                 for cell in row:
                     cell.border = thin_border
 
@@ -1477,11 +1574,6 @@ class AdminAttendance(ctk.CTkFrame):
                 color="0F172A"
             )
 
-            info_fill = PatternFill(
-                start_color="000000",
-                end_color="000000",
-                fill_type="solid"
-            )
 
             info_cells = [
                 (f"A{info_row}", "Team"),
@@ -1496,7 +1588,6 @@ class AdminAttendance(ctk.CTkFrame):
                 cell = ws[cell_ref]
                 cell.value = value
                 cell.font = label_font
-                cell.fill = info_fill
                 cell.alignment = Alignment(
                     horizontal="center",
                     vertical="center"
@@ -1507,7 +1598,7 @@ class AdminAttendance(ctk.CTkFrame):
             ws[f"B{info_row+2}"] = full_name
 
             ws[f"E{info_row}"] = working_days
-            ws[f"E{info_row+1}"] = self._fmt_hours(working_hours)
+            ws[f"E{info_row+1}"] = self._fmt_hours(working_hours+ot_hours)
             ws[f"E{info_row+2}"] = self._fmt_hours(ot_hours)
 
             # ================= TABLE HEADER =================
@@ -1517,6 +1608,7 @@ class AdminAttendance(ctk.CTkFrame):
                 "Date",
                 "Check-In",
                 "Check-Out",
+                "Working Hours",
                 "OT Hours",
                 "Remark",
             ]
@@ -1536,8 +1628,8 @@ class AdminAttendance(ctk.CTkFrame):
                 )
 
                 cell.fill = PatternFill(
-                    start_color="0F172A",
-                    end_color="0F172A",
+                    start_color="D3D3D3",
+                    end_color="D3D3D3",
                     fill_type="solid"
                 )
 
@@ -1557,12 +1649,25 @@ class AdminAttendance(ctk.CTkFrame):
             for idx, row in enumerate(rows, start=data_start):
 
                 is_late = bool(row.get("is_late"))
-
+                # Step A: Find the entry's individual base actual hours with dashboard capping rules
+                try:
+                    daily_ot_val = float(row.get("ot_hours") or 0.0)
+                except (TypeError, ValueError):
+                    daily_ot_val = 0.0
+                daily_ot_accepted = daily_ot_val > 0
+                
+                daily_actual_hours = self._total_hours_between_checkin_checkout(row, daily_ot_accepted)
+                daily_ot_hours = self._ot_hours_from_row(row)
+                
+                # Step B: Turn floats into matching HH:MM UI text strings
+                daily_actual_str = self.decimal_to_hhmm(daily_actual_hours)
+                daily_ot_str = self.decimal_to_hhmm(daily_ot_hours)
                 values = [
                     self._dash(row.get("attendance_date")),
                     self._dash(row.get("check_in")),
                     self._dash(row.get("check_out")),
-                    self._fmt_hours(self._ot_hours_from_row(row)),
+                    daily_actual_str,
+                    daily_ot_str,
                     "LATE" if is_late else "ON TIME",
                 ]
 
@@ -1602,6 +1707,7 @@ class AdminAttendance(ctk.CTkFrame):
                 3: 18,
                 4: 15,
                 5: 18,
+                6: 15
             }
 
             for col_num, width in widths.items():
@@ -1796,18 +1902,27 @@ class AdminAttendance(ctk.CTkFrame):
 
                     return
             # ================= CREATE CARDS =================
+                
                 for row in self.current_rows:
+                    row_working_hours = 0.0
+                    row_ot_hours = 0.0
                     detail_rows = self._get_employee_attendance_rows(row["user_id"], "", from_date, to_date)
 
                     row_workdays_with_ot = sum(
                         int(r.get("workdays", 0) or 0)
                         for r in detail_rows
                     )
-                    row_working_hours = sum(
-                        self._actual_hours_from_row(r) for r in detail_rows
-                    )
-                    row_ot_hours = sum(self._ot_hours_from_row(r) for r in detail_rows)
+                    for r in detail_rows:
+                        try:
+                            db_ot_hours = float(r.get("ot_hours") or 0.0)
+                        except (TypeError, ValueError):
+                            db_ot_hours = 0.0
 
+                        ot_accepted = db_ot_hours > 0
+                        row_ot_hours += self._ot_hours_from_row(r)
+
+                        # Accumulate correctly capped working hours dynamically
+                        row_working_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
                     card = ctk.CTkFrame(
                         self.scroll,
                         fg_color=("#EEF2F7", "#1F2933"),
@@ -1851,7 +1966,7 @@ class AdminAttendance(ctk.CTkFrame):
 
     def export_pdf(self):
         if not self.current_rows:
-            self._show_message("No records to export.", "warning")
+            self._show_message("No records to export.", "error")
             return
 
         from_date = self.from_date_btn.get_date()
@@ -1969,17 +2084,37 @@ class AdminAttendance(ctk.CTkFrame):
             for row in self.current_rows:
                 detail_rows = self._get_employee_attendance_rows(row["user_id"], "", from_date, to_date)
                 row_workdays = sum(int(r.get("workdays", 0) or 0) for r in detail_rows)
-                row_working_hours = sum(self._actual_hours_from_row(r) for r in detail_rows)
-                row_ot_hours = sum(self._ot_hours_from_row(r) for r in detail_rows)
+                raw_ot_hours = sum(self._ot_hours_from_row(r) for r in detail_rows)
+                
+                # ====================================================================
+                # 🛠️ FIX: ALIGN TEAM SUMMARY COMPLIANCE & TOTAL HOURS ($Actual + OT$) 🛠️
+                # ====================================================================
+                raw_actual_hours = 0.0
+                for r in detail_rows:
+                    try:
+                        row_ot_val = float(r.get("ot_hours") or 0.0)
+                    except (TypeError, ValueError):
+                        row_ot_val = 0.0
+                        
+                    ot_accepted = row_ot_val > 0
+                    raw_actual_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
+                
+                # Combined formula definition matching dashboard requirement
+                combined_hours = raw_actual_hours + raw_ot_hours
+                
+                # Format exactly as strings (HH:MM) to look like your image data
+                row_working_hours_str = self.decimal_to_hhmm(combined_hours)
+                row_ot_hours_str = self.decimal_to_hhmm(raw_ot_hours)
+                
                 table_data.append([
                     self._dash(row["employee_id"]),
                     self._dash(row["full_name"]),
                     self._dash(row["team_name"]),
                     f"{row_workdays:g}",
-                    f"{row_working_hours:g}",
+                    row_working_hours_str,                 # 🗹 Displays clean HH:MM string
                     self._num_or_dash(row["leaveday"]),
                     self._dash(row["latecount"]),
-                    self._num_or_dash(row_ot_hours),
+                    row_ot_hours_str,                      # 🗹 Displays clean HH:MM string
                 ])
 
             table = Table(
@@ -2013,7 +2148,7 @@ class AdminAttendance(ctk.CTkFrame):
     
     def export_excel_file(self):
         if not self.current_rows:
-            self._show_message("No records to export.","warning")
+            self._show_message("No records to export.","error")
             return
 
         from_date = self.from_date_btn.get_date()
@@ -2127,8 +2262,8 @@ class AdminAttendance(ctk.CTkFrame):
                 )
 
                 cell.fill = PatternFill(
-                    start_color="0F172A",
-                    end_color="0F172A",
+                    start_color="D3D3D3",
+                    end_color="D3D3D3",
                     fill_type="solid"
                 )
 
@@ -2147,17 +2282,33 @@ class AdminAttendance(ctk.CTkFrame):
                 detail_rows = self._get_employee_attendance_rows(row["user_id"], "", from_date, to_date)
                 row_workdays = sum(int(r.get("workdays", 0) or 0) for r in detail_rows)
                 row_working_hours = sum(self._actual_hours_from_row(r) for r in detail_rows)
-                row_ot_hours = sum(self._ot_hours_from_row(r) for r in detail_rows)
+                raw_ot_hours = sum(self._ot_hours_from_row(r) for r in detail_rows)
+                raw_actual_hours = 0.0
+                for r in detail_rows:
+                    try:
+                        row_ot_val = float(r.get("ot_hours") or 0.0)
+                    except (TypeError, ValueError):
+                        row_ot_val = 0.0
+                        
+                    ot_accepted = row_ot_val > 0
+                    raw_actual_hours += self._total_hours_between_checkin_checkout(r, ot_accepted)
+                
+                # Combined total hours mapping formula requirement
+                combined_hours = raw_actual_hours + raw_ot_hours
+                
+                # Format to string (HH:MM) to exactly mirror dashboard data visuals
+                working_hours_str = self.decimal_to_hhmm(combined_hours)
+                ot_hours_str = self.decimal_to_hhmm(raw_ot_hours)
 
                 values = [
                     self._dash(row["employee_id"]),
                     self._dash(row["full_name"]),
                     self._dash(row["team_name"]),
                     f"{row_workdays:g}",
-                    self._dash(self._fmt_hours(row_working_hours)),
+                    working_hours_str,                     # 🗹 Clean formatted HH:MM string value
                     self._num_or_dash(row["leaveday"]),
                     self._dash(row["latecount"]),
-                    self._dash(self._fmt_hours(row_ot_hours)),
+                    ot_hours_str,                          # 🗹 Clean formatted HH:MM string value
                 ]
 
                 for col_num, value in enumerate(values, 1):

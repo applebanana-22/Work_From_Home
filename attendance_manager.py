@@ -8,21 +8,21 @@ class AttendanceManager:
         self.db = db
         self.user_id = user_id
         self.user_role = user_role.lower()
-        self.last_sync_date = datetime.date.today() # လက်ရှိရက်စွဲကို မှတ်ထားမည်
+        self.last_sync_date = datetime.date.today() # Sync date for midnight reset
         self.is_checked_in = False
         self.load_session()
 
     def check_midnight_reset(self):
-        """ရက်စွဲပြောင်းသွားခြင်း ရှိမရှိ စစ်ဆေးပြီး လိုအပ်ပါက status reset လုပ်သည်"""
+        """This method checks if the date has changed since the last sync. If it has, it resets the check-in status for the new day."""
         current_date = datetime.date.today()
         if current_date > self.last_sync_date:
             self.last_sync_date = current_date
-            self.is_checked_in = False # ရက်သစ်ကူးသဖြင့် status ကို reset ချသည်
+            self.is_checked_in = False # Reset check-in status for the new day
             return True
         return False
 
     def load_session(self):
-        """App ဖွင့်ချိန်တွင် ယနေ့အတွက် session ရှိမရှိ စစ်သည်"""
+        """On app start, check if the user has an active session for today. This ensures that if the app is closed and reopened, the check-in status is retained correctly."""
         today = datetime.date.today().strftime('%Y-%m-%d')
         try:
             query = """
@@ -37,9 +37,9 @@ class AttendanceManager:
             print(f"Session Sync Error: {e}")
 
     def handle_toggle(self, location, callback):
-        # 🔥 Action မလုပ်ခင် ရက်စွဲပြောင်းသွားသလား အမြဲစစ်မည်
+        # 🔥 Always check whether the date has changed before taking action.
         if self.check_midnight_reset():
-            callback(False) # UI ကို Check-in button ပြန်ပြောင်းခိုင်းမည်
+            callback(False) # Reset UI to reflect new day status
 
         if not self.is_checked_in:
             # Check if already completed for the CURRENT date

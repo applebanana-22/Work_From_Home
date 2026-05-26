@@ -707,7 +707,7 @@ class MemberReportFrame(ctk.CTkFrame):
             rows = self.db.cursor.fetchall()
 
             if not rows:
-                return self._show_message("No reports found.", "info")
+                return self._show_message("No reports found.", "error")
 
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".pdf",
@@ -996,7 +996,7 @@ class MemberReportFrame(ctk.CTkFrame):
 
             rows = self.db.cursor.fetchall()
             if not rows:
-                return self._show_message("No reports found.", "info")
+                return self._show_message("No reports found.", "error")
 
             try:
                 from openpyxl import Workbook

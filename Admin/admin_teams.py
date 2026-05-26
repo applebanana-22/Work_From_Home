@@ -348,98 +348,52 @@ class AdminTeams(ctk.CTkFrame):
     # =========================================================
 
     def save_team(self):
-
         team_name = self.team_name_entry.get().strip()
-
+        team_desc = self.team_desc_entry.get("1.0", "end").strip()
         pattern = r"^[A-Z](?=.*\d).{3,}$"
 
+        # 1. Reset all previous validation visuals first
+        self.team_name_entry.configure(border_color=("#D1D5DB", "#444"))
+        self.team_error_label.configure(text="")
+        self.team_desc_entry.configure(border_color=("#D1D5DB", "#444"))
+        self.desc_error_label.configure(text="")
+
+        # 2. Track if any validation fails
+        has_errors = False
+
+        # --- Team Name Validation ---
         if not team_name:
+            self.team_name_entry.configure(border_color="#EF4444")
+            self.team_error_label.configure(text="Team name is required.")
+            has_errors = True
+        elif not re.match(pattern, team_name):
+            self.team_name_entry.configure(border_color="#EF4444")
+            self.team_error_label.configure(text="Must start with Capital, 4+ chars, include number.")
+            has_errors = True
 
-            self.team_name_entry.configure(
-                border_color="#EF4444"
-            )
-
-            self.team_error_label.configure(
-                text="Team name is required."
-            )
-
-            return
-
-        else:
-
-            self.team_name_entry.configure(
-                border_color=("#D1D5DB", "#444")
-            )
-
-            self.team_error_label.configure(
-                text=""
-            )
-
-        if not re.match(pattern, team_name):
-
-            self.team_name_entry.configure(
-                border_color="#EF4444"
-            )
-
-            self.team_error_label.configure(
-                text="Must start with Capital, 4+ chars, include number."
-            )
-
-            return
-        team_desc = self.team_desc_entry.get(
-            "1.0",
-            "end"
-        ).strip()
-
-        
-
+        # --- Team Description Validation ---
         if not team_desc:
+            self.team_desc_entry.configure(border_color="#EF4444")
+            self.desc_error_label.configure(text="Description is required.")
+            has_errors = True
 
-            self.team_desc_entry.configure(
-                border_color="#EF4444"
-            )
-
-            self.desc_error_label.configure(
-                text="Description is required."
-            )
-
+        # 3. STOP execution here if any text input validations failed
+        if has_errors:
             return
-
-        else:
-
-            self.team_desc_entry.configure(
-                border_color=("#D1D5DB", "#444")
-            )
-
-            self.desc_error_label.configure(
-                text=""
-            )
 
         try:
-
-            # UPDATE TEAM
-
+            # --- Database Uniqueness Check ---
+            existing_teams = self.db.get_all_teams()
+            
+            # UPDATE TEAM UNIQUE CHECK
             if self.edit_mode:
-
-                existing_teams = self.db.get_all_teams()
-
                 for team in existing_teams:
-
                     if (
                         team['team_name'].lower() == team_name.lower()
                         and team['team_id'] != self.edit_team_id
                     ):
-
-                        self.team_name_entry.configure(
-                            border_color="#EF4444"
-                        )
-
-                        self.show_error_toast(
-                            "Team name already exists."
-                        )
-
-
-
+                        self.team_name_entry.configure(border_color="#EF4444")
+                        self.show_error_toast("Team name already exists.")
                         return
 
                 updated = self.db.update_team(
@@ -447,44 +401,24 @@ class AdminTeams(ctk.CTkFrame):
                     team_name,
                     team_desc
                 )
-
                 if updated:
                     self.show_success_toast(f"{team_name} updated successfully!")
 
-            # CREATE TEAM
-
+            # CREATE TEAM UNIQUE CHECK
             else:
-
-                existing_teams = self.db.get_all_teams()
-
                 for team in existing_teams:
-
                     if team['team_name'].lower() == team_name.lower():
-
-                        self.team_name_entry.configure(
-                            border_color="#EF4444"
-                        )
-
-                        self.show_error_toast(
-                            "Team name already exists."
-                        )
-
+                        self.team_name_entry.configure(border_color="#EF4444")
+                        self.show_error_toast("Team name already exists.")
                         return
 
-                if self.db.create_team(
-                    team_name,
-                    team_desc
-                ):
-
-                    self.show_success_toast(
-                        f"{team_name} created successfully!"
-                    )
+                if self.db.create_team(team_name, team_desc):
+                    self.show_success_toast(f"{team_name} created successfully!")
 
             self.reset_form()
             self.load_teams()
 
         except Exception as e:
-
             self.show_error_toast("Error", str(e))
 
     def _show_message(self, message, message_type="info", duration=3000):

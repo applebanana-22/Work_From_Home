@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: May 25, 2026 at 03:30 AM
+-- Generation Time: May 26, 2026 at 04:05 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -91,6 +91,17 @@ CREATE TABLE `announcement_replies` (
   `user_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `announcement_replies`
+--
+
+INSERT INTO `announcement_replies` (`id`, `announcement_id`, `message`, `created_by`, `created_at`, `user_id`) VALUES
+(12, 10, 'hh', 'Member 1', '2026-05-25 04:01:46', 12),
+(13, 10, 'kk', 'Member 1', '2026-05-25 04:02:08', 12),
+(14, 1, 'ff', 'Leader One', '2026-05-25 04:30:50', 4),
+(15, 1, 'gg', 'Leader One', '2026-05-25 04:31:13', 4),
+(16, 1, 'hh', 'Leader One', '2026-05-25 04:31:20', 4);
+
 -- --------------------------------------------------------
 
 --
@@ -107,6 +118,16 @@ CREATE TABLE `attendance` (
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `work_mode` varchar(20) DEFAULT 'Office'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `attendance`
+--
+
+INSERT INTO `attendance` (`id`, `user_id`, `attendance_date`, `check_in`, `check_out`, `location_type`, `created_at`, `work_mode`) VALUES
+(871, 12, '2026-05-24', '07:45:00', '16:30:00', 'Office', '2026-05-25 01:32:34', 'Office'),
+(872, 12, '2026-05-23', '07:45:00', '19:30:00', 'Office', '2026-05-25 01:33:30', 'Office'),
+(874, 12, '2026-05-25', '07:46:00', '20:30:00', 'Office', '2026-05-26 01:31:56', 'Office'),
+(875, 12, '2026-05-22', '07:45:00', NULL, 'Office', '2026-05-26 01:43:07', 'Office');
 
 -- --------------------------------------------------------
 
@@ -800,7 +821,12 @@ INSERT INTO `notifications` (`id`, `user_id`, `request_id`, `message`, `notif_ty
 (107, 4, 4, '📅 Member 1 requested 1.0 day leave.', 'System', 1, '2026-05-23 18:24:01'),
 (108, 5, 4, '📅 Member 1 requested 1.0 day leave.', 'System', 0, '2026-05-23 18:24:01'),
 (110, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-24 12:45:11'),
-(111, 12, NULL, 'Your overtime request for 2026-05-24 has been Accepted.', 'System', 1, '2026-05-24 12:45:36');
+(111, 12, NULL, 'Your overtime request for 2026-05-24 has been Accepted.', 'System', 1, '2026-05-24 12:45:36'),
+(442, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-25 02:06:02'),
+(443, 12, NULL, 'New Overtime Request for 2026-05-25.', 'System', 1, '2026-05-25 02:35:58'),
+(444, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-25 04:29:17'),
+(445, 12, NULL, 'Your overtime request for 2026-05-26 has been Accepted.', 'System', 1, '2026-05-25 04:29:59'),
+(446, 12, NULL, 'Your overtime request for 2026-05-25 has been Rejected. Reason: no nedd', 'System', 1, '2026-05-25 04:30:05');
 
 -- --------------------------------------------------------
 
@@ -820,6 +846,17 @@ CREATE TABLE `overtime_requests` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `rejected_reason` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `overtime_requests`
+--
+
+INSERT INTO `overtime_requests` (`id`, `member_id`, `created_by`, `project_id`, `ot_date`, `hours`, `reason`, `status`, `created_at`, `rejected_reason`) VALUES
+(87, 12, 12, 1, '2026-05-25', 2.00, 'dd', 'Rejected', '2026-05-25 02:06:02', 'no nedd'),
+(88, 12, 4, 2, '2026-05-25', 2.00, 'dd', 'Cancelled', '2026-05-25 02:35:58', NULL),
+(89, 12, 12, 5, '2026-05-26', 2.00, 'ddd', 'Accepted', '2026-05-25 04:29:17', NULL),
+(90, 12, 12, 1, '2026-05-25', 2.50, 'Urgent hotfix deployment for the frontend.', 'Accepted', '2026-05-26 01:32:39', NULL),
+(92, 12, 12, 1, '2026-05-22', 3.00, 'Urgent hotfix deployment for the frontend.', 'Accepted', '2026-05-26 01:44:29', NULL);
 
 -- --------------------------------------------------------
 
@@ -986,7 +1023,11 @@ CREATE TABLE `sec_notifications` (
 INSERT INTO `sec_notifications` (`id`, `user_id`, `request_id`, `message`, `notif_type`, `is_read`, `created_at`) VALUES
 (21, 5, NULL, '✅ Your Casual Leave request has been Approved by Team Leader.', 'System', 0, '2026-05-23 18:08:29'),
 (22, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-24 12:45:11'),
-(23, 12, NULL, 'Your overtime request for 2026-05-24 has been Accepted.', 'System', 1, '2026-05-24 12:45:36');
+(23, 12, NULL, 'Your overtime request for 2026-05-24 has been Accepted.', 'System', 1, '2026-05-24 12:45:36'),
+(24, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-25 02:06:02'),
+(25, 4, NULL, 'overtime request submitted by Member 1.', 'System', 1, '2026-05-25 04:29:17'),
+(26, 12, NULL, 'Your overtime request for 2026-05-26 has been Accepted.', 'System', 1, '2026-05-25 04:29:59'),
+(27, 12, NULL, 'Your overtime request for 2026-05-25 has been Rejected. Reason: no nedd', 'System', 1, '2026-05-25 04:30:05');
 
 -- --------------------------------------------------------
 
@@ -2074,7 +2115,8 @@ INSERT INTO `wfh_schedules` (`id`, `user_id`, `leader_id`, `schedule_date`, `sta
 (837, 48, 10, '2026-05-29', 'Office'),
 (838, 49, 10, '2026-05-29', 'Office'),
 (839, 50, 10, '2026-05-29', 'Office'),
-(840, 51, 10, '2026-05-29', 'WFH');
+(840, 51, 10, '2026-05-29', 'WFH'),
+(841, 5, 5, '2026-05-25', 'Office');
 
 --
 -- Indexes for dumped tables
@@ -2211,13 +2253,13 @@ ALTER TABLE `announcements`
 -- AUTO_INCREMENT for table `announcement_replies`
 --
 ALTER TABLE `announcement_replies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=871;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=876;
 
 --
 -- AUTO_INCREMENT for table `daily_reports`
@@ -2241,25 +2283,25 @@ ALTER TABLE `leave_requests`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=442;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=447;
 
 --
 -- AUTO_INCREMENT for table `overtime_requests`
 --
 ALTER TABLE `overtime_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=87;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
 
 --
 -- AUTO_INCREMENT for table `progress_history`
 --
 ALTER TABLE `progress_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=56;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
 
 --
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
 -- AUTO_INCREMENT for table `report_categories`
@@ -2271,13 +2313,13 @@ ALTER TABLE `report_categories`
 -- AUTO_INCREMENT for table `sec_notifications`
 --
 ALTER TABLE `sec_notifications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=101;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=103;
 
 --
 -- AUTO_INCREMENT for table `teams`
@@ -2295,7 +2337,7 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `wfh_schedules`
 --
 ALTER TABLE `wfh_schedules`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=841;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=842;
 
 --
 -- Constraints for dumped tables
