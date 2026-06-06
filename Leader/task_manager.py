@@ -150,8 +150,14 @@ class TaskManager(ctk.CTkFrame):
         self.header_f = ctk.CTkFrame(self, fg_color="transparent")
         self.header_f.pack(fill="x", padx=80, pady=15)
 
-        ctk.CTkButton(self.header_f, text="← Back", width=80, fg_color=("#DBDBDB", "#333333"),
-         text_color=("black", "white"), corner_radius=8,
+        ctk.CTkButton(self.header_f, 
+                text="← Back",
+                width=80,
+                height = 36,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8,
          command=self.back_callback).pack(side="left", padx=10)
 
         ctk.CTkLabel(self.header_f, text=f"Project: {project_name}", 

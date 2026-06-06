@@ -143,7 +143,7 @@ class LeaderDashboard(ctk.CTkFrame):
     def connect_tracking_server(self):
         try:
             if not self.sio.connected:
-                self.sio.connect('http://1192.168.100.109:5000', transports=['websocket']) 
+                self.sio.connect('http://192.168.100.109:5000', transports=['websocket']) 
             @self.sio.on("status_update")
             def on_update(data):
                 # When a status update is received, we need to ensure the UI is still valid before trying to update it.

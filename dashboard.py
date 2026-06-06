@@ -12,7 +12,7 @@ class Dashboard(ctk.CTk):
     def __init__(self, user_data):
         super().__init__()
         
-        ctk.set_appearance_mode("light") 
+        ctk.set_appearance_mode("Light") 
         ctk.set_default_color_theme("blue")
         self.title("GIC Myanmar Work From Home Tracker")
         
@@ -168,7 +168,7 @@ class Dashboard(ctk.CTk):
         self.update_segment_color(self.status_switch.get())
 
         # Theme Switch
-        self.theme_switch = ctk.CTkSwitch(bottom_frame, text="Dark/Light", font=("Arial", 12), command=self.change_appearance_mode)
+        self.theme_switch = ctk.CTkSwitch(bottom_frame, text="☾ / ☀︎", font=("Arial", 12), command=self.change_appearance_mode)
         self.theme_switch.select()
         self.theme_switch.pack(pady=5, padx=5, anchor="w")
 

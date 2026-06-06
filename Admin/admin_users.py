@@ -33,9 +33,15 @@ class UserRegisterFrame(ctk.CTkFrame):
         self.nav_bar.pack(fill="x", padx=20, pady=10)
         
         self.back_btn = ctk.CTkButton(
-            self.nav_bar, text="← Back", width=100,
-            fg_color="#4A4A4A", hover_color="#333333",
-            command=self.back_callback
+            self.nav_bar, 
+                text="← Back",
+                width=80,
+                height = 36,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8,
+                command=self.back_callback
         )
         self.back_btn.pack(side="left")
 
@@ -436,8 +442,14 @@ class UserUpdateFrame(ctk.CTkFrame):
         self.nav_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.nav_bar.pack(fill="x", padx=20, pady=10)
         
-        ctk.CTkButton(self.nav_bar, text="← Back", width=100,
-                      fg_color="#4A4A4A", command=self.back_callback).pack(side="left")
+        ctk.CTkButton(self.nav_bar, 
+                text="← Back",
+                width=80,
+                height = 36,
+                fg_color=("#DBDBDB", "#333333"),
+                text_color=("black", "white"),
+                hover_color=("#CFCFCF", "#444444"),
+                corner_radius=8, command=self.back_callback).pack(side="left")
 
         ctk.CTkLabel(self, text="Update User Account",
                      font=("Arial", 22, "bold")).pack(pady=15)
@@ -784,8 +796,8 @@ class AdminUsers(ctk.CTkFrame):
 
         ctk.CTkButton(filter_frame, text="🔍 Filter",fg_color="#2471A3", hover_color="#1A5276", width=60,height=36, command=self.filter_users).pack(side="left", padx=5)
         ctk.CTkButton(filter_frame, text="✖ Clear", fg_color="#566573", hover_color="#424949", width=60, height=36, command=self.reset_filters).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="📄PDF", fg_color="#AA4242", hover_color="#B62525", width=60, height=36, command=self.export_users).pack(side="left", padx=5)
-        ctk.CTkButton(filter_frame, text="📥Excel", fg_color="#16A085", hover_color="#107863", width=60, height=36, command=self.csvexport_user).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="📄 PDF", fg_color="#AA4242", hover_color="#B62525", width=60, height=36, command=self.export_users).pack(side="left", padx=5)
+        ctk.CTkButton(filter_frame, text="📥 Excel", fg_color="#16A085", hover_color="#107863", width=60, height=36, command=self.csvexport_user).pack(side="left", padx=5)
 
         
         ctk.CTkButton(
